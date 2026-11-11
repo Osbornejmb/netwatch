@@ -25,8 +25,8 @@ To open the development UI from another computer on the LAN, use the Windows hos
 
 ## Current capabilities
 - Dashboard is the default screen; use Edit topology for inventory changes.
-- Status counts and filters for up, down, stale, and not monitored.
-- Full-width topology map, directly colored devices/paths, search, and click-to-open device details from the map or inventory list.
+- A minimal landing screen with horizontal navigation and the topology filling the remaining window. Status counts, search, and filters are available in View options.
+- Full-width topology map, directly colored devices/paths, search, and click-to-open device details from the map or the separate Devices screen.
 - Separate sample preview with 14 example devices and a primary-router failure/restore control; sample checks are frozen and never saved into your network.
 - Actual inventory stays not monitored until the Windows backend is connected.
 

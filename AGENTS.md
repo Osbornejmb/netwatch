@@ -41,7 +41,7 @@ The latest explicit user decision defines scope. Code and passing checks establi
 
 ## UI and verification
 
-- The map is the main working area. Show failures/staleness on the devices and connection paths themselves. Open device details in a popup on selection; keep search, compact filters, and a keyboard-operable device list as supporting workflows.
+- The map fills the opening dashboard below a small horizontal top menu and title/status strip. No sidebar, summary-card row, or inventory table on the landing screen; use the Devices screen and optional View controls. Show failures/staleness on the devices and connection paths themselves. Open device details in a popup on selection; keep search, compact filters, and a keyboard-operable device list as supporting workflows.
 - Use text and icons alongside status colors. Keep readable labels, visible keyboard focus, named icon buttons, usable target sizes, responsive layouts, and reduced-motion support. Do not simulate live activity with decorative animation.
 - Every data-driven screen needs meaningful empty, disconnected, stale, and error states. Use loading feedback only when something actually loads.
 - Run `npm test` and `npm run build` for logic/UI changes. Use `npm ci` on a clean checkout or after lockfile changes. Add a small behavioral test for new nontrivial logic and failure paths; do not add tests that simply repeat implementation details.

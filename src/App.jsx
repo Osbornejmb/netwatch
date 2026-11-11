@@ -3,12 +3,7 @@ import {
   ReactFlow, Background, Controls, MiniMap, addEdge, useEdgesState,
   useNodesState, MarkerType, Panel,
 } from '@xyflow/react'
-import {
-  Activity, AlertTriangle, Bell, Cable, Check, ChevronDown, CircleHelp,
-  Cloud, Command, Cpu, Database, Download, GitBranch, Globe2, LayoutDashboard,
-  Plus, Radio, Router, Search, Settings, ShieldCheck, SlidersHorizontal,
-  Trash2, X, Network, Zap,
-} from 'lucide-react'
+import { Activity, Cable, Check, Command, Database, Download, GitBranch, Plus, Radio, Router, Search, Trash2, X, Network, Zap } from 'lucide-react'
 import RouterNode from './nodes/RouterNode'
 import SwitchNode from './nodes/SwitchNode'
 import Dashboard from './Dashboard'
@@ -154,34 +149,19 @@ export default function App() {
   }
 
   return (
-    <div className={`app-shell${view === 'dashboard' ? ' dashboard-shell' : ''}`}>
-      <aside className="sidebar">
-        <div className="brand"><div className="brand-mark"><Activity size={21}/></div><div><strong>NETWATCH</strong><span>NETWORK OPERATIONS</span></div></div>
-        <div className="workspace"><div className="workspace-icon">NW</div><div><strong>Local workspace</strong><span>Windows host</span></div><ChevronDown size={15}/></div>
-        <div className="nav-label">WORKSPACE</div>
-        <nav>
-          <a className={view === 'dashboard' ? 'nav-item active' : 'nav-item'} href="#dashboard" aria-label="Network dashboard" aria-current={view === 'dashboard' ? 'page' : undefined} onClick={() => setView('dashboard')}><LayoutDashboard size={17}/> Dashboard</a>
-          <a className={view === 'editor' ? 'nav-item active' : 'nav-item'} href="#topology" aria-label="Topology builder" aria-current={view === 'editor' ? 'page' : undefined} onClick={() => setView('editor')}><GitBranch size={17}/> Topology builder</a>
-          <a className="nav-item" href="#inventory" aria-label="Device inventory" onClick={() => setView('dashboard')}><Cpu size={17}/> Devices <span className="nav-count">{nodes.length}</span></a>
-          <a className="nav-item disabled" title="Planned for Phase 2"><Activity size={17}/> Monitoring <span className="soon">PHASE 2</span></a>
-          <a className="nav-item disabled" title="Planned for Phase 3"><Bell size={17}/> Alerts <span className="soon">SOON</span></a>
-        </nav>
-        <div className="nav-label tools-label">CONFIGURATION</div>
-        <nav>
-          <a className="nav-item disabled" title="Planned for a later phase"><SlidersHorizontal size={17}/> Discovery settings</a>
-          <a className="nav-item disabled" title="Planned for a later phase"><Settings size={17}/> System settings</a>
-        </nav>
-        <div className="sidebar-bottom"><div className="secure-icon"><ShieldCheck size={17}/></div><div><strong>Local-first storage</strong><span>Topology saved in this browser</span></div></div>
-      </aside>
-
+    <div className={`app-shell simple-shell${view !== 'editor' ? ' dashboard-shell' : ''}`}>
       <main className="main-area">
         <header className="topbar">
-          <div className="breadcrumbs"><span>Workspace</span><b>/</b><strong>{view === 'dashboard' ? 'Network dashboard' : 'Topology builder'}</strong></div>
-          <div className="top-actions"><div className="host-status"><span className="pulse-dot"/> {view === 'dashboard' ? 'MONITORING OFFLINE' : 'HOST UI READY'}</div><button className="icon-button" aria-label="Topology help" onClick={() => window.alert('Add devices, drag them to arrange the map, and connect their handles. Select a device to inspect it. Export JSON for a backup; import JSON to restore a map. Monitoring is not active yet.')}><CircleHelp size={18}/></button><div className="avatar">AD</div></div>
+          <a className="top-brand" href="#dashboard" onClick={() => setView('dashboard')}><Activity size={19} aria-hidden="true"/> NETWATCH</a>
+          <nav className="top-menu" aria-label="Main navigation">
+            <a href="#dashboard" aria-label="Network dashboard" aria-current={view === 'dashboard' ? 'page' : undefined} onClick={() => setView('dashboard')}>Dashboard</a>
+            <a href="#topology" aria-label="Topology builder" aria-current={view === 'editor' ? 'page' : undefined} onClick={() => setView('editor')}>Topology editor</a>
+            <a href="#inventory" aria-label="Device inventory" aria-current={view === 'inventory' ? 'page' : undefined} onClick={() => setView('inventory')}>Devices</a>
+          </nav>
         </header>
 
         {storageError && <p className="notice storage-warning" role="alert">{storageError} Open the topology editor to save or export a backup.</p>}
-        {view === 'dashboard' ? <Dashboard nodes={nodes} edges={edges} onEdit={() => setView('editor')}/> : <section className="page-content" id="topology">
+        {view !== 'editor' ? <Dashboard nodes={nodes} edges={edges} showInventory={view === 'inventory'} onEdit={() => setView('editor')}/> : <section className="page-content" id="topology">
           <input ref={importInput} type="file" accept=".json,application/json" hidden onChange={importTopology} />
           <div className="page-heading">
             <div><div className="eyebrow">NETWORK MANAGEMENT / PHASE 01</div><h1>Topology builder</h1><p>Map your infrastructure first. Monitoring will be connected in the next phase.</p></div>

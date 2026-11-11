@@ -2,7 +2,7 @@
 
 ## Implemented foundation
 
-React + Vite opens the network health dashboard by default. `src/Dashboard.jsx` renders a dominant read-only React Flow map, compact status counts/filters, click-to-open device detail dialogs, and a supporting device table. The existing topology canvas remains available through Edit topology. Router and switch components share the topology data contract. `src/topology.js` validates imported and saved maps and strips untrusted rendering properties. The browser stores a versioned topology; export/import is the portability boundary. Existing v1 exports remain readable.
+React + Vite opens the network health dashboard by default. `src/Dashboard.jsx` renders a viewport-filling read-only React Flow map with title/status, optional View controls, and click-to-open detail dialogs. App.jsx provides horizontal Dashboard/Topology editor/Devices navigation; the supporting device table is shown only for the Devices view. The existing topology canvas remains available through Edit topology. Router and switch components share the topology data contract. `src/topology.js` validates imported and saved maps and strips untrusted rendering properties. The browser stores a versioned topology; export/import is the portability boundary. Existing v1 exports remain readable.
 
 The system has no active probes, backend, authentication, or live status. Example addresses are inventory placeholders. Management address text is descriptive in this phase; backend address validation is mandatory before any probes exist.
 
