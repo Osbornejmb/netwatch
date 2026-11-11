@@ -1,0 +1,133 @@
+{
+  "repository": {
+    "name": "netwatch",
+    "visibility": "private",
+    "description": "Local-first network topology and phased Windows network monitoring"
+  },
+  "milestones": [
+    {
+      "title": "M1 — Reliable topology foundation",
+      "description": "Editable, recoverable local topology with repeatable checks."
+    },
+    {
+      "title": "M2 — Windows monitoring backend",
+      "description": "Persist inventory and run controlled ICMP checks on the Windows host."
+    },
+    {
+      "title": "M3 — Network intelligence",
+      "description": "Add controlled SNMP/LLDP and redundancy information."
+    },
+    {
+      "title": "M4 — Secure remote operations",
+      "description": "Gate remote access behind identity, transport security, and operational checks."
+    }
+  ],
+  "issues": [
+    {
+      "key": "1.1",
+      "title": "Verify the starter foundation",
+      "milestone": "M1 — Reliable topology foundation",
+      "dependsOn": [],
+      "body": "## Outcome\nEditable, recoverable local topology with repeatable checks.\n\n## Steps and acceptance criteria\n- [ ] Run npm ci, npm test, and npm run build on a clean Node 22 checkout.\n- [ ] Exercise add, drag, connect, keyboard delete, search, export, and import.\n- [ ] Verify corrupt storage pauses autosave and failed writes offer an export backup.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+    },
+    {
+      "key": "1.2",
+      "title": "Finish device editing and accessible workflows",
+      "milestone": "M1 — Reliable topology foundation",
+      "dependsOn": [
+        "1.1"
+      ],
+      "body": "## Outcome\nEditable, recoverable local topology with repeatable checks.\n\n## Steps and acceptance criteria\n- [ ] Edit device names, management addresses, and descriptions in the inspector.\n- [ ] Validate IPv4/IPv6 addresses; reject duplicate management addresses with field errors.\n- [ ] Keep dialog focus inside, return focus on close, and provide keyboard alternatives to dragging.\n- [ ] Add browser checks for edit, delete, import cancellation, and narrow-screen use.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+    },
+    {
+      "key": "1.3",
+      "title": "Complete inventory navigation and recovery UX",
+      "milestone": "M1 — Reliable topology foundation",
+      "dependsOn": [
+        "1.2"
+      ],
+      "body": "## Outcome\nEditable, recoverable local topology with repeatable checks.\n\n## Steps and acceptance criteria\n- [ ] Make Overview, Topology, and Devices navigation reach working sections.\n- [ ] Provide a device list and clear empty/search states.\n- [ ] Offer explicit recovery/download of unreadable saved data before reset.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+    },
+    {
+      "key": "2.1",
+      "title": "Add a local API and SQLite inventory",
+      "milestone": "M2 — Windows monitoring backend",
+      "dependsOn": [
+        "1.3"
+      ],
+      "body": "## Outcome\nPersist inventory and run controlled ICMP checks on the Windows host.\n\n## Steps and acceptance criteria\n- [ ] Create a Node API bound to loopback by default with a health endpoint.\n- [ ] Implement versioned SQLite migrations and topology CRUD with validation.\n- [ ] Keep browser export/import compatibility and provide backup/restore instructions.\n- [ ] Return useful errors and test invalid input, transactions, and persistence after restart.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+    },
+    {
+      "key": "2.2",
+      "title": "Implement bounded Windows ICMP monitoring",
+      "milestone": "M2 — Windows monitoring backend",
+      "dependsOn": [
+        "2.1"
+      ],
+      "body": "## Outcome\nPersist inventory and run controlled ICMP checks on the Windows host.\n\n## Steps and acceptance criteria\n- [ ] Probe only explicitly configured and authorized device addresses.\n- [ ] Pass addresses as process arguments without a shell; validate addresses at the API boundary.\n- [ ] Limit concurrency, timeout, retry count, and polling frequency; cancel work on shutdown.\n- [ ] Store timestamp, latency, and up/down/unknown states; test timeout and recovery with fake probes.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+    },
+    {
+      "key": "2.3",
+      "title": "Connect live status and history to the UI",
+      "milestone": "M2 — Windows monitoring backend",
+      "dependsOn": [
+        "2.2"
+      ],
+      "body": "## Outcome\nPersist inventory and run controlled ICMP checks on the Windows host.\n\n## Steps and acceptance criteria\n- [ ] Display last check time and clearly distinguish unknown, stale, up, and down.\n- [ ] Recover cleanly from API loss without marking every device down.\n- [ ] Show recent device history and test offline/reconnect behavior.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+    },
+    {
+      "key": "3.1",
+      "title": "Add SNMPv3 interface collection",
+      "milestone": "M3 — Network intelligence",
+      "dependsOn": [
+        "2.3"
+      ],
+      "body": "## Outcome\nAdd controlled SNMP/LLDP and redundancy information.\n\n## Steps and acceptance criteria\n- [ ] Keep credentials in the Windows credential store or encrypted host storage, never browser JSON.\n- [ ] Prefer SNMPv3; make legacy access explicit and documented.\n- [ ] Collect interface state and counters with bounded requests and vendor fixtures.\n- [ ] Redact credentials from logs, errors, exports, and API responses.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+    },
+    {
+      "key": "3.2",
+      "title": "Review LLDP neighbors before topology changes",
+      "milestone": "M3 — Network intelligence",
+      "dependsOn": [
+        "3.1"
+      ],
+      "body": "## Outcome\nAdd controlled SNMP/LLDP and redundancy information.\n\n## Steps and acceptance criteria\n- [ ] Collect LLDP only from configured devices.\n- [ ] Present discovered neighbors and proposed links for user approval.\n- [ ] Avoid duplicates and preserve manual topology edits; test partial and stale discovery.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+    },
+    {
+      "key": "3.3",
+      "title": "Model uplinks and router redundancy",
+      "milestone": "M3 — Network intelligence",
+      "dependsOn": [
+        "3.2"
+      ],
+      "body": "## Outcome\nAdd controlled SNMP/LLDP and redundancy information.\n\n## Steps and acceptance criteria\n- [ ] Allow explicit port/uplink labels and redundancy group membership.\n- [ ] Distinguish device, interface, and group health.\n- [ ] Verify partial failure and recovery against documented fixtures.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+    },
+    {
+      "key": "4.1",
+      "title": "Add authentication, roles, and audit records",
+      "milestone": "M4 — Secure remote operations",
+      "dependsOn": [
+        "3.3"
+      ],
+      "body": "## Outcome\nGate remote access behind identity, transport security, and operational checks.\n\n## Steps and acceptance criteria\n- [ ] Require authentication before any non-loopback access.\n- [ ] Enforce viewer/operator/admin permissions on every backend action.\n- [ ] Protect sessions, throttle login attempts, and record changes without credentials.\n- [ ] Test unauthenticated access, cross-role denial, session expiry, and request forgery.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+    },
+    {
+      "key": "4.2",
+      "title": "Implement alerts with deduplication",
+      "milestone": "M4 — Secure remote operations",
+      "dependsOn": [
+        "4.1"
+      ],
+      "body": "## Outcome\nGate remote access behind identity, transport security, and operational checks.\n\n## Steps and acceptance criteria\n- [ ] Configure approved notification destinations with test delivery.\n- [ ] Debounce flapping, deduplicate incidents, and send recovery messages.\n- [ ] Keep delivery retries bounded and test outages without sending real notifications.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+    },
+    {
+      "key": "4.3",
+      "title": "Package and verify the Windows deployment",
+      "milestone": "M4 — Secure remote operations",
+      "dependsOn": [
+        "4.2"
+      ],
+      "body": "## Outcome\nGate remote access behind identity, transport security, and operational checks.\n\n## Steps and acceptance criteria\n- [ ] Provide Windows service installation, restart, update, and uninstall instructions.\n- [ ] Document HTTPS reverse proxy or VPN access and least-privilege firewall rules.\n- [ ] Test backup restoration and reboot recovery on a Windows host.\n- [ ] Complete security review before any remote exposure.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+name: Publish project plan
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [docs/github-plan.json, .github/workflows/project-plan.yml]
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: project-plan
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            const assert = require('node:assert/strict');
+            const plan = JSON.parse(fs.readFileSync('docs/github-plan.json', 'utf8'));
+            assert.equal(plan.milestones.length, 4);
+            assert.equal(plan.issues.length, 12);
+            const titles = new Set(plan.milestones.map(item => item.title));
+            const keys = new Set();
+            for (const issue of plan.issues) {
+              assert(!keys.has(issue.key), 'Duplicate issue key');
+              assert(titles.has(issue.milestone), 'Unknown milestone');
+              assert(issue.dependsOn.every(key => keys.has(key)), 'Dependencies must precede each issue');
+              keys.add(issue.key);
+            }
+            const repo = context.repo;
+            const milestones = await github.paginate(github.rest.issues.listMilestones, { ...repo, state: 'all', per_page: 100 });
+            for (const item of plan.milestones) {
+              if (!milestones.some(existing => existing.title === item.title)) {
+                milestones.push((await github.rest.issues.createMilestone({ ...repo, title: item.title, description: item.description })).data);
+              }
+            }
+            const issues = await github.paginate(github.rest.issues.listForRepo, { ...repo, state: 'all', per_page: 100 });
+            const resolved = new Map();
+            for (const item of plan.issues) {
+              const title = `[${item.key}] ${item.title}`;
+              const milestone = milestones.find(existing => existing.title === item.milestone).number;
+              const dependencies = item.dependsOn.map(key => `#${resolved.get(key).number}`).join(', ') || 'None';
+              const body = `${item.body}\n\n## Dependencies\n${dependencies}\n\n<!-- netwatch-plan:${item.key} -->`;
+              let issue = issues.find(existing => !existing.pull_request && existing.title === title);
+              if (!issue) {
+                issue = (await github.rest.issues.create({ ...repo, title, body, milestone })).data;
+              } else if (issue.milestone?.number !== milestone) {
+                issue = (await github.rest.issues.update({ ...repo, issue_number: issue.number, milestone })).data;
+              }
+              resolved.set(item.key, issue);
+              core.info(`${title}: ${issue.html_url}`);
+            }
+            await core.summary.addHeading('NetWatch plan published').addRaw(`${milestones.length} milestones; ${resolved.size} planned issues. Existing issue bodies and states were preserved.`).write();
