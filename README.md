@@ -1,6 +1,6 @@
 # NetWatch — Network health dashboard
 
-A local-first network operations dashboard with a supporting topology editor. The dashboard shows inventory, health filters, a read-only map, attention panel, and device inspection. A labelled sample preview illustrates up/down states. It does **not** ping devices, monitor BGP, or perform SNMP discovery yet.
+A local-first network operations dashboard with a supporting topology editor. The dashboard shows inventory, health filters, a read-only map, endpoint-colored connection paths, and click-to-open device details. A labelled sample preview illustrates up/down states. It does **not** ping devices, monitor BGP, or perform SNMP discovery yet.
 
 ## Requirements
 - Windows 10/11
@@ -26,8 +26,8 @@ To open the development UI from another computer on the LAN, use the Windows hos
 ## Current capabilities
 - Dashboard is the default screen; use Edit topology for inventory changes.
 - Status counts and filters for up, down, stale, and not monitored.
-- Read-only topology map, attention panel, search, and keyboard-operable inventory inspection.
-- Separate sample preview with 14 example devices; sample checks are frozen and never saved into your network.
+- Full-width topology map, directly colored devices/paths, search, and click-to-open device details from the map or inventory list.
+- Separate sample preview with 14 example devices and a primary-router failure/restore control; sample checks are frozen and never saved into your network.
 - Actual inventory stays not monitored until the Windows backend is connected.
 
 ## Topology editor

@@ -1,10 +1,30 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { deviceHealth, summarizeHealth, createSampleNetwork } from '../src/health.js'
+import { deviceHealth, summarizeHealth, createSampleNetwork, connectionHealth } from '../src/health.js'
 import { validateTopology } from '../src/topology.js'
 
 const now = Date.parse('2026-11-12T00:00:00Z')
 const check = (age, status = 'up') => ({ status, checkedAt: new Date(now - age).toISOString() })
+
+test('a failed router colors only its paths; a responding redundant switch stays up', () => {
+  const checks = { a: check(0, 'down'), b: check(0), sw: check(0) }
+  const status = id => deviceHealth(checks[id], now)
+  assert.equal(connectionHealth(status('a'), status('sw')), 'down')
+  assert.equal(connectionHealth(status('b'), status('sw')), 'up')
+  assert.equal(status('sw'), 'up')
+  checks.b = check(0, 'down')
+  assert.equal(connectionHealth(status('b'), status('sw')), 'down')
+  assert.equal(status('sw'), 'up')
+  checks.a = check(0)
+  assert.equal(connectionHealth(status('a'), status('sw')), 'up')
+})
+
+test('connection tint is conservative for unknown and stale endpoints, independent of orientation', () => {
+  for (const [a, b, expected] of [['up', 'up', 'up'], ['up', 'unknown', 'unknown'], ['up', 'stale', 'stale'], ['stale', 'unknown', 'unknown'], ['down', 'unknown', 'down'], ['down', 'stale', 'down'], ['up', undefined, 'unknown']]) {
+    assert.equal(connectionHealth(a, b), expected)
+    assert.equal(connectionHealth(b, a), expected)
+  }
+})
 
 test('missing, invalid, and future checks never imply a healthy or failed device', () => {
   for (const value of [undefined, {}, { status: 'up' }, { ...check(0), checkedAt: 'invalid' }, check(-1), check(0, 'unsupported')]) {

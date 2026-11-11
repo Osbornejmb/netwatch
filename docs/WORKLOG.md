@@ -1,5 +1,16 @@
 # Working checkpoint
 
+## Current work: topology-first status and popup details (#18)
+
+- Branch feat/topology-status-paths makes the map full-width and summary counts compact; the permanent attention/detail sidebar is removed.
+- Devices are directly tinted green/red/amber/gray. Connection lines summarize endpoint reachability: any down endpoint gives a red dashed path; both up gives green; stale/unknown remain conservative. Device state is never propagated from a failed neighbor.
+- Sample preview starts with the primary router down and supports explicit restore/fail. The other router and responding switches stay green. Colored lines do not establish physical interface state or traffic failover.
+- Device clicks and inventory Inspect open a native modal dialog with status, address, last check, and connected peers/path summaries. Close button, Escape, and backdrop dismiss it; trigger focus is restored.
+- Ten Node tests passed, including redundancy, both-router failure without overriding switch observations, recovery, and orientation-independent stale/unknown path rules. Production build passed.
+- Browser verified red primary-router paths/green alternate paths, restoration (four red paths to one; nine green paths to twelve), switch remaining up, popup data, Escape, close button, backdrop, keyboard Inspect/focus restoration, and return to the unchanged five-device inventory.
+- Desktop and narrow popup/layout inspected. Screenshots: docs/screenshots/topology-paths.jpg, device-popup.jpg, popup-mobile.jpg.
+- Pending: publish PR and verify its GitHub checks. Live monitoring, actual interface/failover proof, full screen-reader verification, and larger-map performance remain future checks.
+
 ## Product decisions
 
 - Network health is the default screen; topology editing supports it.

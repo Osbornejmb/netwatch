@@ -32,7 +32,7 @@ The latest explicit user decision defines scope. Code and passing checks establi
 - Preserve topology IDs, import compatibility, and user data. Validate untrusted input at file, storage, API, and device-response boundaries. Changes to persisted shapes need a migration or explicit version rejection and recovery guidance.
 - Keep inventory separate from observations. Imported topology cannot assert live health. Browser storage must never contain device secrets.
 - Never infer that a device is up because the dashboard is connected, or down because the monitoring service is disconnected. Missing/invalid checks mean unknown; old checks mean stale. Show last check time and the monitoring connection state.
-- Up/down reports describe reachability, not a verified root cause. A line on the topology is a configured link until interface data actually verifies it. Do not claim BGP session health from an ICMP response.
+- Up/down reports describe reachability, not a verified root cause. Line colors may summarize endpoint reachability (red for a down endpoint, green only when both endpoints are up), but they are not verified interface state. Device health is independent: a failed router does not turn a responding redundant switch down. Do not claim BGP session health from an ICMP response.
 - Sample mode must be visibly labelled, separate from the saved inventory, and never persisted as real monitoring results. Tests may use fixtures; production status must come from the host monitoring service.
 - All probes are host-side, authorized-inventory-only, rate/concurrency/time bounded, and shell-free. Never scan a network or change device configuration merely to test UI.
 - Keep credentials out of repository history, logs, exports, screenshots, and client responses. Loopback is the default. Remote access requires the planned authentication, authorization, and transport protections.
@@ -41,7 +41,7 @@ The latest explicit user decision defines scope. Code and passing checks establi
 
 ## UI and verification
 
-- The map is the main working area. Put failures and stale monitoring within easy reach; use search, status filters, and a keyboard-operable device list rather than a tangled graph alone.
+- The map is the main working area. Show failures/staleness on the devices and connection paths themselves. Open device details in a popup on selection; keep search, compact filters, and a keyboard-operable device list as supporting workflows.
 - Use text and icons alongside status colors. Keep readable labels, visible keyboard focus, named icon buttons, usable target sizes, responsive layouts, and reduced-motion support. Do not simulate live activity with decorative animation.
 - Every data-driven screen needs meaningful empty, disconnected, stale, and error states. Use loading feedback only when something actually loads.
 - Run `npm test` and `npm run build` for logic/UI changes. Use `npm ci` on a clean checkout or after lockfile changes. Add a small behavioral test for new nontrivial logic and failure paths; do not add tests that simply repeat implementation details.
