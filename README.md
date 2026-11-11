@@ -85,7 +85,7 @@ npm run preview
 
 Read [AI contribution rules](AGENTS.md), the [product brief](docs/PROJECT.md), [design direction](docs/DESIGN.md), and [working checkpoint](docs/WORKLOG.md).
 
-See [architecture](docs/ARCHITECTURE.md), [implementation roadmap](docs/ROADMAP.md), and [contributing](CONTRIBUTING.md). The machine-readable [GitHub plan](docs/github-plan.json) defines four milestones and twelve ordered issues. The Publish project plan workflow creates them on GitHub when the plan is pushed to main; check its Actions run for publication status.
+See [architecture](docs/ARCHITECTURE.md), [implementation roadmap](docs/ROADMAP.md), and [contributing](CONTRIBUTING.md). The machine-readable [GitHub plan](docs/github-plan.json) defines four milestones and fifteen implementation issues, with a recommended solo order and an explicit Windows MVP release gate. The Publish project plan workflow creates them on GitHub when the plan is pushed to main; check its Actions run for publication status.
 
 Still pending: editable device details, full dialog focus handling, and browser interaction tests. Monitoring and remote access are planned, not implemented.
 

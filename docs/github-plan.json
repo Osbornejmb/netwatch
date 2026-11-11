@@ -2,132 +2,185 @@
   "repository": {
     "name": "netwatch",
     "visibility": "private",
-    "description": "Local-first network topology and phased Windows network monitoring"
+    "description": "Dashboard-first local network monitoring on Windows"
   },
   "milestones": [
     {
       "title": "M1 — Reliable topology foundation",
-      "description": "Editable, recoverable local topology with repeatable checks."
+      "description": "Dashboard-first navigation, valid/editable inventory, recoverable saved maps, and representative map/browser evidence. A sample preview is not proof of live monitoring.",
+      "exitCriteria": "Dashboard-first navigation, valid/editable inventory, recoverable saved maps, and representative map/browser evidence. A sample preview is not proof of live monitoring."
     },
     {
       "title": "M2 — Windows monitoring backend",
-      "description": "Persist inventory and run controlled ICMP checks on the Windows host."
+      "description": "A Windows-hosted local monitoring MVP: real reachable → down → recovered observations, truthful stale/disconnected behavior, persistent inventory/history, local incident lifecycle, backup/restore, and recorded end-to-end evidence.",
+      "exitCriteria": "A Windows-hosted local monitoring MVP: real reachable → down → recovered observations, truthful stale/disconnected behavior, persistent inventory/history, local incident lifecycle, backup/restore, and recorded end-to-end evidence."
     },
     {
       "title": "M3 — Network intelligence",
-      "description": "Add controlled SNMP/LLDP and redundancy information."
+      "description": "Optional read-only SNMP/LLDP and configured redundancy enrich the proven dashboard with verified interface/neighborhood evidence without overwriting manual topology.",
+      "exitCriteria": "Optional read-only SNMP/LLDP and configured redundancy enrich the proven dashboard with verified interface/neighborhood evidence without overwriting manual topology."
     },
     {
       "title": "M4 — Secure remote operations",
-      "description": "Gate remote access behind identity, transport security, and operational checks."
+      "description": "Recoverable Windows service deployment with tested authentication/authorization and an explicitly enabled, protected remote path. Optional SNMP/LLDP is not required for secure access.",
+      "exitCriteria": "Recoverable Windows service deployment with tested authentication/authorization and an explicitly enabled, protected remote path. Optional SNMP/LLDP is not required for secure access."
     }
   ],
   "issues": [
     {
-      "key": "1.1",
-      "title": "Verify the starter foundation",
+      "key": "dashboard-ui",
+      "issueNumber": 13,
+      "title": "[1.0] Make the network health dashboard the primary screen",
       "milestone": "M1 — Reliable topology foundation",
       "dependsOn": [],
-      "body": "## Outcome\nEditable, recoverable local topology with repeatable checks.\n\n## Steps and acceptance criteria\n- [ ] Run npm ci, npm test, and npm run build on a clean Node 22 checkout.\n- [ ] Exercise add, drag, connect, keyboard delete, search, export, and import.\n- [ ] Verify corrupt storage pauses autosave and failed writes offer an export backup.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+      "body": "## Outcome\nEstablish the dashboard-first UI foundation. Implementation is in PR #14 with passing tests/build and browser evidence; this issue stays open until that PR is merged. Larger-map checks belong to #15; real observations belong to #4–#6.\n\n## Steps and acceptance criteria\n- [ ] Open the dashboard by default; keep the existing editor accessible without changing topology IDs or v1 save/import compatibility.\n- [ ] Show full-inventory counts for up, down, stale, and not monitored, plus status filters, name/IP search, and a keyboard-operable inventory list.\n- [ ] Use a readable primary map, a separate down/stale attention panel, and selected-device details with status, last check, and response time where available.\n- [ ] Label sample mode visibly and keep it separate from saved inventory. Actual configured devices stay not monitored until host observations exist.\n- [ ] Test missing, invalid, future, and overdue observations. Configured links must not imply measured interface health or BGP session health.\n- [ ] Apply UI/UX Pro Max guidance and maintain the solo AI instructions adapted from L.A.R.A.; one owner, short branches, no staging or team ownership gates.\n- [ ] Verify desktop/narrow layouts, all status filters, search empty/reset, keyboard inspection, sample isolation, and editor switching; record tests/build/CI and screenshots.\n\n## Definition of done\nImplement only this outcome, update affected documentation and data definitions, run relevant tests/build, and attach evidence. Keep the issue open until the implementation is merged and every required criterion has evidence; name anything unverified."
+    },
+    {
+      "key": "1.1",
+      "issueNumber": 1,
+      "title": "[1.1] Verify dashboard and topology foundation from a clean checkout",
+      "milestone": "M1 — Reliable topology foundation",
+      "dependsOn": [
+        "dashboard-ui"
+      ],
+      "body": "## Outcome\nProve the combined dashboard/editor foundation and existing data-safety behavior. This is a verification step, not a second dashboard implementation.\n\n## Steps and acceptance criteria\n- [ ] From a clean Node 22 checkout, run npm ci, npm test, and npm run build; record versions and results rather than assuming a working developer machine is sufficient.\n- [ ] Verify the dashboard is the default, actual inventory is unmonitored, sample data is labelled and isolated, and navigation reaches the editor and device list.\n- [ ] Exercise add, drag, connect, selection, keyboard delete with linked-edge cleanup, search, export, and valid import in the existing editor.\n- [ ] Verify invalid/malformed/future-version imports are rejected without replacing the current map, and cancelling import replacement preserves it.\n- [ ] Verify corrupt saved data pauses autosave, denied/quota-limited writes preserve the in-memory map, and warnings are visible from the dashboard and editor.\n- [ ] Record current gaps as unfinished criteria in #2/#3/#15; do not close this issue solely because CI is green.\n\n## Definition of done\nImplement only this outcome, update affected documentation and data definitions, run relevant tests/build, and attach evidence. Keep the issue open until the implementation is merged and every required criterion has evidence; name anything unverified."
     },
     {
       "key": "1.2",
-      "title": "Finish device editing and accessible workflows",
+      "issueNumber": 2,
+      "title": "[1.2] Finish device editing and accessible inventory workflows",
       "milestone": "M1 — Reliable topology foundation",
       "dependsOn": [
         "1.1"
       ],
-      "body": "## Outcome\nEditable, recoverable local topology with repeatable checks.\n\n## Steps and acceptance criteria\n- [ ] Edit device names, management addresses, and descriptions in the inspector.\n- [ ] Validate IPv4/IPv6 addresses; reject duplicate management addresses with field errors.\n- [ ] Keep dialog focus inside, return focus on close, and provide keyboard alternatives to dragging.\n- [ ] Add browser checks for edit, delete, import cancellation, and narrow-screen use.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+      "body": "## Outcome\nLet one operator maintain a valid, accessible device inventory that can safely become monitoring targets.\n\n## Steps and acceptance criteria\n- [ ] Edit existing device name, management address, and description without changing its ID, position, or connections; add/delete continues to work.\n- [ ] Allow an empty management address for an unmonitored inventory entry. Validate non-empty IPv4/IPv6 literals and reject duplicate management addresses in the current workspace with clear field errors.\n- [ ] Define canonical address comparison and test IPv4, compressed/equivalent IPv6, malformed input, and duplicates. Revalidate at the host API in #4 before any probes.\n- [ ] Keep modal keyboard focus inside, close with Escape, return focus to its trigger, and give controls clear labels/errors.\n- [ ] Provide a keyboard-operable alternative for positioning and defining/removing links; preserve existing pointer workflows.\n- [ ] Verify edit, cancel, delete with attached links, import cancellation, and desktop/narrow use with behavioral/browser evidence.\n\n## Definition of done\nImplement only this outcome, update affected documentation and data definitions, run relevant tests/build, and attach evidence. Keep the issue open until the implementation is merged and every required criterion has evidence; name anything unverified."
     },
     {
       "key": "1.3",
-      "title": "Complete inventory navigation and recovery UX",
+      "issueNumber": 3,
+      "title": "[1.3] Finish saved-map recovery and verify inventory navigation",
       "milestone": "M1 — Reliable topology foundation",
       "dependsOn": [
-        "1.2"
+        "1.1"
       ],
-      "body": "## Outcome\nEditable, recoverable local topology with repeatable checks.\n\n## Steps and acceptance criteria\n- [ ] Make Overview, Topology, and Devices navigation reach working sections.\n- [ ] Provide a device list and clear empty/search states.\n- [ ] Offer explicit recovery/download of unreadable saved data before reset.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+      "body": "## Outcome\nComplete recovery paths while preserving the dashboard navigation already implemented in the pending UI PR.\n\n## Steps and acceptance criteria\n- [ ] Reuse the dashboard, device list, search/empty states, and navigation from PR #14. Verify them; do not rebuild them.\n- [ ] Let the user download the original unreadable saved content before any explicit reset/replacement. Handle storage-access denial without crashing.\n- [ ] Keep autosave paused until the user explicitly replaces invalid saved data. Import validation/cancellation never destroys the previous saved or in-memory map.\n- [ ] Provide clear backup/import/recovery instructions and show failed-save feedback from either dashboard or editor.\n- [ ] Verify empty inventory, no search matches, invalid saved JSON, storage denial/quota, backup, and restore. Do not treat the new recovery UI as implemented merely because save warnings exist.\n\n## Definition of done\nImplement only this outcome, update affected documentation and data definitions, run relevant tests/build, and attach evidence. Keep the issue open until the implementation is merged and every required criterion has evidence; name anything unverified."
+    },
+    {
+      "key": "dashboard-scale",
+      "issueNumber": 15,
+      "title": "[1.4] Verify dashboard readability and larger-map behavior",
+      "milestone": "M1 — Reliable topology foundation",
+      "dependsOn": [
+        "dashboard-ui"
+      ],
+      "body": "## Outcome\nThe primary network map stays useful at the intended inventory size, including multiple simultaneous failures.\n\n## Steps and acceptance criteria\n- [ ] Build a repeatable synthetic fixture with at least 100 devices and 150 configured links, using documentation-only addresses; do not probe it.\n- [ ] Check label readability, pan/zoom/fit, search, status filters, and keyboard inspection on desktop and a narrow viewport. Verify every filtered link has two visible endpoints.\n- [ ] Keep down/stale devices easy to find even when the full map is crowded. Add grouping/collapse or layout changes only if the measured fixture demonstrates a need; preserve manual positions.\n- [ ] Display inventory health counts independently of search/filter results. Verify empty, all-unknown, multiple-down, and mixed stale states.\n- [ ] Record initial render/filter times, browser, viewport, fixture size, and machine. The 100-device fixture is a provisional check, not a production capacity claim; confirm actual deployment size before release.\n- [ ] Save readable screenshots and document observed limits. The existing 2,000-node import limit is a validation bound, not a performance guarantee.\n\n## Validation\nAttach fixture-based browser evidence and relevant behavioral checks. No hardware access or live monitoring is required for this issue."
     },
     {
       "key": "2.1",
-      "title": "Add a local API and SQLite inventory",
+      "issueNumber": 4,
+      "title": "[2.1] Add local host API and durable inventory/history storage",
       "milestone": "M2 — Windows monitoring backend",
       "dependsOn": [
-        "1.3"
+        "1.1"
       ],
-      "body": "## Outcome\nPersist inventory and run controlled ICMP checks on the Windows host.\n\n## Steps and acceptance criteria\n- [ ] Create a Node API bound to loopback by default with a health endpoint.\n- [ ] Implement versioned SQLite migrations and topology CRUD with validation.\n- [ ] Keep browser export/import compatibility and provide backup/restore instructions.\n- [ ] Return useful errors and test invalid input, transactions, and persistence after restart.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+      "body": "## Outcome\nCreate the real source of inventory and monitoring data. This can start after baseline #1; it does not require unrelated editor polish or SNMP completion.\n\n## Steps and acceptance criteria\n- [ ] Add the smallest Node host API bound to loopback by default, with health/readiness and documented start/stop commands. Do not enable LAN or remote access here.\n- [ ] Document versioned request/response/error shapes for inventory/topology, monitoring snapshots, and paginated device history alongside implementation; include stable IDs, observation timestamps, collector state, and freshness policy.\n- [ ] Persist inventory and observations in SQLite using migrations/transactions. Prevent stale browser edits from silently overwriting newer inventory.\n- [ ] Provide explicit preview/confirmation for browser-to-host inventory migration; preserve IDs and links, avoid duplicates, and retain v1 JSON backup/restore.\n- [ ] Validate device types, text/graph bounds, IPv4/IPv6 target addresses, references, and payload sizes at the host boundary. Reject unexpected origins and cross-site writes; keep sample data out of host inventory.\n- [ ] Define bounded history retention/cleanup, database backup/restore, and schema migration failure recovery. Avoid unbounded history reads or growth.\n- [ ] Test invalid input, concurrent/stale writes, interrupted transactions, restart persistence, pagination, retention, migration, and restore. No live probes are part of this issue.\n\n## Definition of done\nImplement only this outcome, update affected documentation and data definitions, run relevant tests/build, and attach evidence. Keep the issue open until the implementation is merged and every required criterion has evidence; name anything unverified."
     },
     {
       "key": "2.2",
-      "title": "Implement bounded Windows ICMP monitoring",
+      "issueNumber": 5,
+      "title": "[2.2] Implement bounded Windows ICMP checks and health transitions",
       "milestone": "M2 — Windows monitoring backend",
       "dependsOn": [
         "2.1"
       ],
-      "body": "## Outcome\nPersist inventory and run controlled ICMP checks on the Windows host.\n\n## Steps and acceptance criteria\n- [ ] Probe only explicitly configured and authorized device addresses.\n- [ ] Pass addresses as process arguments without a shell; validate addresses at the API boundary.\n- [ ] Limit concurrency, timeout, retry count, and polling frequency; cancel work on shutdown.\n- [ ] Store timestamp, latency, and up/down/unknown states; test timeout and recovery with fake probes.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+      "body": "## Outcome\nProduce bounded, repeatable real reachability observations with an explicit failure/recovery policy and useful diagnostics.\n\n## Steps and acceptance criteria\n- [ ] Probe only explicitly enabled devices from the authorized host inventory. Never launch scans or probe sample fixtures.\n- [ ] Validate IPv4/IPv6 literals and invoke the Windows probe without a shell. Bound worker concurrency, per-probe timeout, polling cadence, and shutdown cancellation.\n- [ ] Document and test the initial detection policy: polling interval, timeout, consecutive-failure threshold for down, successes required for recovery, retry behavior, and the expected detection-delay budget. Treat these as explicit collector policy, not hidden UI constants.\n- [ ] Keep reachable/unreachable observations distinct from collector/process/permission errors. A broken probe runner must not mark every device down; ICMP reachability does not establish link or BGP session health.\n- [ ] Persist timestamped results and finite latency where measured, expose collector readiness/last successful cycle, and prevent overlapping or runaway polling cycles.\n- [ ] Test healthy, sustained failure, transient packet loss, recovery, invalid target, process failure, timeout, and graceful shutdown with a fake probe runner.\n- [ ] On an approved Windows test inventory, record actual reachable/unreachable results and observed timing. Do not claim real hardware proof from fixtures.\n\n## Definition of done\nImplement only this outcome, update affected documentation and data definitions, run relevant tests/build, and attach evidence. Keep the issue open until the implementation is merged and every required criterion has evidence; name anything unverified."
     },
     {
       "key": "2.3",
-      "title": "Connect live status and history to the UI",
+      "issueNumber": 6,
+      "title": "[2.3] Connect real observations, freshness, and history to the dashboard",
       "milestone": "M2 — Windows monitoring backend",
       "dependsOn": [
+        "dashboard-ui",
         "2.2"
       ],
-      "body": "## Outcome\nPersist inventory and run controlled ICMP checks on the Windows host.\n\n## Steps and acceptance criteria\n- [ ] Display last check time and clearly distinguish unknown, stale, up, and down.\n- [ ] Recover cleanly from API loss without marking every device down.\n- [ ] Show recent device history and test offline/reconnect behavior.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+      "body": "## Outcome\nMake the primary dashboard answer the owner's up/down question using genuine host observations rather than sample statuses.\n\n## Steps and acceptance criteria\n- [ ] Replace inventory-only health with the documented host snapshot/history API. Keep sample mode visibly separate and prevent its nodes or checks reaching the host.\n- [ ] Update counts, map cards, attention list, and selected-device details from the same observation snapshot; show last check, measured latency, source, and collector connection state.\n- [ ] Use the collector polling/freshness policy instead of the prototype's fixed 90-second rule. Age data to stale as time passes even if no new response arrives.\n- [ ] Distinguish never monitored, up, down, stale, loading, and failed API requests. Connection loss never turns all devices red; preserve last-known data with its timestamp.\n- [ ] Handle reconnect, out-of-order responses, deleted devices, and polling cleanup without duplicate listeners or obsolete results overwriting newer status.\n- [ ] Show bounded/paginated recent device history and status transitions with consistent timestamps; never infer uptime percentages from insufficient samples.\n- [ ] Test device failure/recovery and API disconnect/stale/reconnect end to end using controlled observations. Keep hardware proof separate for #16.\n\n## Definition of done\nImplement only this outcome, update affected documentation and data definitions, run relevant tests/build, and attach evidence. Keep the issue open until the implementation is merged and every required criterion has evidence; name anything unverified."
     },
     {
-      "key": "3.1",
-      "title": "Add SNMPv3 interface collection",
-      "milestone": "M3 — Network intelligence",
+      "key": "4.2",
+      "issueNumber": 11,
+      "title": "[2.4] Add local incident lifecycle and optional approved notifications",
+      "milestone": "M2 — Windows monitoring backend",
       "dependsOn": [
         "2.3"
       ],
-      "body": "## Outcome\nAdd controlled SNMP/LLDP and redundancy information.\n\n## Steps and acceptance criteria\n- [ ] Keep credentials in the Windows credential store or encrypted host storage, never browser JSON.\n- [ ] Prefer SNMPv3; make legacy access explicit and documented.\n- [ ] Collect interface state and counters with bounded requests and vendor fixtures.\n- [ ] Redact credentials from logs, errors, exports, and API responses.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+      "body": "## Outcome\nMake the first local monitoring release useful for outages and recovery. Local incidents do not depend on SNMP/LLDP or remote login.\n\n## Steps and acceptance criteria\n- [ ] Create a local incident when the collector's failure threshold is reached and resolve it on confirmed recovery; link incidents to device history and the dashboard attention workflow.\n- [ ] Debounce flapping, deduplicate repeated failures, and distinguish collector unavailable/stale monitoring from device-down incidents.\n- [ ] Persist incident opened/resolved timestamps and state across host restart, with bounded retention and one recovery event per incident.\n- [ ] Start with in-app incidents. Add external notification delivery only for an explicitly approved destination; keep credentials host-side and offer a safe test-delivery path.\n- [ ] Keep delivery timeouts/retries bounded; notification failure must not block polling or lose the incident. Do not enable unauthenticated remote configuration.\n- [ ] Test sustained failure, transient loss, recovery, repeated poll cycles, restart, collector outage, and notification failure without sending real messages.\n\n## Definition of done\nImplement only this outcome, update affected documentation and data definitions, run relevant tests/build, and attach evidence. Keep the issue open until the implementation is merged and every required criterion has evidence; name anything unverified."
+    },
+    {
+      "key": "mvp-acceptance",
+      "issueNumber": 16,
+      "title": "[2.5] Validate the live dashboard end to end on Windows",
+      "milestone": "M2 — Windows monitoring backend",
+      "dependsOn": [
+        "2.3",
+        "1.2",
+        "1.3",
+        "dashboard-scale",
+        "4.2"
+      ],
+      "body": "## Outcome\nA first local release proves the owner's main requirement: genuine network up/down changes appear clearly and recover correctly on the dashboard.\n\n## Steps and acceptance criteria\n- [ ] Install from a clean checkout on the intended Windows host and document Node/runtime versions, start/stop commands, approved inventory, and expected polling/detection times.\n- [ ] Use a controlled reachable device, an intentionally unreachable address approved for testing, and a device that recovers. Do not unplug production equipment or change device configuration without explicit authorization.\n- [ ] Show the full path: persisted inventory → bounded host check → timestamped observation → dashboard count, map card, attention list, and device history. Verify the declared failure/recovery thresholds and maximum expected detection delay.\n- [ ] Stop/restart the collector/API and close/reopen the browser. Device history persists; connection loss is visible; old observations become stale without turning the entire network red.\n- [ ] Prove map backup/restore and browser-to-host inventory migration without losing IDs or duplicating devices. Sample mode never reaches the real inventory or collector.\n- [ ] Reuse #15's larger-map evidence and verify the UI remains usable at the actual intended device count. Record device/browser/Windows details and remaining limits.\n- [ ] Exercise local incident deduplication and recovery; confirm retention/cleanup behavior and useful diagnostics with no credentials in logs.\n- [ ] Record release evidence and a runbook. Keep the service loopback-only: remote access remains gated by #10 and #12. Do not mark this release proven if physical Windows checks were unavailable.\n\n## Validation\nAttach actual Windows test evidence for reachable → down → recovered and collector-offline → stale → reconnected scenarios. Fixtures alone do not satisfy this release gate."
+    },
+    {
+      "key": "3.1",
+      "issueNumber": 7,
+      "title": "[3.1] Add SNMPv3 interface collection",
+      "milestone": "M3 — Network intelligence",
+      "dependsOn": [
+        "mvp-acceptance"
+      ],
+      "body": "## Outcome\nAdd actual interface evidence after the live dashboard MVP is validated.\n\n## Steps and acceptance criteria\n- [ ] Add opt-in read-only interface polling only for configured authorized devices, without disrupting the proven ICMP dashboard.\n- [ ] Keep credentials in Windows host-managed secure storage, never browser topology JSON, logs, exports, screenshots, or client responses.\n- [ ] Prefer SNMPv3 and make any legacy compatibility explicit; bound timeouts, concurrency, poll rates, and failure handling.\n- [ ] Collect interface operational/admin state and counters, record timestamps, and define counter wrap/reset/discontinuity behavior before calculating rates.\n- [ ] Show verified interface status separately from device reachability. A device can respond to ping while a port is down; missing/stale SNMP data is not a failed link.\n- [ ] Test vendor/OID fixtures, stale/partial responses, credential rejection, counters, and redaction; record a read-only check on approved hardware before claiming vendor support.\n\n## Definition of done\nImplement only this outcome, update affected documentation and data definitions, run relevant tests/build, and attach evidence. Keep the issue open until the implementation is merged and every required criterion has evidence; name anything unverified."
     },
     {
       "key": "3.2",
-      "title": "Review LLDP neighbors before topology changes",
+      "issueNumber": 8,
+      "title": "[3.2] Review LLDP neighbors before applying topology changes",
       "milestone": "M3 — Network intelligence",
       "dependsOn": [
         "3.1"
       ],
-      "body": "## Outcome\nAdd controlled SNMP/LLDP and redundancy information.\n\n## Steps and acceptance criteria\n- [ ] Collect LLDP only from configured devices.\n- [ ] Present discovered neighbors and proposed links for user approval.\n- [ ] Avoid duplicates and preserve manual topology edits; test partial and stale discovery.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+      "body": "## Outcome\nHelp maintain the map without allowing discovery to overwrite the operator's topology.\n\n## Steps and acceptance criteria\n- [ ] Collect read-only LLDP neighbors only from configured authorized devices, with bounded requests and timestamped evidence.\n- [ ] Present proposed devices/ports/links for operator review before any saved-topology changes; do not automatically import or probe discovered addresses.\n- [ ] Preserve stable IDs, user labels, manual layout, and existing manual links. Define provenance and matching rules for duplicate/changing neighbor identifiers.\n- [ ] Treat missing/stale LLDP information as incomplete evidence, not proof a device or cable disappeared.\n- [ ] Test partial discovery, repeated collection, duplicates, malformed entries, stale neighbors, rejected proposals, and confirmed application with backup/recovery.\n- [ ] Verify one approved hardware example and document unsupported device behavior.\n\n## Definition of done\nImplement only this outcome, update affected documentation and data definitions, run relevant tests/build, and attach evidence. Keep the issue open until the implementation is merged and every required criterion has evidence; name anything unverified."
     },
     {
       "key": "3.3",
-      "title": "Model uplinks and router redundancy",
+      "issueNumber": 9,
+      "title": "[3.3] Model verified uplinks and router redundancy groups",
       "milestone": "M3 — Network intelligence",
       "dependsOn": [
-        "3.2"
+        "3.1"
       ],
-      "body": "## Outcome\nAdd controlled SNMP/LLDP and redundancy information.\n\n## Steps and acceptance criteria\n- [ ] Allow explicit port/uplink labels and redundancy group membership.\n- [ ] Distinguish device, interface, and group health.\n- [ ] Verify partial failure and recovery against documented fixtures.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+      "body": "## Outcome\nRepresent uplinks and redundancy honestly. LLDP is helpful enrichment, not a prerequisite for manually configured groups.\n\n## Steps and acceptance criteria\n- [ ] Support explicit port/uplink labels, device-to-interface mapping, and configured redundancy-group membership without requiring LLDP.\n- [ ] Document the health rule for each group and distinguish device reachability, verified port/link state, and group availability.\n- [ ] Do not claim redundancy is operational merely because two routers are on the map; mark missing protocol/member evidence as unknown.\n- [ ] Preserve configured versus discovered provenance and manual edits; keep missing/stale interface observations from becoming false link failures.\n- [ ] Test a single member failure, all-member failure, missing evidence, stale checks, and recovery with controlled fixtures; use approved hardware for any redundancy behavior claimed as verified.\n\n## Definition of done\nImplement only this outcome, update affected documentation and data definitions, run relevant tests/build, and attach evidence. Keep the issue open until the implementation is merged and every required criterion has evidence; name anything unverified."
     },
     {
       "key": "4.1",
-      "title": "Add authentication, roles, and audit records",
+      "issueNumber": 10,
+      "title": "[4.1] Add authentication, roles, and audit records before remote access",
       "milestone": "M4 — Secure remote operations",
       "dependsOn": [
-        "3.3"
+        "2.1",
+        "2.3"
       ],
-      "body": "## Outcome\nGate remote access behind identity, transport security, and operational checks.\n\n## Steps and acceptance criteria\n- [ ] Require authentication before any non-loopback access.\n- [ ] Enforce viewer/operator/admin permissions on every backend action.\n- [ ] Protect sessions, throttle login attempts, and record changes without credentials.\n- [ ] Test unauthenticated access, cross-role denial, session expiry, and request forgery.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
-    },
-    {
-      "key": "4.2",
-      "title": "Implement alerts with deduplication",
-      "milestone": "M4 — Secure remote operations",
-      "dependsOn": [
-        "4.1"
-      ],
-      "body": "## Outcome\nGate remote access behind identity, transport security, and operational checks.\n\n## Steps and acceptance criteria\n- [ ] Configure approved notification destinations with test delivery.\n- [ ] Debounce flapping, deduplicate incidents, and send recovery messages.\n- [ ] Keep delivery retries bounded and test outages without sending real notifications.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+      "body": "## Outcome\nPrepare the existing dashboard/API for protected access. This can be scheduled earlier if remote access becomes a priority; it is not blocked by network-intelligence features.\n\n## Steps and acceptance criteria\n- [ ] Define the single-owner account bootstrap and recovery path; require authentication before any non-loopback access. Do not expose the service during implementation.\n- [ ] Enforce viewer/operator/admin permissions at every host API action, including topology edits, monitoring targets, credentials, discovery, and notification settings.\n- [ ] Protect sessions and sensitive writes; throttle login attempts and avoid account/session secrets in logs or client responses.\n- [ ] Record meaningful configuration changes and access failures with bounded audit retention and safe export.\n- [ ] Keep the same authorization rules across local and future remote access. No separate unsecured remote endpoints or browser-only role checks.\n- [ ] Test unauthenticated access, cross-role denial, session expiry, logout, request forgery, account recovery, and audit redaction. This security work does not depend on SNMP/LLDP.\n\n## Definition of done\nImplement only this outcome, update affected documentation and data definitions, run relevant tests/build, and attach evidence. Keep the issue open until the implementation is merged and every required criterion has evidence; name anything unverified."
     },
     {
       "key": "4.3",
-      "title": "Package and verify the Windows deployment",
+      "issueNumber": 12,
+      "title": "[4.2] Package and verify secure Windows deployment",
       "milestone": "M4 — Secure remote operations",
       "dependsOn": [
-        "4.2"
+        "mvp-acceptance",
+        "4.1"
       ],
-      "body": "## Outcome\nGate remote access behind identity, transport security, and operational checks.\n\n## Steps and acceptance criteria\n- [ ] Provide Windows service installation, restart, update, and uninstall instructions.\n- [ ] Document HTTPS reverse proxy or VPN access and least-privilege firewall rules.\n- [ ] Test backup restoration and reboot recovery on a Windows host.\n- [ ] Complete security review before any remote exposure.\n\n## Validation\nInclude the relevant automated checks and a reproducible manual verification in the closing pull request."
+      "body": "## Outcome\nDeliver a recoverable Windows deployment and a verified secure path to the dashboard, after the local monitoring release and access controls are proven.\n\n## Steps and acceptance criteria\n- [ ] Package the built dashboard and host as a documented Windows service with least-privilege execution, start/stop, reboot recovery, update/rollback, and uninstall behavior.\n- [ ] Keep configuration/database/secrets outside replaceable program files; updating or uninstalling must not silently destroy inventory/history or backups.\n- [ ] Provide a usable restore runbook and verify restoration on the intended Windows host.\n- [ ] Keep loopback the default. For explicitly enabled remote access, document and verify HTTPS reverse-proxy or VPN routing, restricted firewall rules, and authenticated/authorized access.\n- [ ] Verify failed authentication, role restrictions, transport configuration, timeout/reconnect, and absence of unauthenticated remote paths before exposure.\n- [ ] Record the Windows version, actual deployment size, supported protocols, known limits, and end-to-end release evidence. Never deploy the Vite development server as production.\n- [ ] Remote deployment may ship without optional SNMP/LLDP features if the owner chooses; do not make them accidental prerequisites.\n\n## Definition of done\nImplement only this outcome, update affected documentation and data definitions, run relevant tests/build, and attach evidence. Keep the issue open until the implementation is merged and every required criterion has evidence; name anything unverified."
     }
   ]
 }

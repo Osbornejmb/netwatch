@@ -12,4 +12,4 @@ Read [AGENTS.md](AGENTS.md) first; it is the shared entry point for AI contribut
 
 Never commit device credentials, real topology exports, .env files, node_modules, local tools, or build output. Preserve import compatibility and user data. Use tests for status freshness, trust boundaries, and failure recovery; fixtures never establish real network health.
 
-Repository: https://github.com/Osbornejmb/netwatch. The checked-in docs/github-plan.json and Publish project plan workflow provision the original four milestones and twelve issues idempotently. Additional user-requested issues can be tracked directly on GitHub without changing the original plan.
+Repository: https://github.com/Osbornejmb/netwatch. The checked-in docs/github-plan.json and docs/ROADMAP.md define the current four milestones, fifteen implementation issues, recommended solo order, and actual dependencies. The Publish project plan workflow matches stable plan markers before titles, creates only missing work, and preserves issue bodies/states. Keep deliberate acceptance-criteria changes synchronized between the plan and existing GitHub issues.
