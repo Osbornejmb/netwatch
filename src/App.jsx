@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import RouterNode from './nodes/RouterNode'
 import SwitchNode from './nodes/SwitchNode'
+import Dashboard from './Dashboard'
 
 import { readTopology, writeTopology, validateTopology } from './topology'
 
@@ -65,6 +66,7 @@ export default function App() {
   const saved = useMemo(() => readTopology({ getItem: key => localStorage.getItem(key) }, { nodes: initialNodes, edges: initialEdges }), [])
   const [nodes, setNodes, onNodesChange] = useNodesState(saved.topology.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(saved.topology.edges)
+  const [view, setView] = useState('dashboard')
   const [showModal, setShowModal] = useState(false)
   const [selectedNode, setSelectedNode] = useState(null)
   const [query, setQuery] = useState('')
@@ -152,15 +154,15 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${view === 'dashboard' ? ' dashboard-shell' : ''}`}>
       <aside className="sidebar">
         <div className="brand"><div className="brand-mark"><Activity size={21}/></div><div><strong>NETWATCH</strong><span>NETWORK OPERATIONS</span></div></div>
         <div className="workspace"><div className="workspace-icon">NW</div><div><strong>Local workspace</strong><span>Windows host</span></div><ChevronDown size={15}/></div>
         <div className="nav-label">WORKSPACE</div>
         <nav>
-          <a className="nav-item" href="#overview"><LayoutDashboard size={17}/> Overview</a>
-          <a className="nav-item active" href="#topology"><GitBranch size={17}/> Topology builder <span className="nav-dot"/></a>
-          <a className="nav-item" href="#devices"><Cpu size={17}/> Devices <span className="nav-count">{nodes.length}</span></a>
+          <a className={view === 'dashboard' ? 'nav-item active' : 'nav-item'} href="#dashboard" aria-label="Network dashboard" aria-current={view === 'dashboard' ? 'page' : undefined} onClick={() => setView('dashboard')}><LayoutDashboard size={17}/> Dashboard</a>
+          <a className={view === 'editor' ? 'nav-item active' : 'nav-item'} href="#topology" aria-label="Topology builder" aria-current={view === 'editor' ? 'page' : undefined} onClick={() => setView('editor')}><GitBranch size={17}/> Topology builder</a>
+          <a className="nav-item" href="#inventory" aria-label="Device inventory" onClick={() => setView('dashboard')}><Cpu size={17}/> Devices <span className="nav-count">{nodes.length}</span></a>
           <a className="nav-item disabled" title="Planned for Phase 2"><Activity size={17}/> Monitoring <span className="soon">PHASE 2</span></a>
           <a className="nav-item disabled" title="Planned for Phase 3"><Bell size={17}/> Alerts <span className="soon">SOON</span></a>
         </nav>
@@ -174,12 +176,12 @@ export default function App() {
 
       <main className="main-area">
         <header className="topbar">
-          <div className="breadcrumbs"><span>Workspace</span><b>/</b><strong>Topology builder</strong></div>
-          <div className="top-actions"><div className="host-status"><span className="pulse-dot"/> HOST UI READY</div><button className="icon-button" aria-label="Topology help" onClick={() => window.alert('Add devices, drag them to arrange the map, and connect their handles. Select a device to inspect it. Export JSON for a backup; import JSON to restore a map. Monitoring is not active yet.')}><CircleHelp size={18}/></button><div className="avatar">AD</div></div>
+          <div className="breadcrumbs"><span>Workspace</span><b>/</b><strong>{view === 'dashboard' ? 'Network dashboard' : 'Topology builder'}</strong></div>
+          <div className="top-actions"><div className="host-status"><span className="pulse-dot"/> {view === 'dashboard' ? 'MONITORING OFFLINE' : 'HOST UI READY'}</div><button className="icon-button" aria-label="Topology help" onClick={() => window.alert('Add devices, drag them to arrange the map, and connect their handles. Select a device to inspect it. Export JSON for a backup; import JSON to restore a map. Monitoring is not active yet.')}><CircleHelp size={18}/></button><div className="avatar">AD</div></div>
         </header>
 
-        <section className="page-content" id="topology">
-          {storageError && <p className="notice" role="alert">{storageError}</p>}
+        {storageError && <p className="notice storage-warning" role="alert">{storageError} Open the topology editor to save or export a backup.</p>}
+        {view === 'dashboard' ? <Dashboard nodes={nodes} edges={edges} onEdit={() => setView('editor')}/> : <section className="page-content" id="topology">
           <input ref={importInput} type="file" accept=".json,application/json" hidden onChange={importTopology} />
           <div className="page-heading">
             <div><div className="eyebrow">NETWORK MANAGEMENT / PHASE 01</div><h1>Topology builder</h1><p>Map your infrastructure first. Monitoring will be connected in the next phase.</p></div>
@@ -231,7 +233,7 @@ export default function App() {
             <div className="info-card"><div className="info-icon"><Database size={17}/></div><div><strong>Saved locally</strong><p>Your current map is stored in this browser. Export JSON to back it up or import it on another workstation.</p></div></div>
           </div>
           <footer>NETWATCH <span>•</span> PHASE 1 FOUNDATION <span>•</span> NO LIVE NETWORK PROBES YET</footer>
-        </section>
+        </section>}
       </main>
       {showModal && <AddDeviceModal onClose={() => setShowModal(false)} onAdd={addDevice}/>}
     </div>

@@ -2,7 +2,7 @@
 
 ## Implemented foundation
 
-React + Vite renders a topology canvas using React Flow. Router and switch components share the topology data contract. `src/topology.js` validates imported and saved maps and strips untrusted rendering properties. The browser stores a versioned topology; export/import is the portability boundary. Existing v1 exports remain readable.
+React + Vite opens the network health dashboard by default. `src/Dashboard.jsx` renders a read-only React Flow map, status counts/filters, attention and detail panels, and a device table. The existing topology canvas remains available through Edit topology. Router and switch components share the topology data contract. `src/topology.js` validates imported and saved maps and strips untrusted rendering properties. The browser stores a versioned topology; export/import is the portability boundary. Existing v1 exports remain readable.
 
 The system has no active probes, backend, authentication, or live status. Example addresses are inventory placeholders. Management address text is descriptive in this phase; backend address validation is mandatory before any probes exist.
 
@@ -24,3 +24,9 @@ Bind development and the future API to loopback by default. LAN development is e
 ## Recovery and delivery
 
 A failed storage read pauses autosave until the user explicitly replaces the saved data. Failed writes display a warning and preserve the in-memory map for export. Import replacement requires confirmation. CI runs the topology self-checks and production build. Browser interaction and Windows hardware checks remain separate acceptance work in the roadmap.
+
+## Dashboard observations
+
+`src/health.js` defines the UI health policy separately from inventory: up/down only from valid timestamped observations, stale after 90 seconds, unknown for absent/invalid/future data. The freshness threshold is a prototype limit to replace with the collector polling policy. Actual inventory currently has no observations and is always unmonitored. Sample mode uses a separate documentation-address fixture, frozen timestamps, and an explicit banner. It never writes sample nodes/checks to storage. Link lines are configured topology only, not measured interface health or BGP session state. A monitoring service connection failure must not be translated into device failures when the backend is added.
+
+System fonts replace the starter's Google Fonts import so the dashboard does not need a font CDN at runtime. `src/dashboard.css` contains the light dashboard tokens; the editor retains its original dark workspace. No dependencies or storage schema changes were added.

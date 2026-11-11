@@ -1,122 +1,71 @@
-# NetWatch implementation roadmap
+# NetWatch step-by-step implementation plan
 
-This is the proposed implementation order, not a claim that monitoring exists. Dates are intentionally unset until scope and hardware access are confirmed. The checked-in GitHub plan is the source for publishing milestones and issues.
+The owner's priority is a clear dashboard showing genuine device up/down behavior. The topology editor supports it. This is a solo workflow: one coherent feature at a time, short branches to main, and evidence before closing an issue. Dates and production capacity are not promised without deployment evidence.
 
-## M1 — Reliable topology foundation
+## First usable release
 
-Editable, recoverable local topology with repeatable checks.
+M1 + M2 deliver the local monitoring MVP. SNMP/LLDP, BGP collection, and remote access are not prerequisites for seeing real up/down status. BGP session monitoring is not currently in scope; ping results cannot establish BGP health.
 
-### 1.1 Verify the starter foundation
+**Critical path:** #13 → #1 → #4 → #5 → #6 → #11 → #16. Inventory editing (#2), recovery (#3), and map evidence (#15) must also be complete before the release gate #16. They do not block starting the backend after #1. Authentication #10 can be brought forward after #4/#6 if remote access becomes urgent, without waiting for SNMP.
 
-Depends on: none.
+## Recommended solo order
 
-- [ ] Run npm ci, npm test, and npm run build on a clean Node 22 checkout.
-- [ ] Exercise add, drag, connect, keyboard delete, search, export, and import.
-- [ ] Verify corrupt storage pauses autosave and failed writes offer an export backup.
+| Order | Issue | Deliverable | Required before starting |
+|---|---|---|---|
+| 1 | [#13 Make the network health dashboard the primary screen](https://github.com/Osbornejmb/netwatch/issues/13) | Dashboard UI foundation | None |
+| 2 | [#1 Verify dashboard and topology foundation from a clean checkout](https://github.com/Osbornejmb/netwatch/issues/1) | Reliable topology foundation | #13 |
+| 3 | [#2 Finish device editing and accessible inventory workflows](https://github.com/Osbornejmb/netwatch/issues/2) | Reliable topology foundation | #1 |
+| 4 | [#3 Finish saved-map recovery and verify inventory navigation](https://github.com/Osbornejmb/netwatch/issues/3) | Reliable topology foundation | #1 |
+| 5 | [#15 Verify dashboard readability and larger-map behavior](https://github.com/Osbornejmb/netwatch/issues/15) | Larger-map evidence | #13 |
+| 6 | [#4 Add local host API and durable inventory/history storage](https://github.com/Osbornejmb/netwatch/issues/4) | Windows monitoring backend | #1 |
+| 7 | [#5 Implement bounded Windows ICMP checks and health transitions](https://github.com/Osbornejmb/netwatch/issues/5) | Windows monitoring backend | #4 |
+| 8 | [#6 Connect real observations, freshness, and history to the dashboard](https://github.com/Osbornejmb/netwatch/issues/6) | Windows monitoring backend | #13, #5 |
+| 9 | [#11 Add local incident lifecycle and optional approved notifications](https://github.com/Osbornejmb/netwatch/issues/11) | Windows monitoring backend | #6 |
+| 10 | [#16 Validate the live dashboard end to end on Windows](https://github.com/Osbornejmb/netwatch/issues/16) | Proven Windows monitoring MVP | #6, #2, #3, #15, #11 |
+| 11 | [#7 Add SNMPv3 interface collection](https://github.com/Osbornejmb/netwatch/issues/7) | Network intelligence | #16 |
+| 12 | [#8 Review LLDP neighbors before applying topology changes](https://github.com/Osbornejmb/netwatch/issues/8) | Network intelligence | #7 |
+| 13 | [#9 Model verified uplinks and router redundancy groups](https://github.com/Osbornejmb/netwatch/issues/9) | Network intelligence | #7 |
+| 14 | [#10 Add authentication, roles, and audit records before remote access](https://github.com/Osbornejmb/netwatch/issues/10) | Secure remote operations | #4, #6 |
+| 15 | [#12 Package and verify secure Windows deployment](https://github.com/Osbornejmb/netwatch/issues/12) | Secure remote operations | #16, #10 |
 
-### 1.2 Finish device editing and accessible workflows
+The recommended order is not an artificial dependency chain. Follow the required dependencies if prioritizing the live-monitoring critical path.
 
-Depends on: 1.1.
+## Milestones and exit criteria
 
-- [ ] Edit device names, management addresses, and descriptions in the inspector.
-- [ ] Validate IPv4/IPv6 addresses; reject duplicate management addresses with field errors.
-- [ ] Keep dialog focus inside, return focus on close, and provide keyboard alternatives to dragging.
-- [ ] Add browser checks for edit, delete, import cancellation, and narrow-screen use.
+### M1 — Reliable topology foundation
 
-### 1.3 Complete inventory navigation and recovery UX
+Dashboard-first navigation, valid/editable inventory, recoverable saved maps, and representative map/browser evidence. A sample preview is not proof of live monitoring.
 
-Depends on: 1.2.
+Issues: [#13](https://github.com/Osbornejmb/netwatch/issues/13), [#1](https://github.com/Osbornejmb/netwatch/issues/1), [#2](https://github.com/Osbornejmb/netwatch/issues/2), [#3](https://github.com/Osbornejmb/netwatch/issues/3), [#15](https://github.com/Osbornejmb/netwatch/issues/15).
 
-- [ ] Make Overview, Topology, and Devices navigation reach working sections.
-- [ ] Provide a device list and clear empty/search states.
-- [ ] Offer explicit recovery/download of unreadable saved data before reset.
+### M2 — Windows monitoring backend
 
-## M2 — Windows monitoring backend
+A Windows-hosted local monitoring MVP: real reachable → down → recovered observations, truthful stale/disconnected behavior, persistent inventory/history, local incident lifecycle, backup/restore, and recorded end-to-end evidence.
 
-Persist inventory and run controlled ICMP checks on the Windows host.
+Issues: [#4](https://github.com/Osbornejmb/netwatch/issues/4), [#5](https://github.com/Osbornejmb/netwatch/issues/5), [#6](https://github.com/Osbornejmb/netwatch/issues/6), [#11](https://github.com/Osbornejmb/netwatch/issues/11), [#16](https://github.com/Osbornejmb/netwatch/issues/16).
 
-### 2.1 Add a local API and SQLite inventory
+### M3 — Network intelligence
 
-Depends on: 1.3.
+Optional read-only SNMP/LLDP and configured redundancy enrich the proven dashboard with verified interface/neighborhood evidence without overwriting manual topology.
 
-- [ ] Create a Node API bound to loopback by default with a health endpoint.
-- [ ] Implement versioned SQLite migrations and topology CRUD with validation.
-- [ ] Keep browser export/import compatibility and provide backup/restore instructions.
-- [ ] Return useful errors and test invalid input, transactions, and persistence after restart.
+Issues: [#7](https://github.com/Osbornejmb/netwatch/issues/7), [#8](https://github.com/Osbornejmb/netwatch/issues/8), [#9](https://github.com/Osbornejmb/netwatch/issues/9).
 
-### 2.2 Implement bounded Windows ICMP monitoring
+### M4 — Secure remote operations
 
-Depends on: 2.1.
+Recoverable Windows service deployment with tested authentication/authorization and an explicitly enabled, protected remote path. Optional SNMP/LLDP is not required for secure access.
 
-- [ ] Probe only explicitly configured and authorized device addresses.
-- [ ] Pass addresses as process arguments without a shell; validate addresses at the API boundary.
-- [ ] Limit concurrency, timeout, retry count, and polling frequency; cancel work on shutdown.
-- [ ] Store timestamp, latency, and up/down/unknown states; test timeout and recovery with fake probes.
+Issues: [#10](https://github.com/Osbornejmb/netwatch/issues/10), [#12](https://github.com/Osbornejmb/netwatch/issues/12).
 
-### 2.3 Connect live status and history to the UI
+## Current evidence and next action
 
-Depends on: 2.2.
+- The original topology/storage foundation is on main. Dashboard UI and solo instructions are implemented in open [PR #14](https://github.com/Osbornejmb/netwatch/pull/14); its seven tests and production build passed locally and on GitHub, and desktop/narrow browser evidence is attached.
+- #13 remains open until the dashboard PR merges. Other issues are not complete merely because a prerequisite has a prototype or green CI.
+- Next: review/land the dashboard foundation, complete clean-checkout verification #1, then start host API #4. Complete #2/#3/#15 alongside that sequence before the MVP release gate.
+- No live probes, host database, SNMP/LLDP, alerts, or remote access are implemented yet. #16 requires actual approved Windows/device evidence; fixtures alone cannot close it.
 
-- [ ] Display last check time and clearly distinguish unknown, stale, up, and down.
-- [ ] Recover cleanly from API loss without marking every device down.
-- [ ] Show recent device history and test offline/reconnect behavior.
+## Plan maintenance
 
-## M3 — Network intelligence
+`docs/github-plan.json` contains the same 15 issue definitions and dependency keys. Keys are stable identifiers, not execution order; original keys remain stable after reordering. GitHub issue numbers and this table identify the work.
 
-Add controlled SNMP/LLDP and redundancy information.
-
-### 3.1 Add SNMPv3 interface collection
-
-Depends on: 2.3.
-
-- [ ] Keep credentials in the Windows credential store or encrypted host storage, never browser JSON.
-- [ ] Prefer SNMPv3; make legacy access explicit and documented.
-- [ ] Collect interface state and counters with bounded requests and vendor fixtures.
-- [ ] Redact credentials from logs, errors, exports, and API responses.
-
-### 3.2 Review LLDP neighbors before topology changes
-
-Depends on: 3.1.
-
-- [ ] Collect LLDP only from configured devices.
-- [ ] Present discovered neighbors and proposed links for user approval.
-- [ ] Avoid duplicates and preserve manual topology edits; test partial and stale discovery.
-
-### 3.3 Model uplinks and router redundancy
-
-Depends on: 3.2.
-
-- [ ] Allow explicit port/uplink labels and redundancy group membership.
-- [ ] Distinguish device, interface, and group health.
-- [ ] Verify partial failure and recovery against documented fixtures.
-
-## M4 — Secure remote operations
-
-Gate remote access behind identity, transport security, and operational checks.
-
-### 4.1 Add authentication, roles, and audit records
-
-Depends on: 3.3.
-
-- [ ] Require authentication before any non-loopback access.
-- [ ] Enforce viewer/operator/admin permissions on every backend action.
-- [ ] Protect sessions, throttle login attempts, and record changes without credentials.
-- [ ] Test unauthenticated access, cross-role denial, session expiry, and request forgery.
-
-### 4.2 Implement alerts with deduplication
-
-Depends on: 4.1.
-
-- [ ] Configure approved notification destinations with test delivery.
-- [ ] Debounce flapping, deduplicate incidents, and send recovery messages.
-- [ ] Keep delivery retries bounded and test outages without sending real notifications.
-
-### 4.3 Package and verify the Windows deployment
-
-Depends on: 4.2.
-
-- [ ] Provide Windows service installation, restart, update, and uninstall instructions.
-- [ ] Document HTTPS reverse proxy or VPN access and least-privilege firewall rules.
-- [ ] Test backup restoration and reboot recovery on a Windows host.
-- [ ] Complete security review before any remote exposure.
+The Publish project plan workflow matches stable markers or titles before creating missing work, updates canonical titles/milestones, and preserves existing issue bodies/states. Intentional acceptance-criteria revisions must be applied to both the plan and existing GitHub issues. It must not recreate issues solely because a title changes.
 

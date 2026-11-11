@@ -22,7 +22,8 @@ jobs:
             const assert = require('node:assert/strict');
             const plan = JSON.parse(fs.readFileSync('docs/github-plan.json', 'utf8'));
             assert.equal(plan.milestones.length, 4);
-            assert.equal(plan.issues.length, 12);
+            assert(plan.issues.length > 0, 'The plan must contain implementation issues');
+            assert.equal(new Set(plan.issues.map(item => item.title)).size, plan.issues.length, 'Duplicate issue titles');
             const titles = new Set(plan.milestones.map(item => item.title));
             const keys = new Set();
             for (const issue of plan.issues) {
@@ -36,20 +37,26 @@ jobs:
             for (const item of plan.milestones) {
               if (!milestones.some(existing => existing.title === item.title)) {
                 milestones.push((await github.rest.issues.createMilestone({ ...repo, title: item.title, description: item.description })).data);
+              } else {
+                const milestone = milestones.find(existing => existing.title === item.title);
+                if (milestone.description !== item.description) {
+                  await github.rest.issues.updateMilestone({ ...repo, milestone_number: milestone.number, description: item.description });
+                }
               }
             }
             const issues = await github.paginate(github.rest.issues.listForRepo, { ...repo, state: 'all', per_page: 100 });
             const resolved = new Map();
             for (const item of plan.issues) {
-              const title = `[${item.key}] ${item.title}`;
+              const title = item.title;
               const milestone = milestones.find(existing => existing.title === item.milestone).number;
               const dependencies = item.dependsOn.map(key => `#${resolved.get(key).number}`).join(', ') || 'None';
               const body = `${item.body}\n\n## Dependencies\n${dependencies}\n\n<!-- netwatch-plan:${item.key} -->`;
-              let issue = issues.find(existing => !existing.pull_request && existing.title === title);
+              const marker = `<!-- netwatch-plan:${item.key} -->`;
+              let issue = issues.find(existing => !existing.pull_request && (existing.body?.includes(marker) || existing.title === title));
               if (!issue) {
                 issue = (await github.rest.issues.create({ ...repo, title, body, milestone })).data;
-              } else if (issue.milestone?.number !== milestone) {
-                issue = (await github.rest.issues.update({ ...repo, issue_number: issue.number, milestone })).data;
+              } else if (issue.milestone?.number !== milestone || issue.title !== title) {
+                issue = (await github.rest.issues.update({ ...repo, issue_number: issue.number, title, milestone })).data;
               }
               resolved.set(item.key, issue);
               core.info(`${title}: ${issue.html_url}`);
