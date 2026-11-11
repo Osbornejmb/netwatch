@@ -1,6 +1,6 @@
-# NetWatch — Phase 1 starter
+# NetWatch — Network health dashboard
 
-A local-first network topology builder. Phase 1 provides the UI and editable topology canvas only. It does **not** ping devices or perform SNMP discovery yet.
+A local-first network operations dashboard with a supporting topology editor. The dashboard shows inventory, health filters, a read-only map, attention panel, and device inspection. A labelled sample preview illustrates up/down states. It does **not** ping devices, monitor BGP, or perform SNMP discovery yet.
 
 ## Requirements
 - Windows 10/11
@@ -23,7 +23,14 @@ The server binds to this computer only by default. Run `npm run dev:lan` to opt 
 
 To open the development UI from another computer on the LAN, use the Windows host's LAN IP and port 5173, for example `http://192.168.1.50:5173`. This is development-only and is not secure remote access. Do not expose the Vite development server to the internet.
 
-## Phase 1 capabilities
+## Current capabilities
+- Dashboard is the default screen; use Edit topology for inventory changes.
+- Status counts and filters for up, down, stale, and not monitored.
+- Read-only topology map, attention panel, search, and keyboard-operable inventory inspection.
+- Separate sample preview with 14 example devices; sample checks are frozen and never saved into your network.
+- Actual inventory stays not monitored until the Windows backend is connected.
+
+## Topology editor
 - Add router and switch nodes.
 - Routers are square-style nodes; switches are circle-style nodes.
 - Drag nodes to arrange the map.
@@ -76,8 +83,10 @@ npm run build
 npm run preview
 ```
 
+Read [AI contribution rules](AGENTS.md), the [product brief](docs/PROJECT.md), [design direction](docs/DESIGN.md), and [working checkpoint](docs/WORKLOG.md).
+
 See [architecture](docs/ARCHITECTURE.md), [implementation roadmap](docs/ROADMAP.md), and [contributing](CONTRIBUTING.md). The machine-readable [GitHub plan](docs/github-plan.json) defines four milestones and twelve ordered issues. The Publish project plan workflow creates them on GitHub when the plan is pushed to main; check its Actions run for publication status.
 
-Still pending: editable device details, inventory navigation, full dialog focus handling, and browser interaction tests. Monitoring and remote access are planned, not implemented.
+Still pending: editable device details, full dialog focus handling, and browser interaction tests. Monitoring and remote access are planned, not implemented.
 
 Repository: [Osbornejmb/netwatch](https://github.com/Osbornejmb/netwatch). See [issues](https://github.com/Osbornejmb/netwatch/issues), [milestones](https://github.com/Osbornejmb/netwatch/milestones), and [build and plan workflows](https://github.com/Osbornejmb/netwatch/actions).

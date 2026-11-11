@@ -2,6 +2,10 @@
 
 This is the proposed implementation order, not a claim that monitoring exists. Dates are intentionally unset until scope and hardware access are confirmed. The checked-in GitHub plan is the source for publishing milestones and issues.
 
+## Dashboard priority update
+
+The owner made the up/down network health dashboard the main product screen. [Issue #13](https://github.com/Osbornejmb/netwatch/issues/13) adds its UI foundation and the solo AI workflow. Host observations remain M2 work; sample preview is not live monitoring. Existing twelve issues remain the baseline plan.
+
 ## M1 — Reliable topology foundation
 
 Editable, recoverable local topology with repeatable checks.

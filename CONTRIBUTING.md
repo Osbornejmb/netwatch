@@ -1,7 +1,15 @@
-# Contributing
+# Solo development workflow
 
-Use Node.js 22 or newer. Run `npm ci`, `npm test`, and `npm run build` before a pull request. Use `npm run dev` for local development or `npm run dev:lan` only on a trusted LAN.
+Read [AGENTS.md](AGENTS.md) first; it is the shared entry point for AI contributors. The owner works across all folders. No staging branch, team boundaries, mandatory second reviewer, or separate contract-change process is required.
 
-Follow docs/ROADMAP.md in dependency order. Keep each pull request focused on one issue and include its acceptance evidence. Never commit device credentials, real topology exports, .env files, node_modules, or build output. New API and probe logic needs boundary and failure-path tests. Preserve existing exports when changing the schema.
+1. Read the request/issue and current product, architecture, design, and checkpoint documents.
+2. Start one coherent feature branch from main: `feat/<topic>`, `fix/<topic>`, or `docs/<topic>`. Keep unrelated work intact.
+3. Implement the smallest complete change, including affected data definitions, tests, and documentation. The dashboard is the current product priority.
+4. With Node 22+, use `npm ci` for a clean setup, then `npm test` and `npm run build`. Run `npm run dev` to inspect the UI; `npm run dev:lan` is explicit trusted-LAN development only.
+5. Inspect desktop and narrow layouts, normal/empty/disconnected states, and interactions. State any missing evidence; hardware behavior needs hardware verification.
+6. Push the branch and open a PR to main. Describe the result, linked issue, validation evidence, and any remaining limits. Check GitHub Actions and fix failures.
+7. Merge within the owner's authorization. No separate lead or second-person approval is required by this repository. Update docs/WORKLOG.md and close only acceptance criteria actually verified.
 
-The project repository is https://github.com/Osbornejmb/netwatch. docs/github-plan.json contains the proposed private repository, four milestones, twelve ordered issues, and acceptance criteria. The Publish project plan workflow creates missing milestones and issues, resolves dependency keys to issue links, and preserves existing issue bodies and states. Rerun it from Actions if publication fails.
+Never commit device credentials, real topology exports, .env files, node_modules, local tools, or build output. Preserve import compatibility and user data. Use tests for status freshness, trust boundaries, and failure recovery; fixtures never establish real network health.
+
+Repository: https://github.com/Osbornejmb/netwatch. The checked-in docs/github-plan.json and Publish project plan workflow provision the original four milestones and twelve issues idempotently. Additional user-requested issues can be tracked directly on GitHub without changing the original plan.
