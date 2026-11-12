@@ -12,6 +12,7 @@ import {
 import RouterNode from './nodes/RouterNode'
 import SwitchNode from './nodes/SwitchNode'
 import Dashboard from './Dashboard'
+import { createId } from './id'
 
 import { readTopology, writeTopology, validateTopology } from './topology'
 
@@ -107,7 +108,7 @@ export default function App() {
 
   const onConnect = useCallback((params) => {
     setEdges(eds => addEdge({
-      ...params, id: `edge-${crypto.randomUUID()}`, label: 'Link',
+      ...params, id: `edge-${createId()}`, label: 'Link',
       style: { stroke: '#64748b', strokeWidth: 2 },
       labelStyle: { fill: '#94a3b8', fontSize: 10 },
       markerEnd: { type: MarkerType.ArrowClosed, color: '#64748b' },
@@ -116,7 +117,7 @@ export default function App() {
 
   const addDevice = ({ kind, name, ip, description }) => {
     if (nodes.length >= 2000) { window.alert('This map supports up to 2,000 devices.'); return }
-    const id = `${kind}-${crypto.randomUUID()}`
+    const id = `${kind}-${createId()}`
     setNodes(ns => [...ns, {
       id, type: kind, position: { x: 430 + Math.random() * 220, y: 180 + Math.random() * 180 },
       data: { label: name, ip, description },
@@ -209,7 +210,7 @@ export default function App() {
               onPaneClick={() => setSelectedNode(null)}
               fitView fitViewOptions={{ padding: 0.2 }}
               deleteKeyCode={['Backspace', 'Delete']}
-              defaultEdgeOptions={{ type: 'smoothstep', style: { stroke: '#64748b', strokeWidth: 2 }, labelStyle: { fill: '#94a3b8', fontSize: 10 } }}
+              defaultEdgeOptions={{ markerEnd: { type: MarkerType.ArrowClosed, color: '#64748b' }, type: 'smoothstep', style: { stroke: '#64748b', strokeWidth: 2 }, labelStyle: { fill: '#94a3b8', fontSize: 10 } }}
               proOptions={{ hideAttribution: true }}
             >
               <Background color="#263449" gap={22} size={1}/>
