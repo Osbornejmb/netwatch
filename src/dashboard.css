@@ -30,3 +30,12 @@
 @media(max-width:720px){.simple-shell .topbar{flex-wrap:wrap}.simple-shell .top-menu{order:3;width:100%;justify-content:space-between;margin-left:0}.simple-shell .backup-recovery{margin-left:auto}.simple-shell .backup-recovery details[open]{top:8px}.simple-shell .backup-recovery summary{min-height:44px}.health-button,.health-view-options summary{min-height:44px}}
 
 .dashboard-shell .backup-recovery{color:var(--health-text)}
+.health-view-options>div{max-height:max(100px,calc(100dvh - 240px));overflow-y:auto}
+.health-node-focus{outline:3px solid #2456c7;outline-offset:5px}
+.health-node-connected{outline:3px dashed #2456c7;outline-offset:5px}
+.health-node-muted{opacity:.38}
+.health-inventory tr.is-connected{background:#edf3ff}
+.health-highlight-status{max-width:440px;overflow-wrap:anywhere}
+.health-map-focus-controls{position:absolute;right:12px;bottom:12px;z-index:6;max-width:min(340px,calc(100% - 76px));padding:10px;background:#fffffff5;border:1px solid var(--health-border);border-radius:7px;box-shadow:0 3px 12px #172b4314;display:flex;flex-wrap:wrap;gap:8px}
+.health-map-focus-controls .health-highlight-status{width:100%;margin:0;font-size:11px;color:var(--health-text)}
+.health-map-focus-controls .health-button{min-height:44px}

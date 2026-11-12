@@ -13,3 +13,8 @@ Reference guidance: [UI/UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pr
 - Clearly label sample mode. Default to actual configured inventory with unknown health and an honest disconnected explanation.
 
 Validate at desktop and narrow widths. Check search, each status filter, selecting a device from map and list, sample mode isolation, and switching back to the editor. Record limitations in WORKLOG.md.
+
+- View options can switch between saved positions and a temporary radial layout, with an optional center device. Keep the default full-map workspace and manual editor positions intact.
+- Selecting a device highlights direct peers and incident paths in either layout. Use blue solid/dashed outlines to distinguish focus/peers without replacing green/red/amber/gray health colors. Keep an explicit Clear highlight control and a textual direct-peer count; do not imply transitive connectivity or live interface verification.
+
+- Allow individual dashboard devices to be dragged, highlighting direct peers and attached links from drag start. Do not open a popup on drag release. Keep focus/reset controls over the map so they do not shift the canvas during a gesture. Saved-layout moves autosave; radial/sample moves are temporary and explicitly resettable.
