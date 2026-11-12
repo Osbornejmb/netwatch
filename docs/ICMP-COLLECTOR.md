@@ -69,3 +69,17 @@ History/check entries: `{id,deviceId,status:"up"|"down"|"unknown",checkedAt:"ISO
 Fake-runner tests cover success, initial unknown, transient loss, down threshold/recovery, process/permission errors, invalid addresses/output/latency, authorization changes during checks, bounded concurrency/timeout/cadence, no overlapping cycles, graceful cancellation, timestamp freeze, schema migration/rollback and backup/restore. Windows CI additionally runs `node scripts/check-windows-icmp.mjs --loopback`: a fresh temporary explicitly authorized inventory of **127.0.0.1 and ::1 only**, exercising the real helper and finite latency without contacting external devices. Its timing/results are printed in CI. Loopback is not proof that a switch or remote router responds.
 
 Issue #5's approved Windows device test is still required: record Windows/Node versions, exact authorized inventory, which devices are expected to answer/block ICMP, actual raw outcomes/latencies and cycle duration, three-failure detection time and recovery time. Use an approved existing unreachable/block-ICMP device; do not scan or alter production routing/firewalls to manufacture a failure. Start with one or two approved devices, export the API history/collector snapshots, and compare observed timing to the policy above. A permission/process error is an environment failure, not a passed unreachable-device test. Stop the collector after the test and disable the test inventory as appropriate. Do not close #5 based solely on fake runners or loopback.
+
+## Single-computer test
+
+When no other devices are available, run this from the checked-out branch on your Windows computer:
+
+```powershell
+npm.cmd ci
+npm.cmd test
+node scripts/check-windows-icmp.mjs --loopback
+```
+
+The smoke test creates a temporary database, explicitly authorizes only 127.0.0.1/::1, runs one real collector cycle, prints results and removes its temporary database. It does not replace your saved inventory or enable the production host. The locally compiled helper cache may be created under data/collector. It needs neither another device nor admin/firewall changes. Fake-runner tests in npm test cover the unavailable device's failure/recovery behavior. They do not turn the self-test into external-network evidence.
+
+Recorded Windows CI result: [icmp-loopback-results.json](icmp-loopback-results.json), Windows Server 2025 x64, reviewed source commit d6078ec. Both loopbacks returned reachable/up with 0 ms (timer-resolution) roundtrip measurement; the first cycle including helper compilation took 1,973 ms, with zero collector errors. This proves the Windows executable path and local ICMP replies on that runner; Windows 10/11 user-machine execution, remote-device unreachability and end-to-end network failure/recovery timing remain unverified. The owner has only the current computer available, so those external-device checks remain pending rather than being invented.
