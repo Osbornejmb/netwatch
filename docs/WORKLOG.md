@@ -2,9 +2,9 @@
 
 ## Current status (2026-11-12)
 
-- Completed/closed: #13, #1, #2, #3, #15, #18 and #24. Their implementations/evidence were merged through #14/#20/#21/#22/#23/#19/#25 respectively.
-- Latest application checkpoint: #25, commit `5aa9200a2ea3ff8d1c6bd83121457ecbeab1c7be`. All 21 tests, production build, six browser suites and pre-merge GitHub checks passed. The default full-map dashboard supports saved/radial layouts, direct-peer highlighting and individual dragging; saved-layout movement autosaves while radial/sample adjustments are temporary.
-- In review: #4 host API/SQLite persistence and explicit browser transfer (see HOST-API.md). Next after acceptance: #5 bounded Windows ICMP, then #6 real observations. No live probes, dashboard observation integration, SNMP/LLDP, alerts or remote access are implemented.
+- Completed/closed: #13, #1, #2, #3, #15, #18, #24 and #4. Issue #4 (2.1) merged through PR #26 as `7dc9bacfc3bb6496235ea68b27b63857bd0e8444`. Earlier implementations/evidence were merged through #14/#20/#21/#22/#23/#19/#25.
+- Latest application checkpoint: #26, commit `7dc9bacfc3bb6496235ea68b27b63857bd0e8444`. All 30 tests and build passed in Ubuntu/Windows CI on the reviewed head; host transfer, inventory, recovery and topology browser suites passed during review. The default full-map dashboard supports saved/radial layouts, direct-peer highlighting and individual dragging; saved-layout movement autosaves while radial/sample adjustments are temporary.
+- Implemented: #4 host API/SQLite persistence and explicit browser transfer (see HOST-API.md). Next: #5 bounded Windows ICMP, then #6 real observations. No live probes, dashboard observation integration, SNMP/LLDP, alerts or remote access are implemented.
 - The dated and feature-specific entries below are historical checkpoints. Their then-current next steps and open/closed notes are superseded by this current status. The 100-device fixture is provisional, not a production capacity claim; confirm deployment size and target-machine behavior before release.
 
 ## Current work: topology-first status and popup details (#18)
@@ -164,3 +164,5 @@ A fresh Node 22 install, fourteen tests and build passed during review. The firs
 - Host preview added expandable review lists, but the shared modal focus loop omitted summary elements. Included summary/link/textarea controls in focus traversal and added a host browser keyboard check reaching and opening both review sections.
 - Corrected an inherited-property edge case so a valid device ID such as `toString` with no management address defaults to monitoring disabled rather than being rejected by the host. Regression coverage includes the ID.
 - Review verification: all 30 tests and production build pass on Node 22.23.5. Host transfer (including preview keyboard review), inventory, recovery and topology browser suites pass on desktop/narrow layouts. Final GitHub Ubuntu/Windows checks are required before the authorized merge.
+
+- PR #26 was merged after all final Ubuntu/Windows and security checks passed; issue #4 is closed with all acceptance criteria checked and evidence linked. Next unresolved implementation step is #5 (2.2), bounded Windows ICMP.
