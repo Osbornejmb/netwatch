@@ -71,3 +71,8 @@
 - Desktop 1440×1000 and narrow 390×844 checked with no document overflow. Review images: `docs/screenshots/recovery-desktop.jpg` and `docs/screenshots/recovery-narrow.jpg`. Browser tests use isolated contexts; they do not probe devices.
 - No dependency or persisted topology schema change. Multi-tab conflict resolution and host persistence remain future work; screen-reader/hardware verification is not claimed. #3 stays open until merge/review of the acceptance evidence.
 - Next: #15 for larger-map evidence in the solo sequence; #4 for the host API on the monitoring critical path.
+
+
+### PR #22 review follow-up
+
+A fresh Node 22 install, fourteen tests and build passed during review. The first recovery browser run timed out only at its final screenshot readiness wait after switching browser contexts; four subsequent diagnostic runs passed all checks. The screenshot setup now explicitly brings the main page forward and scrolls the map into view before checking initialized nodes. Recovery and inventory suites were rerun after this change. No application behavior changed in this follow-up.

@@ -134,11 +134,14 @@ assert.ok(await denied.getByRole('alert').isVisible())
 await deniedContext.close()
 // Screenshot recovery in both layouts using a fresh corrupt saved value.
 await page.evaluate(({key,raw})=>localStorage.setItem(key,raw),{key,raw})
+await page.bringToFront()
 await page.reload()
+await page.locator('.health-map').scrollIntoViewIfNeeded()
 await page.waitForFunction(() => {
   const nodes = [...document.querySelectorAll('.react-flow__node')]
   return nodes.length === 5 && nodes.every(node => node.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }))
 })
+await page.evaluate(() => window.scrollTo(0, 0))
 await page.screenshot({path:fileURLToPath(new URL('../docs/screenshots/recovery-desktop.jpg',import.meta.url)),fullPage:true})
 await page.setViewportSize({width:390,height:844})
 await page.getByRole('button',{name:'Replace saved map…',exact:true}).click()
