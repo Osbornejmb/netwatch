@@ -10,7 +10,8 @@
     "dev:lan": "vite --host 0.0.0.0",
     "test": "node --test",
     "start": "node host/main.js",
-    "db": "node host/maintenance.js"
+    "db": "node host/maintenance.js",
+    "desktop:setup": "node scripts/setup-desktop.mjs"
   },
   "dependencies": {
     "@xyflow/react": "^12.8.5",

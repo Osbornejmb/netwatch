@@ -4,6 +4,8 @@ Requires Node 22.13+ (built-in node:sqlite; Node 22 prints an experimental SQLit
 
 ## Run and stop
 
+Windows users can alternatively use the [per-user tray app and desktop shortcut](WINDOWS-LAUNCHER.md). It owns the host lifecycle through private IPC, uses a separate persistent data location by default and preserves the same loopback-only HTTP boundary. It is not an unattended Windows service.
+
 From the repository: `npm ci`, `npm run build`, `npm start`. On PowerShell with script execution disabled, use `npm.cmd` for each command. Open **http://127.0.0.1:4317**. Stop with Ctrl+C before maintenance. The host serves the compiled UI and API from the same origin, binds exclusively to 127.0.0.1, and has no LAN option. `localhost`, alternate Host headers, unexpected Origin headers and cross-site fetches are rejected. No CORS permission is granted. Vite dev/preview remain browser-only workflows; do not proxy or expose this API to the LAN.
 
 Data defaults to `data/netwatch.sqlite` relative to the working directory. Set NETWATCH_DB to an absolute path to keep data elsewhere. Protect that directory with OS user permissions. The database contains inventory and reachability history, never device credentials. Local OS processes/users with access to this API can change inventory; remote access requires issue #10.
