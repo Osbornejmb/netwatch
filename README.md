@@ -93,7 +93,7 @@ Read [AI contribution rules](AGENTS.md), the [product brief](docs/PROJECT.md), [
 
 See [architecture](docs/ARCHITECTURE.md), [implementation roadmap](docs/ROADMAP.md), and [contributing](CONTRIBUTING.md). The machine-readable [GitHub plan](docs/github-plan.json) defines four milestones and fifteen implementation issues, with a recommended solo order and an explicit Windows MVP release gate. The Publish project plan workflow creates them on GitHub when the plan is pushed to main; check its Actions run for publication status.
 
-Still pending: improved saved-map recovery/import dialogs and ongoing browser regression coverage. Monitoring and remote access are planned, not implemented.
+Saved-map recovery and import confirmations now use keyboard-accessible dialogs; optional browser regression scripts cover inventory and recovery. Monitoring and remote access are planned, not implemented.
 
 Repository: [Osbornejmb/netwatch](https://github.com/Osbornejmb/netwatch). See [issues](https://github.com/Osbornejmb/netwatch/issues), [milestones](https://github.com/Osbornejmb/netwatch/milestones), and [build and plan workflows](https://github.com/Osbornejmb/netwatch/actions).
 
@@ -101,10 +101,24 @@ Repository: [Osbornejmb/netwatch](https://github.com/Osbornejmb/netwatch). See [
 
 Management addresses must be plain IPv4 or IPv6 literals; hostnames, URL/bracket notation, subnet prefixes, IPv6 zone identifiers, and ambiguous IPv4 forms such as leading-zero octets are rejected. Surrounding whitespace is removed; IPv6 is lowercased and compressed before duplicate comparison. IPv4 and IPv6 are distinct address families; IPv4-mapped IPv6 spellings are compared in their canonical IPv6 form. Empty addresses are allowed on multiple inventory entries.
 
-Valid v1 maps keep their IDs, positions, links, and schema. Imports with invalid or duplicate addresses are rejected before replacement. Work on a copy of an older JSON backup: replace descriptive/invalid addresses with literals or empty strings and remove duplicate addresses before importing. If saved browser data fails these checks, autosave pauses and leaves the original saved content untouched; do not confirm replacement until you have a backup. Export saves the current visible map, not the unreadable original. Downloading unreadable saved content is still tracked in #3.
+Valid v1 maps keep their IDs, positions, links, and schema. Imports with invalid or duplicate addresses are rejected before replacement. Work on a copy of an older JSON backup: replace descriptive/invalid addresses with literals or empty strings and remove duplicate addresses before importing. If saved browser data fails these checks, autosave pauses and leaves the original saved content untouched; do not confirm replacement until you have a backup. Export saves the current visible map, not the unreadable original. Use Download original saved content in Map backup and recovery to preserve unreadable saved text separately from the visible map.
 
 These UI checks do not authorize probes. The future host API must independently validate addresses, require monitoring opt-in, and use bounded shell-free probes.
 
 ## Optional inventory browser regression check
 
 With the build preview running, use an existing Playwright installation to run `node scripts/check-inventory-browser.mjs`. This check is separate from `npm test` and does not add a runtime dependency. `PLAYWRIGHT_MODULE` can point to an external Playwright module, `CHROMIUM_PATH` to a browser executable, and `NETWATCH_URL` to the preview (defaults to `http://127.0.0.1:4173`). It uses a fresh browser context, checks edits/validation/focus/keyboard links/import preservation, and refreshes the inventory review screenshots.
+
+## Backup, import and saved-map recovery
+
+Open **Map backup and recovery** from either the dashboard or editor:
+
+1. **Export current map** downloads the visible real inventory as JSON. Sample-preview devices and statuses are never exported. Keep this file as your normal backup.
+2. **Import backup** validates a JSON file (up to 5 MB), then shows device/link counts and asks before replacing the visible map. Cancel or Escape keeps the current map. Invalid files show an inline error and change neither the visible map nor saved data. The editor's Import JSON uses the same flow.
+3. If saved content is unreadable, autosave pauses and the banner identifies the visible starter map as a fallback. **Download original saved content** downloads the original text unchanged as a `.txt` file, even when it is empty or invalid JSON. This is a recovery copy, not an export of the fallback. Repair a copy offline and import the repaired JSON if needed.
+4. While recovery is active, importing a valid backup changes only the visible map; the original saved content and paused autosave remain protected. After backing up both versions as needed, choose **Replace saved map…**, then explicitly confirm to write the visible map and resume autosave. Cancelling leaves the original untouched. A failed write retains the visible map and recovery copy, and autosave stays paused.
+5. When browser storage access is denied, the app cannot read or download the original. Export the visible map first, allow browser storage, and reload to recover the original. A quota failure also offers an export and explicit retry; the app cannot guarantee persistence until saving succeeds.
+
+The same warnings and controls are available on the dashboard and in the editor. Import/replacement dialogs start on Cancel, trap Tab, close with Escape, and restore keyboard focus.
+
+With preview running, `node scripts/check-recovery-browser.mjs` runs optional recovery/download/restore regression checks using the same external Playwright configuration as the inventory check above. It also refreshes `docs/screenshots/recovery-{desktop,narrow}.jpg`.

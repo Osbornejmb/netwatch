@@ -55,3 +55,12 @@ select:focus-visible{outline:2px solid #69d7d0;outline-offset:3px}
 @media(max-width:720px){.position-form,.link-form{flex-direction:column;align-items:stretch}.position-form label,.link-form label{width:100%;min-width:0}.inventory-controls{padding:12px}.heading-actions{flex-wrap:wrap}.device-dialog{width:calc(100% - 24px);padding:16px}}
 .link-endpoint{flex:1;min-width:150px}
 @media(max-width:720px){.link-endpoint{min-width:0;width:100%}}
+.backup-recovery{margin:12px 32px;color:#cbd8e6;background:#101c2a;border:1px solid #34485d;border-radius:8px;padding:12px;font-size:12px}
+.backup-recovery summary{cursor:pointer;min-height:32px;align-content:center;font-weight:600}
+.backup-recovery p{line-height:1.6}
+.backup-actions{display:flex;flex-wrap:wrap;gap:8px}
+.backup-actions .button{min-height:44px}
+.backup-status:empty{display:none}
+.backup-recovery .notice{margin-top:0;font-size:12px}
+summary:focus-visible{outline:2px solid #69d7d0;outline-offset:3px}
+@media(max-width:720px){.backup-recovery{margin:12px}.backup-actions{flex-direction:column;align-items:stretch}}

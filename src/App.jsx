@@ -13,6 +13,7 @@ import RouterNode from './nodes/RouterNode'
 import SwitchNode from './nodes/SwitchNode'
 import Dashboard from './Dashboard'
 import DeviceDialog from './DeviceDialog'
+import RecoveryDialog from './RecoveryDialog'
 import InventoryControls from './InventoryControls'
 import { createId } from './id'
 
@@ -47,6 +48,11 @@ export default function App() {
 
   const [storageError, setStorageError] = useState(saved.error)
   const [autosavePaused, setAutosavePaused] = useState(Boolean(saved.error))
+  const [recovery, setRecovery] = useState(saved.recovery)
+  const [pendingAction, setPendingAction] = useState(null)
+  const [importError, setImportError] = useState('')
+  const [importBusy, setImportBusy] = useState(false)
+  const [backupNotice, setBackupNotice] = useState('')
   const importInput = useRef(null)
 
   useEffect(() => {
@@ -55,7 +61,8 @@ export default function App() {
       writeTopology(localStorage, { nodes, edges })
       setStorageError('')
     } catch {
-      setStorageError('Map could not be saved. Export JSON to keep a backup, then retry Save map.')
+      setBackupNotice('')
+      setStorageError('Map could not be saved. Autosave is paused. Export the current map to keep a backup, then retry saving.')
       setAutosavePaused(true)
     }
   }, [nodes, edges, autosavePaused])
@@ -65,13 +72,15 @@ export default function App() {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
+    setImportBusy(true); setImportError(''); setBackupNotice('')
     try {
       if (file.size > 5 * 1024 * 1024) throw new Error('Choose a JSON file smaller than 5 MB.')
       const topology = validateTopology(JSON.parse(await file.text()))
-      if (!window.confirm('Replace this map with the imported map? Export your current map first if you need a backup.')) return
-      setNodes(topology.nodes); setEdges(topology.edges); setSelectedNode(null)
+      setPendingAction({ kind: 'import', topology })
     } catch (error) {
-      window.alert(`Import failed: ${error.message}`)
+      setImportError(`Import failed: ${error.message}`)
+    } finally {
+      setImportBusy(false)
     }
   }
 
@@ -110,22 +119,42 @@ export default function App() {
   const routerCount = nodes.filter(n => n.type === 'router').length
   const switchCount = nodes.filter(n => n.type === 'switch').length
 
-  const exportTopology = () => {
-    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), ...validateTopology({ nodes, edges }) }, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = 'netwatch-topology.json'; a.click()
-    URL.revokeObjectURL(url)
+  const download = (content, filename, type) => {
+    const url = URL.createObjectURL(new Blob([content], { type }))
+    const link = document.createElement('a')
+    link.href = url; link.download = filename; link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
-  const saveNow = () => {
-    if (autosavePaused && !window.confirm('Replace the saved map with the current map and resume autosave?')) return
+  const exportTopology = () => {
+    download(JSON.stringify({ exportedAt: new Date().toISOString(), ...validateTopology({ nodes, edges }) }, null, 2), 'netwatch-topology.json', 'application/json')
+  }
+  const downloadOriginal = () => {
+    if (typeof recovery?.raw === 'string') download(recovery.raw, 'netwatch-original-saved-content.txt', 'text/plain;charset=utf-8')
+  }
+
+  const persistCurrent = () => {
     try {
       writeTopology(localStorage, { nodes, edges })
-      setStorageError(''); setAutosavePaused(false)
+      setStorageError(''); setAutosavePaused(false); setRecovery(null)
+      setBackupNotice('Map saved. Autosave is active.')
       setSavedNotice(true); setTimeout(() => setSavedNotice(false), 1800)
     } catch {
-      setStorageError('Map could not be saved. Export JSON to keep a backup.')
+      setStorageError('Map could not be saved. Autosave is paused. Export the current map to keep a backup.')
+      setAutosavePaused(true)
     }
+  }
+  const saveNow = () => {
+    setBackupNotice('')
+    if (autosavePaused) setPendingAction({ kind: 'save' })
+    else persistCurrent()
+  }
+  const confirmRecovery = () => {
+    if (pendingAction.kind === 'import') {
+      setNodes(pendingAction.topology.nodes); setEdges(pendingAction.topology.edges); setSelectedNode(null); setQuery('')
+      setBackupNotice(autosavePaused ? 'Map imported into this view. Autosave remains paused; replace the saved map explicitly to save it.' : 'Map imported. Autosave is active.')
+    } else persistCurrent()
+    setPendingAction(null)
   }
 
   return (
@@ -155,12 +184,22 @@ export default function App() {
           <div className="top-actions"><div className="host-status"><span className="pulse-dot"/> {view === 'dashboard' ? 'MONITORING OFFLINE' : 'HOST UI READY'}</div><button className="icon-button" aria-label="Topology help" onClick={() => window.alert('Add devices, drag them to arrange the map, and connect their handles. Select a device to inspect it. Export JSON for a backup; import JSON to restore a map. Monitoring is not active yet.')}><CircleHelp size={18}/></button><div className="avatar">AD</div></div>
         </header>
 
-        {storageError && <p className="notice storage-warning" role="alert">{storageError} Open the topology editor to save or export a backup.</p>}
+        <section className="backup-recovery" aria-label="Map backup and recovery">
+          {storageError && <p className="notice storage-warning" role="alert">{storageError}</p>}
+          {importError && <p className="notice storage-warning" role="alert">{importError} Your current map and saved data have not been replaced.</p>}
+          <details open={storageError ? true : undefined}>
+            <summary>Map backup and recovery</summary>
+            <p>Export current map downloads the visible inventory, never sample data. Import validates a JSON backup before asking to replace the visible map. Keep a backup before replacing any saved content.</p>
+            {recovery && <p>{typeof recovery.raw === 'string' ? 'Download original saved content preserves the unreadable saved text exactly. It is separate from the current visible map.' : 'The original saved content is unavailable because storage access was denied. Export the visible map, allow browser storage, then reload to access the original before replacing it.'}</p>}
+            <div className="backup-actions"><button className="button secondary" onClick={exportTopology}>Export current map</button><button className="button secondary" disabled={importBusy} onClick={() => importInput.current.click()}>{importBusy ? 'Reading backup…' : 'Import backup'}</button><button className="button secondary" disabled={importBusy} onClick={saveNow}>{autosavePaused ? 'Replace saved map…' : 'Save current map'}</button>{typeof recovery?.raw === 'string' && <button className="button secondary" onClick={downloadOriginal}>Download original saved content</button>}</div>
+          </details>
+          <p className="backup-status" role="status">{importBusy ? 'Validating backup…' : backupNotice}</p>
+          <input ref={importInput} type="file" accept=".json,application/json" hidden onChange={importTopology}/>
+        </section>
         {view === 'dashboard' ? <Dashboard nodes={nodes} edges={edges} onEdit={() => setView('editor')}/> : <section className="page-content" id="topology">
-          <input ref={importInput} type="file" accept=".json,application/json" hidden onChange={importTopology} />
           <div className="page-heading">
             <div><div className="eyebrow">NETWORK MANAGEMENT / PHASE 01</div><h1>Topology builder</h1><p>Map your infrastructure first. Monitoring will be connected in the next phase.</p></div>
-            <div className="heading-actions"><button className="button secondary" onClick={() => importInput.current.click()}>Import JSON</button><button className="button secondary" onClick={exportTopology}><Download size={16}/> Export JSON</button><button className="button primary" onClick={() => setShowModal('add')}><Plus size={17}/> Add device</button></div>
+            <div className="heading-actions"><button className="button secondary" disabled={importBusy} onClick={() => importInput.current.click()}>Import JSON</button><button className="button secondary" onClick={exportTopology}><Download size={16}/> Export JSON</button><button className="button primary" onClick={() => setShowModal('add')}><Plus size={17}/> Add device</button></div>
           </div>
 
           <div className="stats-grid" id="overview">
@@ -212,6 +251,7 @@ export default function App() {
           <footer>NETWATCH <span>•</span> PHASE 1 FOUNDATION <span>•</span> NO LIVE NETWORK PROBES YET</footer>
         </section>}
       </main>
+      {pendingAction && <RecoveryDialog action={pendingAction} paused={autosavePaused} unavailable={recovery?.raw === null} hasOriginal={typeof recovery?.raw === 'string'} onDownloadOriginal={downloadOriginal} onClose={() => setPendingAction(null)} onConfirm={confirmRecovery}/>}
       {showModal && <DeviceDialog device={showModal === 'edit' ? selectedNode : null} nodes={nodes} onClose={() => setShowModal(false)} onSave={saveDevice}/>}
     </div>
   )
