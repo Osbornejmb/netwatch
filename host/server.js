@@ -8,10 +8,10 @@ function readBody(req) {
     const chunks=[];let bytes=0;let rejected=false
     req.on('data',chunk=>{
       bytes+=chunk.length
-      if(bytes>MAX_BODY) {if(!rejected){rejected=true;reject(invalid('Payload exceeds 5 MB.',413))}return}
+      if(bytes>MAX_BODY) {rejected=true;chunks.length=0;return}
       if(!rejected) chunks.push(chunk)
     })
-    req.on('end',()=>{if(!rejected)resolve(Buffer.concat(chunks).toString('utf8'))})
+    req.on('end',()=>{if(rejected)reject(invalid('Payload exceeds 5 MB.',413));else resolve(Buffer.concat(chunks).toString('utf8'))})
     req.on('error',()=>reject(invalid('Request interrupted.')))
   })
 }
@@ -33,7 +33,6 @@ export function createHost(store, { port = 4317, dist = resolve('dist') } = {}) 
       if (req.method==='PUT' && url.pathname==='/api/v1/topology') {
         if (req.headers['content-type']?.split(';')[0] !== 'application/json') throw invalid('Use application/json.',415)
         if (req.headers['x-netwatch-write'] !== '1') throw invalid('Explicit write header required.',403)
-        if (Number(req.headers['content-length']) > MAX_BODY) throw invalid('Payload exceeds 5 MB.',413)
         const raw=await readBody(req)
         let body
         try { body=JSON.parse(raw) } catch {throw invalid('Invalid JSON.')}
@@ -45,7 +44,7 @@ export function createHost(store, { port = 4317, dist = resolve('dist') } = {}) 
       let data
       try {data=await readFile(file)} catch {throw invalid('Build not found. Run npm run build.',404)}
       res.writeHead(200,{'Content-Type':({'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon'})[extname(file)]||'application/octet-stream','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"});res.end(data)
-    } catch(e) {if(e.status===413) res.setHeader('Connection','close');send(e.status ?? 500,{error:{code:e.status===409?'revision_conflict':!e.status?'internal_error':'request_rejected',message:!e.status?'Host request failed.':e.message}})}
+    } catch(e) {send(e.status ?? 500,{error:{code:e.status===409?'revision_conflict':!e.status?'internal_error':'request_rejected',message:!e.status?'Host request failed.':e.message}})}
   })
   server.requestTimeout=15000
   server.headersTimeout=10000

@@ -20,10 +20,11 @@ test('inventory persists across restart with stable IDs, normalized targets and 
  store.close();const reopened=openStore(path);assert.deepEqual(reopened.read(),saved);reopened.close()
 })
 test('separate connections reject stale/concurrent edits and rollback interrupted inventory transactions',t=>{
- const {path,store}=fixture(t);const other=openStore(path);t.after(()=>other.close())
+ const {path,store}=fixture(t);const other=openStore(path);try {
  store.write(input(),0);assert.throws(()=>other.write(input(),0),e=>e.status===409)
  assert.throws(()=>store.write(input({r1:true}),1,()=>{throw new Error('interrupted')}),/interrupted/)
  assert.equal(other.read().revision,1);assert.equal(other.read().monitoring.r1,false)
+ } finally {other.close()}
 })
 test('host rejects bad graph, target, IDs, monitoring and sample source without altering inventory',t=>{
  const {store}=fixture(t)
