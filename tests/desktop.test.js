@@ -15,10 +15,11 @@ function setup(t) {
  t.after(()=>rmSync(directory,{recursive:true,force:true}))
  return directory
 }
-function launch(t,path) {
- const child=spawn(process.execPath,[fileURLToPath(new URL('../host/desktop.js',import.meta.url))],{env:{...process.env,NETWATCH_DB:path,NETWATCH_ICMP:'0'},stdio:['pipe','pipe','pipe']})
+function launch(t,path,execArgs=[]) {
+ const child=spawn(process.execPath,[...execArgs,fileURLToPath(new URL('../host/desktop.js',import.meta.url))],{env:{...process.env,NETWATCH_DB:path,NETWATCH_ICMP:'0'},stdio:['pipe','pipe','pipe']})
  const events=[];const lines=createInterface({input:child.stdout});lines.on('line',line=>events.push(JSON.parse(line)))
  const closed=once(child,'close');let finished=false;void closed.then(()=>{finished=true})
+ const deadline=setTimeout(()=>child.kill('SIGKILL'),20000);child.once('close',()=>clearTimeout(deadline))
  t.after(async()=>{if(!finished){child.stdin.end();await closed}})
  return {child,events,closed}
 }
@@ -40,6 +41,13 @@ test('desktop-owned host starts, stops, restarts and closes cleanly when control
  }
  const cancelled=launch(t,path);cancelled.child.stdin.end()
  assert.equal((await cancelled.closed)[0],0);assert.equal(existsSync(path+'.lock'),false)
+})
+test('desktop shutdown before the listener binds does not leave a live host',async t=>{
+ const path=join(setup(t),'db')
+ const instance=launch(t,path,['--import',new URL('./fixtures/delayed-listen.mjs',import.meta.url).href])
+ instance.child.stdin.end()
+ assert.equal((await instance.closed)[0],0,JSON.stringify(instance.events))
+ assert.equal(existsSync(path+'.lock'),false)
 })
 test('desktop start reports an occupied port without stopping the existing host',async t=>{
  const directory=setup(t);const owner=launch(t,join(directory,'owner'));await running(owner)

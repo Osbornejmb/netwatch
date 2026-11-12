@@ -2,6 +2,8 @@
 
 ## Current work (2026-11-13): Windows local controls #28
 
+- Ubuntu CI and its requested retry hung in desktop lifecycle tests, revealing an early Stop/listen race after the initial review. Reproduced on Windows with a delayed-listen fixture: old host stayed alive and hit the failure deadline; the fix closes any late listener when stopping and does not start collection/readiness. Targeted lifecycle suite now passes all four tests, including the deterministic regression. Added a subprocess watchdog and bounded CI job duration; Ubuntu tests remain enabled. New full-suite/CI evidence supersedes the earlier acceptance checkpoint before merge.
+
 - Final PR #29 review found no merge-blocking code defects or unresolved review threads. Replayed actual installed shortcut activation into the same controller, native Start/Stop/Quit, UTF-8 status, empty inventory and lock release; preserved user preferences and probed no devices. CI passes all 46 tests/build, Windows launcher compilation and loopback/lifecycle checks. Native screenshot capture still fails; visual/DPI and tray-menu pointer checks are explicitly tracked in issue 2.5 (#16) as release validation, not falsely reported as passed. Launcher accepted for the user-authorized merge; real-time dashboard issue 2.3 (#6) remains next.
 
 - Issue #5 merged through PR #27 as a08c179 and is closed. Current branch feat/windows-launcher adds a locally compiled per-user WinForms tray app, optional Desktop shortcut, Start/Stop/Open Dashboard/Quit and ICMP opt-in. Private Node parent-child IPC owns graceful shutdown; closing/hiding a control window or browser does not stop monitoring. LOCALAPPDATA/NetWatch stores data/settings outside the checkout; existing databases are not migrated or overwritten.
