@@ -1,0 +1,42 @@
+{
+  "scope": "User-authorized home gateway only; private address and host metadata omitted; no outage induced",
+  "sourceCommit": "a5a1a5171db0528dd3dc9e175b1610e6f38309b2",
+  "cycles": [
+    {
+      "elapsedStartMs": 1,
+      "wallDurationMs": 1343,
+      "status": "up",
+      "outcome": "reachable",
+      "latencyMs": 2,
+      "collectorDurationMs": 1210,
+      "collectorErrors": 0,
+      "diagnostics": []
+    },
+    {
+      "elapsedStartMs": 30005,
+      "wallDurationMs": 124,
+      "status": "up",
+      "outcome": "reachable",
+      "latencyMs": 2,
+      "collectorDurationMs": 114,
+      "collectorErrors": 0,
+      "diagnostics": []
+    },
+    {
+      "elapsedStartMs": 60002,
+      "wallDurationMs": 99,
+      "status": "up",
+      "outcome": "reachable",
+      "latencyMs": 2,
+      "collectorDurationMs": 96,
+      "collectorErrors": 0,
+      "diagnostics": []
+    }
+  ],
+  "historyCount": 3,
+  "stoppedState": "stopped",
+  "limitations": [
+    "No actual unreachable result or failure/recovery timing verified",
+    "Physical Ctrl+C not tested"
+  ]
+}

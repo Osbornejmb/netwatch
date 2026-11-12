@@ -97,3 +97,11 @@ Run `node scripts/check-windows-host.mjs --loopback` with port 4317 free for rep
 Validation found and fixed a shutdown race: abort notification can arrive before a child closes, and compilation can still be pending when collector workers return. Collector shutdown now drains preparation and child-close events before the host releases SQLite/its lock. The new regression fails against the old shutdown implementation. Actual helper cancellation also observed child close before stop returned.
 
 The host script invokes the installed SIGINT handler through child IPC because Node's Windows child.kill('SIGINT') forcibly terminates a process. This verifies the production shutdown handler, not physical console Ctrl+C delivery. Remote-device unreachability, real network failure/recovery timing and physical Ctrl+C remain unverified; PR #27 stays draft and #5 stays open. Dashboard observations remain issue #6.
+
+## Authorized home-router validation (2026-11-12)
+
+The owner subsequently authorized checking the home router after its address was identified from Windows' configured Wi-Fi default gateway ([private gateway address omitted]). No network scan or router login/configuration change was used. A single Windows ping first replied in 2 ms, followed by three real NetWatch/.NET collector cycles against **only that address** in an isolated temporary inventory/database. The temporary helper cache also stayed inside that temporary directory; the normal database and running dashboard were unchanged.
+
+All three collector checks returned reachable/up with measured 2 ms echo latency, zero errors and empty diagnostics. Cycle starts were spaced 30,004 ms and 29,997 ms apart by the validation harness. Collector durations were 1,210 ms (cold compilation), 114 ms and 96 ms. The isolated snapshot/history APIs returned all three real observations; collection stopped and the temporary database/cache were removed. See [router results](windows-router-results.json), generated against source a5a1a51.
+
+This establishes external-device **reachable** behavior on the owner's Windows computer. No outage was induced on the home router. Actual unreachable results, three-failure detection time and recovery timing remain unverified, along with physical console Ctrl+C. PR #27 remains draft and issue #5 open pending that evidence.
