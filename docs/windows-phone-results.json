@@ -1,0 +1,86 @@
+{
+  "scope": "Authorized phone on local Wi-Fi; no IP, MAC, device ID or absolute timestamps published",
+  "sourceCommit": "b034f0a345a37daa49e8b5951345ad75e4ac4fa7",
+  "policy": {
+    "intervalMs": 30000,
+    "failuresForDown": 3,
+    "successesForRecovery": 1
+  },
+  "checks": [
+    {
+      "elapsedMs": 0,
+      "status": "up",
+      "outcome": "reachable",
+      "reason": "success",
+      "latencyMs": 69
+    },
+    {
+      "elapsedMs": 31167,
+      "status": "up",
+      "outcome": "unreachable",
+      "reason": "TimedOut",
+      "latencyMs": null
+    },
+    {
+      "elapsedMs": 61154,
+      "status": "up",
+      "outcome": "unreachable",
+      "reason": "DestinationHostUnreachable",
+      "latencyMs": null
+    },
+    {
+      "elapsedMs": 91154,
+      "status": "down",
+      "outcome": "unreachable",
+      "reason": "TimedOut",
+      "latencyMs": null
+    },
+    {
+      "elapsedMs": 121147,
+      "status": "down",
+      "outcome": "unreachable",
+      "reason": "TimedOut",
+      "latencyMs": null
+    },
+    {
+      "elapsedMs": 151157,
+      "status": "down",
+      "outcome": "unreachable",
+      "reason": "TimedOut",
+      "latencyMs": null
+    },
+    {
+      "elapsedMs": 181152,
+      "status": "down",
+      "outcome": "unreachable",
+      "reason": "TimedOut",
+      "latencyMs": null
+    },
+    {
+      "elapsedMs": 210058,
+      "status": "up",
+      "outcome": "reachable",
+      "reason": "success",
+      "latencyMs": 75
+    },
+    {
+      "elapsedMs": 240070,
+      "status": "up",
+      "outcome": "reachable",
+      "reason": "success",
+      "latencyMs": 75
+    }
+  ],
+  "observedTimings": {
+    "firstFailureToDownMs": 59987,
+    "lastSuccessToDownMs": 91154,
+    "lastFailureToFirstRecoveryMs": 28906
+  },
+  "collectorDiagnostics": "API inspections during down and recovery reported errors=0 and empty diagnostics",
+  "storage": "Read-only extraction from stopped test database; integrity_check=ok; host lock absent",
+  "limitations": [
+    "Wi-Fi off/on action timestamps were not captured; these intervals are between observations, not measured action-to-detection delays",
+    "Phone reachability does not establish router or internet health",
+    "Physical Ctrl+C delivery was not observed by the agent; stopped host and absent lock do not prove its stop mechanism"
+  ]
+}
