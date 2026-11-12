@@ -52,14 +52,14 @@ test('history pagination has stable cursors, bounds and retention; restart remov
 })
 test('history total cap bounds growth',t=>{
  const {store}=fixture(t);store.write(input({r1:true}),0)
- store.db.exec('BEGIN');const insert=store.db.prepare('INSERT INTO checks(device_id,status,checked_at) VALUES(?,?,?)');for(let i=0;i<100005;i++)insert.run('r1','up',Date.now());store.db.exec('COMMIT')
+ store.db.exec('BEGIN');const insert=store.db.prepare("INSERT INTO checks(device_id,status,checked_at,outcome,reason) VALUES(?,?,?,'reachable','legacy')");for(let i=0;i<100005;i++)insert.run('r1','up',Date.now());store.db.exec('COMMIT')
  store.snapshot();assert.equal(store.db.prepare('SELECT COUNT(*) n FROM checks').get().n,100000)
 })
 test('failed initial migration rolls back schema; future schemas are rejected without modification',t=>{
  const dir=mkdtempSync(join(tmpdir(),'netwatch-migration-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));const path=join(dir,'db')
  assert.throws(()=>openStore(path,{migrate:()=>{throw new Error('migration interrupted')}}),/interrupted/)
- const db=new DatabaseSync(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,0);assert.equal(db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name='inventory'").get().n,0);db.exec('PRAGMA user_version=2');db.close()
- assert.throws(()=>openStore(path),/newer/);const check=new DatabaseSync(path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,2);check.close()
+ const db=new DatabaseSync(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,0);assert.equal(db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name='inventory'").get().n,0);db.exec('PRAGMA user_version=3');db.close()
+ assert.throws(()=>openStore(path),/newer/);const check=new DatabaseSync(path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,3);check.close()
 })
 test('offline backup/restore validates data, advances revision and rejects corrupt backups and active locks',t=>{
  const {dir,path,store}=fixture(t);store.write(input({r1:true}),0);store.append([{deviceId:'r1',status:'up',checkedAt:new Date().toISOString()}]);store.close()
