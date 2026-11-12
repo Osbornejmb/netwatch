@@ -59,6 +59,8 @@ Issues: [#10](https://github.com/Osbornejmb/netwatch/issues/10), [#12](https://g
 
 ## Current evidence and next action
 
+- Built-in starter inventory and sample preview are removed by the owner's request; new networks start empty. Test-only fixtures retain regression coverage; existing saved inventory/history are preserved.
+
 - The dashboard foundation and solo instructions were merged through [PR #14](https://github.com/Osbornejmb/netwatch/pull/14), with eight tests/build and desktop/narrow acceptance evidence.
 - Issues #13, #1, #2 and #3 are complete and closed: dashboard foundation, clean-checkout verification, accessible inventory editing and saved-map recovery (#14/#20/#21/#22).
 - Issue #18's map-first layout and popups are merged through #19; issue #15's provisional 100-device/180-link evidence is merged through #23. See SCALE-VALIDATION.md for timings and limits.

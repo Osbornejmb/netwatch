@@ -4,7 +4,7 @@ import { validateTopology } from '../src/topology.js'
 export const MAX_BODY = 5 * 1024 * 1024
 export function invalid(message, status = 400) { return Object.assign(new Error(message), { status }) }
 export function inventory(value) {
-  if (!value || value.source !== 'inventory') throw invalid('Only explicitly selected inventory is accepted; sample data is not inventory.')
+  if (!value || value.source !== 'inventory') throw invalid('Only explicitly selected saved devices are accepted.')
   let topology
   try { topology = validateTopology(value.topology) } catch(e) { throw invalid(e.message) }
   for (const item of [...topology.nodes, ...topology.edges]) if (item.id.length > 100) throw invalid('IDs must be at most 100 characters.')

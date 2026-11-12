@@ -1,8 +1,10 @@
+import { createEditorNetwork } from '../tests/fixtures/editor-network.js'
 import { fileURLToPath } from 'node:url'
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 import assert from 'node:assert/strict'
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH || undefined,args:['--no-sandbox']})
 const context=await browser.newContext({viewport:{width:1440,height:1000}})
+await context.addInitScript(network => { if (!localStorage.getItem('netwatch-topology-v1')) localStorage.setItem('netwatch-topology-v1', JSON.stringify(network)) }, createEditorNetwork())
 const page=await context.newPage()
 page.setDefaultTimeout(10000)
 const errors=[]

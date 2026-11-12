@@ -1,3 +1,4 @@
+import { hostSnapshot } from '../tests/fixtures/host-snapshot.js'
 import { validateTopology } from '../src/topology.js'
 import { createScaleNetwork } from '../tests/fixtures/scale-network.js'
 import { fileURLToPath } from 'node:url'
@@ -6,37 +7,27 @@ import os from 'node:os'
 import assert from 'node:assert/strict'
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--no-sandbox'] })
-// Mixed observations are injected only into Vite's served sample generator.
-// Production App and storage still have no observation source. Measure this
-// as a development-server QA run, not as a production capacity benchmark.
-const url = process.env.NETWATCH_SCALE_URL || 'http://127.0.0.1:5173'
+// Controlled HTTP observations only; never sent to a collector.
+const url = process.env.NETWATCH_SCALE_URL || 'http://127.0.0.1:4173'
 const initial = createScaleNetwork(Date.now())
 const topology = validateTopology(initial)
 const serialized = JSON.stringify(topology)
 const errors = []
 const cgroup = async name => { try { return (await readFile(`/sys/fs/cgroup/${name}`, 'utf8')).trim() } catch { return 'unavailable' } }
-const report = { observedAt: new Date().toISOString(), mode: 'Vite development-server QA (not production capacity)', fixture: { nodes: 100, edges: 180, mixedCounts: { all:100, up:70, down:10, stale:10, unknown:10 } }, browser: await browser.version(), machine: { platform: os.platform(), arch: os.arch(), cpuModel: os.cpus()[0]?.model, logicalCpus: os.cpus().length, memoryGiB: Math.round(os.totalmem()/1024**3), runnerNode: process.version, cpuMax: await cgroup('cpu.max'), memoryMaxBytes: await cgroup('memory.max'), scope: 'Shared managed cloud executor; host resources are not dedicated allocations' }, runs: [] }
+const report = { observedAt: new Date().toISOString(), mode: 'Controlled snapshot QA (not production capacity)', fixture: { nodes: 100, edges: 180, mixedCounts: { all:100, up:70, down:10, stale:10, unknown:10 } }, browser: await browser.version(), machine: { platform: os.platform(), arch: os.arch(), cpuModel: os.cpus()[0]?.model, logicalCpus: os.cpus().length, memoryGiB: Math.round(os.totalmem()/1024**3), runnerNode: process.version, cpuMax: await cgroup('cpu.max'), memoryMaxBytes: await cgroup('memory.max'), scope: 'Shared managed cloud executor; host resources are not dedicated allocations' }, runs: [] }
 for (const viewport of [{width:1440,height:900},{width:390,height:844}]) {
   const context = await browser.newContext({ viewport })
   await context.addInitScript(value => localStorage.setItem('netwatch-topology-v1', value), serialized)
   const page = await context.newPage()
   page.setDefaultTimeout(15000)
   page.on('pageerror', error => errors.push(error.message))
-  let injected = false
-  await page.route('**/src/health.js*', async route => {
-    const response = await route.fetch()
-    const source = await response.text()
-    const body = source.replace('export function createSampleNetwork(now) {', `export function createSampleNetwork(now) { return (${createScaleNetwork.toString()})(now);`)
-    assert.notEqual(body, source, 'Sample generator interception must match the current source')
-    injected = true
-    await route.fulfill({ response, body })
-  })
+  let checks = {}
+  await page.route('**/api/v1/snapshot', route => route.fulfill({ json: hostSnapshot(topology, checks) }))
   const started = performance.now()
   await page.goto(url)
   await page.waitForFunction(() => document.querySelectorAll('.react-flow__node').length === 100 && [...document.querySelectorAll('.react-flow__node')].every(node => getComputedStyle(node).visibility === 'visible'))
   const run = {viewport, initialUnknownRenderMs: Math.round(performance.now()-started), filters:[]}
   report.runs.push(run)
-  assert.ok(injected)
   assert.equal(await page.locator('table,.sidebar,.health-stats').count(),0)
   const initialBounds = await page.evaluate(() => {
     const map = document.querySelector('.health-map').getBoundingClientRect()
@@ -52,10 +43,11 @@ for (const viewport of [{width:1440,height:900},{width:390,height:844}]) {
   await view.click()
   assert.match(await page.locator('option[value=unknown]').textContent(),/100/)
   await view.click()
-  const sampleStarted=performance.now()
-  await page.getByRole('button',{name:'Preview sample statuses'}).click()
+  const mixedStarted=performance.now()
+  checks = initial.checks
+  await page.getByRole('button',{name:'Refresh host',exact:true}).click()
   await page.locator('.health-node-down').first().waitFor()
-  run.mixedSampleRenderMs=Math.round(performance.now()-sampleStarted)
+  run.mixedSnapshotRenderMs=Math.round(performance.now()-mixedStarted)
   assert.equal(await page.locator('.health-node-down').count(),10)
   assert.equal(await page.locator('.health-node-stale').count(),10)
   await view.click()
@@ -152,5 +144,5 @@ assert.ok(await page.getByText('Your network map starts here',{exact:true}).isVi
 await empty.close()
 assert.deepEqual(errors,[])
 await writeFile(fileURLToPath(new URL('../docs/scale-results.json',import.meta.url)),JSON.stringify(report,null,2)+'\n')
-console.log('PASS: 100 devices/180 links, full-view default, unknown/multiple-down/stale/empty states, stable counts, filtered-edge endpoints, search, pan/zoom/fit, keyboard inspection, viewport bounds and sample/storage isolation')
+console.log('PASS: 100 devices/180 links, full-view default, unknown/multiple-down/stale/empty states, stable counts, filtered-edge endpoints, search, pan/zoom/fit, keyboard inspection, viewport bounds and observation/storage isolation')
 await browser.close()

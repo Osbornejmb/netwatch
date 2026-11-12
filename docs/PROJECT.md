@@ -15,4 +15,4 @@ Topology creation/import remains a supporting workflow. Keep the existing editor
 
 ## Delivery boundary
 
-The first dashboard is a UI foundation with a separately labelled sample preview. Actual inventory remains unmonitored until the host collector exists. Never use sample statuses as evidence that real monitoring works. See ARCHITECTURE.md for implemented components and ROADMAP.md for remaining work.
+The dashboard displays genuine host observations; fresh browser and host inventories start empty. Built-in demo devices/statuses and preview controls are removed. Synthetic observations exist only in tests. See ARCHITECTURE.md for implemented components and ROADMAP.md for remaining work.

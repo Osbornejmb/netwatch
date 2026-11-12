@@ -16,22 +16,9 @@ import { createId } from './id'
 import { readTopology, writeTopology, validateTopology } from './topology'
 
 const nodeTypes = { router: RouterNode, switch: SwitchNode }
-const initialNodes = [
-  { id: 'r1', type: 'router', position: { x: 360, y: 70 }, data: { label: 'CORE-ROUTER-01', ip: '192.168.1.1' } },
-  { id: 'r2', type: 'router', position: { x: 690, y: 70 }, data: { label: 'CORE-ROUTER-02', ip: '192.168.1.2' } },
-  { id: 's1', type: 'switch', position: { x: 525, y: 270 }, data: { label: 'CORE-SWITCH-01', ip: '192.168.1.10' } },
-  { id: 's2', type: 'switch', position: { x: 270, y: 470 }, data: { label: 'ACCESS-SWITCH-01', ip: '192.168.1.11' } },
-  { id: 's3', type: 'switch', position: { x: 780, y: 470 }, data: { label: 'ACCESS-SWITCH-02', ip: '192.168.1.12' } },
-]
-const initialEdges = [
-  { id: 'e-r1-s1', source: 'r1', target: 's1', label: 'Uplink', animated: false, style: { stroke: '#64748b', strokeWidth: 2 }, labelStyle: { fill: '#94a3b8', fontSize: 10 } },
-  { id: 'e-r2-s1', source: 'r2', target: 's1', label: 'Uplink', style: { stroke: '#64748b', strokeWidth: 2 }, labelStyle: { fill: '#94a3b8', fontSize: 10 } },
-  { id: 'e-s1-s2', source: 's1', target: 's2', label: 'Downlink', style: { stroke: '#64748b', strokeWidth: 2 }, labelStyle: { fill: '#94a3b8', fontSize: 10 } },
-  { id: 'e-s1-s3', source: 's1', target: 's3', label: 'Downlink', style: { stroke: '#64748b', strokeWidth: 2 }, labelStyle: { fill: '#94a3b8', fontSize: 10 } },
-]
 
 export default function App() {
-  const saved = useMemo(() => readTopology({ getItem: key => localStorage.getItem(key) }, { nodes: initialNodes, edges: initialEdges }), [])
+  const saved = useMemo(() => readTopology({ getItem: key => localStorage.getItem(key) }, { nodes: [], edges: [] }), [])
   const [nodes, setNodes, onNodesChange] = useNodesState(saved.topology.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(saved.topology.edges)
   const [view, setView] = useState('dashboard')
@@ -170,7 +157,7 @@ export default function App() {
             <summary aria-label="Map backup and recovery">Backup{storageError ? ' · Autosave paused' : importError ? ' · Import failed' : ''}</summary>
             {storageError && <p className="notice storage-warning" role="alert">{storageError}</p>}
             {importError && <p className="notice storage-warning" role="alert">{importError} Your current map and saved data have not been replaced.</p>}
-            <p>Export current map downloads the visible inventory, never sample data. Import validates a JSON backup before asking to replace the visible map. Keep a backup before replacing any saved content.</p>
+            <p>Export your map before importing a backup or replacing saved devices.</p>
             {recovery && <p>{typeof recovery.raw === 'string' ? 'Download original saved content preserves the unreadable saved text exactly. It is separate from the current visible map.' : 'The original saved content is unavailable because storage access was denied. Export the visible map, allow browser storage, then reload to access the original before replacing it.'}</p>}
             <div className="backup-actions"><button className="button secondary" onClick={exportTopology}>Export current map</button><button className="button secondary" disabled={importBusy} onClick={() => importInput.current.click()}>{importBusy ? 'Reading backup…' : 'Import backup'}</button><button className="button secondary" disabled={importBusy} onClick={saveNow}>{autosavePaused ? 'Replace saved map…' : 'Save current map'}</button>{typeof recovery?.raw === 'string' && <button className="button secondary" onClick={downloadOriginal}>Download original saved content</button>}</div>
           <HostStorage importGeneration={importGeneration} nodes={nodes} edges={edges} paused={autosavePaused} onLoad={topology => { setNodes(topology.nodes); setEdges(topology.edges); setSelectedNode(null) }}/><p className="backup-status" role="status">{importBusy ? 'Validating backup…' : backupNotice}</p>
@@ -181,7 +168,7 @@ export default function App() {
 
         {view !== 'editor' ? <Dashboard nodes={nodes} edges={edges} showInventory={view === 'inventory'} onMoveDevice={(id, position) => setNodes(current => current.map(node => node.id === id ? { ...node, position } : node))} onEdit={() => setView('editor')}/> : <section className="page-content" id="topology">
           <div className="page-heading">
-            <div><div className="eyebrow">NETWORK MANAGEMENT / PHASE 01</div><h1>Topology builder</h1><p>Edit the browser working copy, then use Backup to save it to the host for monitoring.</p></div>
+            <div><div className="eyebrow">NETWORK MANAGEMENT</div><h1>Topology builder</h1><p>Edit the browser working copy, then use Backup to save it to the host for monitoring.</p></div>
             <div className="heading-actions"><button className="button secondary" disabled={importBusy} onClick={() => importInput.current.click()}>Import JSON</button><button className="button secondary" onClick={exportTopology}><Download size={16}/> Export JSON</button><button className="button primary" onClick={() => setShowModal('add')}><Plus size={17}/> Add device</button></div>
           </div>
 
@@ -231,7 +218,7 @@ export default function App() {
             <div className="info-card"><div className="info-icon"><Zap size={17}/></div><div><strong>Explicit device monitoring</strong><p>Authorize ICMP checks on saved host devices. SNMP/LLDP interface verification remains planned. No networks are scanned.</p></div></div>
             <div className="info-card"><div className="info-icon"><Database size={17}/></div><div><strong>Saved locally</strong><p>Your current map is stored in this browser. Export JSON to back it up or import it on another workstation.</p></div></div>
           </div>
-          <footer>NETWATCH <span>•</span> PHASE 1 FOUNDATION <span>•</span> BROWSER WORKING COPY</footer>
+          <footer>NETWATCH <span>•</span> LOCAL MONITORING <span>•</span> BROWSER WORKING COPY</footer>
         </section>}
       </main>
       {pendingAction && <RecoveryDialog action={pendingAction} paused={autosavePaused} unavailable={recovery?.raw === null} hasOriginal={typeof recovery?.raw === 'string'} onDownloadOriginal={downloadOriginal} onClose={() => setPendingAction(null)} onConfirm={confirmRecovery}/>}

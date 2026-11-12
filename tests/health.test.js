@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { deviceHealth, summarizeHealth, createSampleNetwork, connectionHealth } from '../src/health.js'
+import { deviceHealth, summarizeHealth, connectionHealth } from '../src/health.js'
+import { createHealthNetwork } from './fixtures/health-network.js'
 import { validateTopology } from '../src/topology.js'
 
 const now = Date.parse('2026-11-12T00:00:00Z')
@@ -39,11 +40,11 @@ test('fresh up/down observations expire to stale at the freshness boundary', () 
   assert.equal(deviceHealth(check(90_001, 'down'), now), 'stale')
 })
 
-test('summary counts only inventory devices and sample network remains valid topology', () => {
-  const sample = createSampleNetwork(now)
-  assert.equal(validateTopology(sample).nodes.length, 14)
-  sample.checks['not-in-inventory'] = check(0, 'down')
-  assert.deepEqual(summarizeHealth(sample.nodes, sample.checks, now), { all: 14, up: 11, down: 1, stale: 1, unknown: 1 })
-  assert.deepEqual(summarizeHealth(sample.nodes, {}, now), { all: 14, up: 0, down: 0, stale: 0, unknown: 14 })
+test('summary counts only inventory devices and test network remains valid topology', () => {
+  const network = createHealthNetwork(now)
+  assert.equal(validateTopology(network).nodes.length, 14)
+  network.checks['not-in-inventory'] = check(0, 'down')
+  assert.deepEqual(summarizeHealth(network.nodes, network.checks, now), { all: 14, up: 11, down: 1, stale: 1, unknown: 1 })
+  assert.deepEqual(summarizeHealth(network.nodes, {}, now), { all: 14, up: 0, down: 0, stale: 0, unknown: 14 })
   assert.deepEqual(summarizeHealth([], {}, now), { all: 0, up: 0, down: 0, stale: 0, unknown: 0 })
 })

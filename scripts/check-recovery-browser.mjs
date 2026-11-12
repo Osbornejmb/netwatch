@@ -1,3 +1,4 @@
+import { createEditorNetwork } from '../tests/fixtures/editor-network.js'
 import { fileURLToPath } from 'node:url'
 import { readFile } from 'node:fs/promises'
 import assert from 'node:assert/strict'
@@ -30,13 +31,13 @@ assert.equal(await stored(), raw)
 const originalDownload = page.getByRole('button', {name: 'Download original saved content', exact: true})
 assert.equal(await download(originalDownload), raw)
 const exported = await download(page.getByRole('button', {name: 'Export current map',exact:true}))
-assert.equal(JSON.parse(exported).nodes.length, 5)
+assert.equal(JSON.parse(exported).nodes.length, 0)
 assert.notEqual(exported, raw)
 // All invalid input variants preserve the visible fallback and saved original.
 for (const invalid of ['{', JSON.stringify({schemaVersion:99,nodes:[],edges:[]}), JSON.stringify({nodes:{},edges:[]}), ' '.repeat(5*1024*1024+1)]) {
   await upload(invalid)
   await page.getByRole('alert').filter({hasText:'Import failed'}).waitFor()
-  assert.equal(await count(), '5')
+  assert.equal(await count(), '0')
   assert.equal(await stored(), raw)
 }
 await upload(JSON.stringify(replacement))
@@ -44,7 +45,7 @@ let dialog = page.getByRole('dialog',{name:'Import this map?'})
 await dialog.waitFor()
 assert.equal(await dialog.getByRole('button',{name:'Cancel',exact:true}).evaluate(e=>e===document.activeElement),true)
 await page.keyboard.press('Escape')
-assert.equal(await count(),'5'); assert.equal(await stored(),raw)
+assert.equal(await count(),'0'); assert.equal(await stored(),raw)
 await upload(JSON.stringify(replacement))
 await dialog.getByRole('button',{name:'Import map',exact:true}).click()
 assert.equal(await count(),'1')
@@ -77,12 +78,12 @@ await page.waitForFunction(key=>JSON.parse(localStorage.getItem(key)).nodes.leng
 assert.equal(await originalDownload.count(),0)
 await page.reload()
 assert.equal(await count(),'1')
-// Normal restore, empty inventory, no-match states and sample-safe export.
+// Normal restore, empty inventory, no-match states and inventory export.
 await upload(JSON.stringify({nodes:[],edges:[]}))
 await page.getByRole('dialog').getByRole('button',{name:'Import map',exact:true}).click()
 assert.equal(await count(),'0')
 assert.ok(await page.getByText('Your network map starts here',{exact:true}).isVisible())
-await upload(exported)
+await upload(JSON.stringify(createEditorNetwork()))
 await page.getByRole('dialog').getByRole('button',{name:'Import map',exact:true}).click()
 assert.equal(await count(),'5')
 await page.getByText('View options',{exact:true}).click()
@@ -90,11 +91,9 @@ await page.getByLabel('Search dashboard devices').fill('no matches')
 assert.ok(await page.getByText('No matching devices',{exact:true}).isVisible())
 await page.getByLabel('Search dashboard devices').fill('')
 await page.getByText('View options',{exact:true}).click()
-await page.getByRole('button',{name:'Preview sample statuses'}).click()
 await page.locator('summary[aria-label="Map backup and recovery"]').click()
 assert.equal(JSON.parse(await download(page.getByRole('button',{name:'Export current map',exact:true}))).nodes.length,5)
 await page.locator('summary[aria-label="Map backup and recovery"]').click()
-await page.getByRole('button',{name:'Return to my network'}).click()
 await page.getByRole('link',{name:'Topology builder',exact:true}).click()
 await page.getByRole('link',{name:'Device inventory',exact:true}).click()
 assert.ok(await page.locator('#inventory').isVisible())
@@ -146,7 +145,7 @@ await page.reload()
 await page.locator('.health-map').scrollIntoViewIfNeeded()
 await page.waitForFunction(() => {
   const nodes = [...document.querySelectorAll('.react-flow__node')]
-  return nodes.length === 5 && nodes.every(node => node.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }))
+  return nodes.length === 0 && nodes.every(node => node.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }))
 })
 await page.evaluate(() => window.scrollTo(0, 0))
 await page.screenshot({path:fileURLToPath(new URL('../docs/screenshots/recovery-desktop.jpg',import.meta.url)),fullPage:true})
@@ -157,5 +156,5 @@ await page.screenshot({path:fileURLToPath(new URL('../docs/screenshots/recovery-
 await page.keyboard.press('Escape')
 assert.equal(await stored(),raw)
 assert.deepEqual(errors,[])
-console.log('PASS: exact original download, separate visible backup, invalid/oversize/cancelled imports, paused import and explicit replacement, restore/empty/search/navigation/sample isolation, quota/retry and denied storage, modal focus/cancel, desktop/narrow')
+console.log('PASS: exact original download, separate visible backup, invalid/oversize/cancelled imports, paused import and explicit replacement, restore/empty/search/navigation/export isolation, quota/retry and denied storage, modal focus/cancel, desktop/narrow')
 await browser.close()

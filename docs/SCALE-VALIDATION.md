@@ -1,3 +1,5 @@
+> Current browser checks use isolated test inventories and controlled snapshot HTTP responses; the built-in sample preview and Vite sample-generator interception described in the original evidence below have been removed. Historical measurements are retained as historical evidence.
+
 # Dashboard scale validation — issue 1.4
 
 The default dashboard remains the network map fitted to the remaining viewport. A repeatable synthetic fixture covers 100 devices and 180 configured links using unique 198.51.100.0/24 documentation addresses. No probes or host services run.
