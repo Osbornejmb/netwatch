@@ -1,5 +1,16 @@
 # Working checkpoint
 
+## Current work: topology-first status and popup details (#18)
+
+- Branch feat/topology-status-paths makes the map fill the viewport below a small title/status strip and horizontal menu. Sidebar, avatar/breadcrumbs, summary cards, and default table are removed; View options contains search/status counts, and Devices opens the inventory separately.
+- Devices are directly tinted green/red/amber/gray. Connection lines summarize endpoint reachability: any down endpoint gives a red dashed path; both up gives green; stale/unknown remain conservative. Device state is never propagated from a failed neighbor.
+- Sample preview starts with the primary router down and supports explicit restore/fail. The other router and responding switches stay green. Colored lines do not establish physical interface state or traffic failover.
+- Device clicks and inventory Inspect open a native modal dialog with status, address, last check, and connected peers/path summaries. Close button, Escape, and backdrop dismiss it; trigger focus is restored.
+- Ten Node tests passed, including redundancy, both-router failure without overriding switch observations, recovery, and orientation-independent stale/unknown path rules. Production build passed.
+- Browser verified red primary-router paths/green alternate paths, restoration (four red paths to one; nine green paths to twelve), switch remaining up, popup data, Escape, close button, backdrop, keyboard Inspect/focus restoration, and return to the unchanged five-device inventory.
+- Desktop and narrow popup/layout inspected. The simplified opening screen has zero sidebars, summary cards, or tables, and the map takes 453 of 565 viewport pixels in the checked desktop view. Top navigation, separate Devices/Inspect, hidden filters/search, clear/reset, and editor round-trip were verified. Screenshots: docs/screenshots/topology-paths.jpg, device-popup.jpg, popup-mobile.jpg.
+- Pending: publish PR and verify its GitHub checks. Live monitoring, actual interface/failover proof, full screen-reader verification, and larger-map performance remain future checks.
+
 ## Product decisions
 
 - Network health is the default screen; topology editing supports it.
@@ -76,3 +87,14 @@
 ### PR #22 review follow-up
 
 A fresh Node 22 install, fourteen tests and build passed during review. The first recovery browser run timed out only at its final screenshot readiness wait after switching browser contexts; four subsequent diagnostic runs passed all checks. The screenshot setup now explicitly brings the main page forward and scrolls the map into view before checking initialized nodes. Recovery and inventory suites were rerun after this change. No application behavior changed in this follow-up.
+
+
+## PR #19 integration/review — Issue #18 (2026-11-12)
+
+- Merged current main into the PR branch and resolved App/Dashboard/architecture conflicts. Preserved LAN-safe IDs, editor arrows, advancing real-mode freshness, inventory validation/editing and keyboard map controls, and saved-map backup/recovery safeguards from #20–#22.
+- Recovery controls moved into a top-menu Backup popover. Paused/error indicators remain visible when closed; errors expand the controls. Default landing retains horizontal Dashboard/Topology editor/Devices navigation and a map filling the rest of the viewport, without summary cards, sidebar or default table.
+- Review found that regenerating controlled graph nodes discarded React Flow measurements during freshness updates, which could leave cards hidden. Dashboard now retains measured health-card dimensions and handles dimension events. Browser regression advances the clock and confirms the cards stay visible. An injected real-mode observation ages from up to stale without remounting (test fixture only; no live monitoring).
+- Review also found that Enter on a map node only selected it rather than opening details. Added Enter/Space activation and button/dialog semantics. DeviceDetails shares the existing tested modal hook for explicit Tab trapping and close/Escape/backdrop/focus restoration.
+- Sixteen Node tests cover existing foundations and endpoint failure/stale/unknown rules. Optional `scripts/check-topology-browser.mjs` verifies map viewport/layout, primary-router failure/restore colors, independent responding switches, optional filters, no-match/reset, node and inventory keyboard popups, focus/backdrop, sample isolation and desktop/narrow navigation. Inventory and recovery scripts were updated for the new menu/filter layout and both pass.
+- Screenshots refreshed: topology-paths.jpg, device-popup.jpg, topology-mobile.jpg, inventory and recovery layouts. Windows hardware, live monitoring, screen-reader behavior and larger-map performance remain unverified; #15 and the host monitoring issues remain separate work.
+- #18 is complete only after this reviewed integration merges. #1/#2/#3 remain completed, and their behavior is preserved.

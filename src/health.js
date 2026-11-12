@@ -19,6 +19,12 @@ export function summarizeHealth(nodes, checks, now) {
   return counts
 }
 
+export function connectionHealth(source, target) {
+  if (source === 'down' || target === 'down') return 'down'
+  if (![source, target].every(status => ['up', 'stale'].includes(status))) return 'unknown'
+  return source === 'stale' || target === 'stale' ? 'stale' : 'up'
+}
+
 export function createSampleNetwork(now) {
   const nodes = [
     { id: 'core-a', type: 'router', position: { x: 290, y: 0 }, data: { label: 'CORE-ROUTER-01', ip: '192.0.2.1', description: 'Sample primary core router' } },
@@ -28,7 +34,7 @@ export function createSampleNetwork(now) {
   for (let group = 0; group < 3; group++) {
     const id = `dist-${group}`
     nodes.push({ id, type: 'switch', position: { x: 90 + group * 380, y: 190 }, data: { label: `DISTRIBUTION-0${group + 1}`, ip: `192.0.2.${10 + group}`, description: `Sample distribution group ${group + 1}` } })
-    for (const source of ['core-a', 'core-b']) edges.push({ id: `${source}-${id}`, source, target: id })
+    for (const source of ['core-a', 'core-b']) edges.push({ id: `${source}-${id}`, source, target: id, targetHandle: source === 'core-a' ? 'uplink-a' : 'uplink-b' })
     for (let row = 0; row < 3; row++) {
       const accessId = `access-${group}-${row}`
       nodes.push({ id: accessId, type: 'switch', position: { x: 130 + group * 380, y: 370 + row * 135 }, data: { label: `ACCESS-${group + 1}-0${row + 1}`, ip: `192.0.2.${30 + group * 3 + row}`, description: `Sample access switch · Group ${group + 1}` } })

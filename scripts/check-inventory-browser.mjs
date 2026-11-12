@@ -8,7 +8,7 @@ page.setDefaultTimeout(10000)
 const errors=[]
 page.on('pageerror',e=>errors.push(e.message))
 await page.goto(process.env.NETWATCH_URL || 'http://127.0.0.1:4173')
-await page.getByRole('button',{name:'Edit topology',exact:true}).click()
+await page.getByRole('link',{name:'Topology builder',exact:true}).click()
 const snapshot=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('netwatch-topology-v1')))
 const original=await snapshot()
 await page.getByLabel('Selected device',{exact:true}).selectOption('r1')

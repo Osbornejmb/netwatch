@@ -1,6 +1,6 @@
 # NetWatch — Network health dashboard
 
-A local-first network operations dashboard with a supporting topology editor. The dashboard shows inventory, health filters, a read-only map, attention panel, and device inspection. A labelled sample preview illustrates up/down states. It does **not** ping devices, monitor BGP, or perform SNMP discovery yet.
+A local-first network operations dashboard with a supporting topology editor. The dashboard shows inventory, health filters, a read-only map, endpoint-colored connection paths, and click-to-open device details. A labelled sample preview illustrates up/down states. It does **not** ping devices, monitor BGP, or perform SNMP discovery yet.
 
 ## Requirements
 - Windows 10/11
@@ -24,10 +24,10 @@ The server binds to this computer only by default. Run `npm run dev:lan` to opt 
 To open the development UI from another computer on the LAN, use the Windows host's LAN IP and port 5173, for example `http://192.168.1.50:5173`. This is development-only and is not secure remote access. Do not expose the Vite development server to the internet.
 
 ## Current capabilities
-- Dashboard is the default screen; use Edit topology for inventory changes.
-- Status counts and filters for up, down, stale, and not monitored.
-- Read-only topology map, attention panel, search, and keyboard-operable inventory inspection.
-- Separate sample preview with 14 example devices; sample checks are frozen and never saved into your network.
+- Dashboard is the default screen; use Topology editor in the top menu for inventory changes.
+- A minimal landing screen with horizontal navigation and the topology filling the remaining window. Status counts, search, and filters are available in View options.
+- Full-width topology map, directly colored devices/paths, search, and click-to-open device details from the map or the separate Devices screen.
+- Separate sample preview with 14 example devices and a primary-router failure/restore control; sample checks are frozen and never saved into your network.
 - Actual inventory stays not monitored until the Windows backend is connected.
 
 ## Topology editor
@@ -111,7 +111,7 @@ With the build preview running, use an existing Playwright installation to run `
 
 ## Backup, import and saved-map recovery
 
-Open **Map backup and recovery** from either the dashboard or editor:
+Open **Backup** (Map backup and recovery) in the top menu from the dashboard, Devices, or editor:
 
 1. **Export current map** downloads the visible real inventory as JSON. Sample-preview devices and statuses are never exported. Keep this file as your normal backup.
 2. **Import backup** validates a JSON file (up to 5 MB), then shows device/link counts and asks before replacing the visible map. Cancel or Escape keeps the current map. Invalid files show an inline error and change neither the visible map nor saved data. The editor's Import JSON uses the same flow.
@@ -122,3 +122,7 @@ Open **Map backup and recovery** from either the dashboard or editor:
 The same warnings and controls are available on the dashboard and in the editor. Import/replacement dialogs start on Cancel, trap Tab, close with Escape, and restore keyboard focus.
 
 With preview running, `node scripts/check-recovery-browser.mjs` runs optional recovery/download/restore regression checks using the same external Playwright configuration as the inventory check above. It also refreshes `docs/screenshots/recovery-{desktop,narrow}.jpg`.
+
+## Optional topology browser check
+
+`node scripts/check-topology-browser.mjs` uses the same external Playwright/browser configuration as the inventory and recovery scripts. It checks the viewport-filling layout, optional filters, independent device/path states, primary-router sample failure/restore, keyboard/mouse popups, focus restoration, sample isolation, and desktop/narrow navigation. Dashboard cards retain React Flow measurement state across freshness-clock updates so the map stays initialized while observations age.

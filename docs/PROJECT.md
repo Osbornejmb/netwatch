@@ -2,7 +2,7 @@
 
 ## Primary outcome
 
-A network operator opens the dashboard and immediately sees device reachability, where attention is needed, and how affected devices connect. The user's reference is a large up/down network map; NetWatch should make it cleaner through hierarchy, readable cards, filters, and a separate attention panel.
+A network operator opens the dashboard and immediately sees device reachability, where attention is needed, and how affected devices connect. The user's reference is a large up/down network map; NetWatch should make it cleaner through a viewport-filling topology, directly colored devices and paths, a small horizontal top menu, optional view controls, and click-to-open device details. The opening screen has no sidebar, summary-card row, or device table. A red router/path must not turn an independently responding redundant switch red.
 
 ## Priority order
 
