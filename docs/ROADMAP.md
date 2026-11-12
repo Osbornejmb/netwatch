@@ -58,9 +58,11 @@ Issues: [#10](https://github.com/Osbornejmb/netwatch/issues/10), [#12](https://g
 
 ## Current evidence and next action
 
-- The original topology/storage foundation is on main. Dashboard UI and solo instructions were merged through [PR #14](https://github.com/Osbornejmb/netwatch/pull/14); its seven tests and production build passed locally and on GitHub, and desktop/narrow browser evidence is attached.
-- #13, #1 and #2 are closed following the dashboard, verification and inventory-editing merges (#14/#20/#21). Other issues are not complete merely because a prerequisite has a prototype or green CI.
-- Saved-map recovery #3 and map-first layout #18 are merged through PRs #22/#19. Issue #15 has 100-device/180-link fixture evidence on its feature branch pending review/merge; see SCALE-VALIDATION.md. Next critical-path work is host API #4.
+- The dashboard foundation and solo instructions were merged through [PR #14](https://github.com/Osbornejmb/netwatch/pull/14), with eight tests/build and desktop/narrow acceptance evidence.
+- Issues #13, #1, #2 and #3 are complete and closed: dashboard foundation, clean-checkout verification, accessible inventory editing and saved-map recovery (#14/#20/#21/#22).
+- Issue #18's map-first layout and popups are merged through #19; issue #15's provisional 100-device/180-link evidence is merged through #23. See SCALE-VALIDATION.md for timings and limits.
+- Issue #24's radial layout, direct-peer highlights and individual dashboard dragging are merged through #25. All 21 tests, build, browser regression suites and pre-merge CI checks passed. Real saved-layout moves autosave; radial/sample moves remain temporary and resettable.
+- Next critical-path work: [#4 local host API and durable inventory/history storage](https://github.com/Osbornejmb/netwatch/issues/4), then #5 bounded Windows ICMP and #6 real dashboard observations. A completed UI or fixture is not proof of live monitoring.
 - No live probes, host database, SNMP/LLDP, alerts, or remote access are implemented yet. #16 requires actual approved Windows/device evidence; fixtures alone cannot close it.
 
 ## Plan maintenance

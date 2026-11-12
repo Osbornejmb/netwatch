@@ -1,5 +1,12 @@
 # Working checkpoint
 
+## Current status (2026-11-12)
+
+- Completed/closed: #13, #1, #2, #3, #15, #18 and #24. Their implementations/evidence were merged through #14/#20/#21/#22/#23/#19/#25 respectively.
+- Latest application checkpoint: #25, commit `5aa9200a2ea3ff8d1c6bd83121457ecbeab1c7be`. All 21 tests, production build, six browser suites and pre-merge GitHub checks passed. The default full-map dashboard supports saved/radial layouts, direct-peer highlighting and individual dragging; saved-layout movement autosaves while radial/sample adjustments are temporary.
+- Next: #4 host API/SQLite persistence, followed by #5 bounded Windows ICMP and #6 real observations. No live probes, host database, SNMP/LLDP, alerts or remote access are implemented.
+- The dated and feature-specific entries below are historical checkpoints. Their then-current next steps and open/closed notes are superseded by this current status. The 100-device fixture is provisional, not a production capacity claim; confirm deployment size and target-machine behavior before release.
+
 ## Current work: topology-first status and popup details (#18)
 
 - Branch feat/topology-status-paths makes the map fill the viewport below a small title/status strip and horizontal menu. Sidebar, avatar/breadcrumbs, summary cards, and default table are removed; View options contains search/status counts, and Devices opens the inventory separately.
@@ -28,7 +35,7 @@
 ## Verification
 
 - Eight Node tests pass (topology validation/recovery plus health states, freshness boundaries, fixture validity, empty inventory summary, and inventory-only counts).
-- Production build and GitHub push/PR checks passed for the dashboard commit; rerun checks for the implementation-plan revision.
+- Production build and GitHub push/PR checks passed for the final dashboard/implementation-plan revision.
 - Browser checked the default unmonitored state, sample totals (14 total, 11 up, 1 down, 1 stale, 1 not monitored), each status filter, empty search/reset, keyboard inspection with Enter, sample isolation, and editor switching.
 - Desktop and 390 px layouts inspected; narrow document width matches the viewport. Mobile navigation spacing was corrected. Map supports zoom/pan; use the inventory list for readable device details on narrow screens.
 - Review images: docs/screenshots/dashboard.jpg and docs/screenshots/dashboard-mobile.jpg. Both show SAMPLE DATA.
@@ -37,16 +44,24 @@
 
 - Implement host API/persistence and bounded Windows ICMP checks (#4–#6), then connect actual observations and monitoring freshness to the dashboard.
 - No real probes, SNMP, BGP session monitoring, alerts, or remote access exist yet. Hardware behavior, large-topology performance, and screen-reader behavior are unverified.
-- Issue #13 tracks the dashboard change. Do not close #1: its clean-checkout and full editor acceptance checks remain separate work.
+- Issue 1.0 (#13) is complete via merged PR #14, with acceptance criteria checked and linked evidence. Next is issue 1.1 (#1). Do not close #1: its clean-checkout and full editor acceptance checks remain separate work.
 
 ## Issue-plan review
 
-- Reviewed and updated all fifteen current implementation issues, keeping them open and preserving existing numbers.
+- At the plan review, updated all fifteen implementation issues without closing them or changing existing numbers. Issue #13 was subsequently completed by PR #14.
 - Added #15 for representative larger-map evidence and #16 for the actual Windows end-to-end local monitoring release gate.
 - Clarified failure/recovery policy, stale aging without fresh API responses, history retention, browser-to-host migration, and restart/backup behavior.
 - Moved local incidents #11 into M2. Alerts and authentication no longer wait unnecessarily for SNMP/LLDP. #3 verifies/reuses navigation from PR #14 rather than building it twice.
 - Critical path: #13 → #1 → #4 → #5 → #6 → #11 → #16. #2/#3/#15 are also release prerequisites. No issue is closed by this plan review.
 - docs/ROADMAP.md and docs/github-plan.json match the updated GitHub issues. Stable plan markers prevent renamed issues being recreated. The workflow self-check covers dependency links, reruns, renamed titles, and preservation of edited/closed issues.
+
+## Historical PR #14 acceptance checkpoint
+
+- Reviewed PR #14 against its connected code, tests, persisted-data boundaries, sample isolation, and issue 1.0 criteria. No merge-blocking findings; no external change requests or inline review comments were present.
+- All eight local tests passed again. Final-head push and PR checks were green before the owner-authorized squash merge.
+- Accepted implementation commit: 7b6b083580ccc6b15b59d5ede9d595447287ab76 on main. Local main was synchronized.
+- Issue 1.0 is GitHub #13, not GitHub #1. It was already implemented in the accepted PR; all seven acceptance criteria are now checked and the issue is closed. No duplicate feature implementation is needed.
+- Issue 1.1 (#1) remains the next development/verification checkpoint. No host probes or real-hardware claims were added during acceptance.
 
 ## Foundation reliability follow-up (2026-11-12)
 
