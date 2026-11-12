@@ -58,9 +58,9 @@ Issues: [#10](https://github.com/Osbornejmb/netwatch/issues/10), [#12](https://g
 
 ## Current evidence and next action
 
-- The original topology/storage foundation is on main. Dashboard UI and solo instructions are implemented in open [PR #14](https://github.com/Osbornejmb/netwatch/pull/14); its seven tests and production build passed locally and on GitHub, and desktop/narrow browser evidence is attached.
-- #13 remains open until the dashboard PR merges. Other issues are not complete merely because a prerequisite has a prototype or green CI.
-- Next: review/land the dashboard foundation, complete clean-checkout verification #1, then start host API #4. Complete #2/#3/#15 alongside that sequence before the MVP release gate.
+- The original topology/storage foundation is on main. Dashboard UI and solo instructions were merged through [PR #14](https://github.com/Osbornejmb/netwatch/pull/14); its seven tests and production build passed locally and on GitHub, and desktop/narrow browser evidence is attached.
+- #13, #1 and #2 are closed following the dashboard, verification and inventory-editing merges (#14/#20/#21). Other issues are not complete merely because a prerequisite has a prototype or green CI.
+- Saved-map recovery #3 is implemented on its feature branch pending review/merge. Next: larger-map verification #15 in the recommended solo order, or host API #4 on the live-monitoring critical path. Both remain release prerequisites.
 - No live probes, host database, SNMP/LLDP, alerts, or remote access are implemented yet. #16 requires actual approved Windows/device evidence; fixtures alone cannot close it.
 
 ## Plan maintenance

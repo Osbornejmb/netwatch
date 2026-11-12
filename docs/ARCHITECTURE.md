@@ -2,9 +2,9 @@
 
 ## Implemented foundation
 
-React + Vite opens the network health dashboard by default. `src/Dashboard.jsx` renders a viewport-filling read-only React Flow map with title/status, optional View controls, and click-to-open detail dialogs. App.jsx provides horizontal Dashboard/Topology editor/Devices navigation; the supporting device table is shown only for the Devices view. The existing topology canvas remains available through Edit topology. Router and switch components share the topology data contract. `src/topology.js` validates imported and saved maps and strips untrusted rendering properties. The browser stores a versioned topology; export/import is the portability boundary. Existing v1 exports remain readable.
+React + Vite opens the network health dashboard by default. `src/Dashboard.jsx` renders a viewport-filling read-only React Flow map with title/status, optional View controls, and click-to-open detail dialogs. App.jsx provides horizontal Dashboard/Topology editor/Devices navigation; the supporting device table is shown only for the Devices view. The existing topology canvas remains available through Edit topology. Router and switch components share the topology data contract. `src/topology.js` validates imported and saved maps and strips untrusted rendering properties. The browser stores a versioned topology; export/import is the portability boundary. Valid v1 exports remain readable; invalid or duplicate management addresses are rejected without replacement (see README recovery guidance).
 
-The system has no active probes, backend, authentication, or live status. Example addresses are inventory placeholders. Management address text is descriptive in this phase; backend address validation is mandatory before any probes exist.
+The system has no active probes, backend, authentication, or live status. Example addresses are inventory placeholders. Management addresses are validated as IPv4/IPv6 literals (or empty), with canonical IPv6 comparison and duplicate rejection. Backend address validation remains mandatory before any probes exist.
 
 ## Planned system
 
@@ -23,7 +23,7 @@ Bind development and the future API to loopback by default. LAN development is e
 
 ## Recovery and delivery
 
-A failed storage read pauses autosave until the user explicitly replaces the saved data. Failed writes display a warning and preserve the in-memory map for export. Import replacement requires confirmation. CI runs the topology self-checks and production build. Browser interaction and Windows hardware checks remain separate acceptance work in the roadmap.
+A failed storage read pauses autosave until the user explicitly replaces the saved data. Failed writes display a warning and preserve the in-memory map for export. Import replacement requires an accessible confirmation dialog. Unreadable original storage text is retained separately for download; denied access is distinguished from invalid content. Importing while recovery is active changes only the in-memory map and keeps autosave paused. A separate explicit replacement resumes autosave only after a successful write. Recovery/backup controls and failed-save warnings appear in both views. CI runs the topology self-checks and production build. Browser interaction and Windows hardware checks remain separate acceptance work in the roadmap.
 
 ## Dashboard observations
 
@@ -33,4 +33,12 @@ System fonts replace the starter's Google Fonts import so the dashboard does not
 
 ## Device selection
 
-`src/DeviceDetails.jsx` uses a native modal dialog opened from map nodes or inventory Inspect. It shows the selected device and its connected peers/path summaries. The browser traps focus; close button, Escape, and backdrop dismiss it, and focus returns to the trigger. `createSampleNetwork` still supplies a separate fixture; the dashboard adds an explicit primary-router failure/restore preview without writing to storage.
+`src/DeviceDetails.jsx` uses a native modal dialog opened from map nodes or inventory Inspect. It shows the selected device and its connected peers/path summaries. The shared modal hook traps forward/reverse Tab; close button, Escape, and backdrop dismiss it, and focus returns to the trigger. Map nodes expose button/dialog semantics and Enter/Space activation. `createSampleNetwork` still supplies a separate fixture; the dashboard adds an explicit primary-router failure/restore preview without writing to storage.
+
+## Inventory editing
+
+`src/inventory.js` defines literal-address normalization and duplicate comparison, shared by add/edit forms and topology import/storage validation. It rejects hostnames, CIDR/zone/bracket syntax and ambiguous IPv4 notation. IPv6 uses the WHATWG URL parser for validation and canonical compression, without network requests; IPv4-mapped IPv6 remains canonical IPv6. Empty addresses are unmonitored inventory entries. Invalid legacy saved maps pause autosave without changing the raw data; no persisted schema change is required.
+
+`DeviceDialog.jsx` and `RecoveryDialog.jsx` share `useModal.js` for native modal dialogs, explicit Tab wrapping, Escape handling and focus restoration after close. Device fields have associated validation errors. Edits replace only device data, preserving type, ID, position and connections. Selection is derived from current nodes by ID, so edited/dragged details stay current. `InventoryControls.jsx` provides device selection, X/Y position updates and directed link creation/removal without canvas gestures. The existing pointer workflows remain available.
+
+Dashboard health-card dimensions are maintained separately from inventory, using React Flow dimension-change events. Rendered nodes carry those measured dimensions across freshness/filter/selection updates, preventing reinitialization or hidden nodes when the clock ticks. This UI state is not persisted or exported. Backup controls are available in a top-menu popover with visible paused/error indicators, preserving the viewport-filling map and all recovery safeguards.

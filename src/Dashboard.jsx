@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ReactFlow, Controls, Handle, Position } from '@xyflow/react'
 import { ArrowDownCircle, ArrowUpRight, CheckCircle2, CircleHelp, Clock3, Network, Router, Search } from 'lucide-react'
 import { HEALTH, createSampleNetwork, deviceHealth, summarizeHealth, connectionHealth } from './health'
 import DeviceDetails from './DeviceDetails'
+
 import './dashboard.css'
 
 const healthIcons = { up: CheckCircle2, down: ArrowDownCircle, stale: Clock3, unknown: CircleHelp }
@@ -31,11 +32,43 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
   const [statusFilter, setStatusFilter] = useState('all')
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState(null)
+  const [nodeSizes, setNodeSizes] = useState({})
+  // Preserve React Flow's measured health-card dimensions across clock/filter
+  // renders. Replacing controlled nodes without them resets initialization.
+  const onNodesChange = useCallback(changes => {
+    const measured = changes.filter(change => change.type === 'dimensions' && change.dimensions)
+    if (!measured.length) return
+    setNodeSizes(previous => {
+      let next = previous
+      for (const change of measured) {
+        const size = change.dimensions
+        if (previous[change.id]?.width !== size.width || previous[change.id]?.height !== size.height) {
+          next = { ...next, [change.id]: size }
+        }
+      }
+      return next
+    })
+  }, [])
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (sampleMode) return
+    const update = () => setNow(Date.now())
+    update()
+    const timer = window.setInterval(update, 1000)
+    window.addEventListener('focus', update)
+    document.addEventListener('visibilitychange', update)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', update)
+      document.removeEventListener('visibilitychange', update)
+    }
+  }, [sampleMode])
   const sampleTime = useMemo(() => Date.now(), [])
   const sample = useMemo(() => createSampleNetwork(sampleTime), [sampleTime])
   const { nodes, edges, checks } = sampleMode ? { ...sample, checks: { ...sample.checks, 'core-a': { ...sample.checks['core-a'], status: sampleRouterDown ? 'down' : 'up' } } } : { nodes: inventory, edges: inventoryEdges, checks: NO_CHECKS }
-  const counts = summarizeHealth(nodes, checks, sampleTime)
-  const devices = nodes.map(node => ({ ...node, health: deviceHealth(checks[node.id], sampleTime) }))
+  const counts = summarizeHealth(nodes, checks, sampleMode ? sampleTime : now)
+  const devices = nodes.map(node => ({ ...node, health: deviceHealth(checks[node.id], sampleMode ? sampleTime : now) }))
+
   const visible = devices.filter(node => (statusFilter === 'all' || node.health === statusFilter) && `${node.data.label} ${node.data.ip}`.toLowerCase().includes(query.trim().toLowerCase()))
   const visibleIds = new Set(visible.map(node => node.id))
   const selected = devices.find(node => node.id === selectedId)
@@ -83,8 +116,8 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
     </section>
     ) : (
         <div className="health-map">
-          <ReactFlow key={sampleMode ? 'sample' : 'inventory'}
-            nodes={devices.map(node => ({ ...node, type: 'health', hidden: !visibleIds.has(node.id), selected: selectedId === node.id, ariaLabel: `${node.data.label}, ${HEALTH[node.health].label}. Open device details`, data: { ...node.data, kind: node.type, status: node.health } }))}
+          <ReactFlow key={sampleMode ? 'sample' : 'inventory'} onNodesChange={onNodesChange}
+            nodes={devices.map(node => ({ ...node, measured: nodeSizes[node.id], type: 'health', ariaRole: 'button', domAttributes: { 'aria-haspopup': 'dialog', onKeyDown: event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); setSelectedId(node.id) } } }, hidden: !visibleIds.has(node.id), selected: selectedId === node.id, ariaLabel: `${node.data.label}, ${HEALTH[node.health].label}. Open device details`, data: { ...node.data, kind: node.type, status: node.health } }))}
             edges={mapEdges}
             nodeTypes={nodeTypes} onNodeClick={(_, node) => setSelectedId(node.id)} onPaneClick={() => setSelectedId(null)}
             nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} deleteKeyCode={null}
