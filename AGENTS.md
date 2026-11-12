@@ -7,7 +7,7 @@ NetWatch is a local-first Windows network monitoring dashboard. Its job is to sh
 Stack: React 18, Vite 6, plain JavaScript (ESM, no TypeScript), React Flow (`@xyflow/react`), Lucide, Tailwind. Host: Node >= 22.13 using built-in `node:sqlite` (no runtime packages). No linter or formatter is configured.
 
 **Implemented:** dashboard and topology editor, browser-local topology with JSON backup/restore and recovery, loopback Node API + SQLite store with explicit browser transfer (`docs/HOST-API.md`), opt-in bounded Windows ICMP collector (`docs/ICMP-COLLECTOR.md`).
-**Issue #6 implementation:** dashboard snapshot polling, host freshness, per-device authorization and bounded history; see WORKLOG.md for verification and publication status. **Not implemented:** incidents/alerts, SNMP/LLDP, BGP, authentication, remote access, Windows service packaging. Never describe a planned feature as implemented. Docs can lag the code: confirm status with `git log` and the code, and never hardcode test counts or PR/issue states from memory.
+**Issue #6 implementation:** dashboard snapshot polling, host freshness, per-device authorization and bounded history; merged through PR #30; see WORKLOG.md for verification and remaining release work. **Not implemented:** incidents/alerts, SNMP/LLDP, BGP, authentication, remote access, Windows service packaging. Never describe a planned feature as implemented. Docs can lag the code: confirm status with `git log` and the code, and never hardcode test counts or PR/issue states from memory.
 
 ## Commands
 
