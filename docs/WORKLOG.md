@@ -119,3 +119,13 @@ A fresh Node 22 install, fourteen tests and build passed during review. The firs
 - Evidence images: radial-desktop.jpg, radial-narrow.jpg, radial-highlight-desktop.jpg, radial-highlight-narrow.jpg, radial-controls-narrow.jpg and radial-101-narrow.jpg. Large radial overviews can make labels tiny and links can cross; zoom/search/Devices remain necessary. No hardware, monitoring or full screen-reader claims.
 - #24 remains open until PR review/merge. Next monitoring milestone remains host API/storage #4.
 - Final checks: Node 22.23.5 tests/build and radial, topology, recovery, inventory and 100-device scale browser suites pass. Scale count assertions now target the status selector explicitly because View options also contains layout/center selectors.
+
+
+## Dashboard individual dragging follow-up — #24 / PR #25 (2026-11-12)
+
+- Enabled free individual node dragging in the dashboard. Position overrides render during movement; direct peers/incident paths highlight from drag start and links follow the moved device. Neighbor positions do not change, and drag release does not open a detail popup. Click/keyboard inspection remains available.
+- Real Saved positions persist at drag stop through App's existing autosave/recovery flow, with reload/editor/export compatibility. Radial and sample moves remain view-only, with explicit Reset/refit. Source/layout/center/sample changes invalidate or clear temporary geometry. No IDs, fields, edge endpoints/handles or health policy change.
+- Moved map focus/reset controls into an overlay, preserving canvas geometry during interaction. Added scripts/check-dashboard-drag-browser.mjs for mid-drag highlights/path geometry, individual movement, no drag popup, manual persistence/reload, radial/sample isolation/reset, narrow gestures and quota failure preserving the previous save and moved in-memory graph.
+- A narrow browser gesture after resize initially started before Fit view completed. The test now waits for resize observation and fully fitted node bounds before dragging; no timing logs remain in application code.
+- Screenshots: dashboard-drag-saved.jpg, dashboard-drag-radial.jpg and dashboard-drag-narrow.jpg. Highlighting refers to configured incident links, not verified hardware port state. Full hardware/touch-device/screen-reader testing is not claimed.
+- Final verification: Node 22.23.5 passes all 21 tests and production build; dashboard-drag, radial, topology, recovery, inventory and 100-device scale browser checks pass. The scale QA server was restarted after a connection-refused setup failure; the rerun passed. Commit/push requested on the existing feat/radial-map branch.

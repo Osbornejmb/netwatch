@@ -176,7 +176,7 @@ export default function App() {
         </section>
         </header>
 
-        {view !== 'editor' ? <Dashboard nodes={nodes} edges={edges} showInventory={view === 'inventory'} onEdit={() => setView('editor')}/> : <section className="page-content" id="topology">
+        {view !== 'editor' ? <Dashboard nodes={nodes} edges={edges} showInventory={view === 'inventory'} onMoveDevice={(id, position) => setNodes(current => current.map(node => node.id === id ? { ...node, position } : node))} onEdit={() => setView('editor')}/> : <section className="page-content" id="topology">
           <div className="page-heading">
             <div><div className="eyebrow">NETWORK MANAGEMENT / PHASE 01</div><h1>Topology builder</h1><p>Map your infrastructure first. Monitoring will be connected in the next phase.</p></div>
             <div className="heading-actions"><button className="button secondary" disabled={importBusy} onClick={() => importInput.current.click()}>Import JSON</button><button className="button secondary" onClick={exportTopology}><Download size={16}/> Export JSON</button><button className="button primary" onClick={() => setShowModal('add')}><Plus size={17}/> Add device</button></div>

@@ -1,6 +1,6 @@
 # NetWatch — Network health dashboard
 
-A local-first network operations dashboard with a supporting topology editor. The dashboard shows inventory, health filters, a read-only map, endpoint-colored connection paths, and click-to-open device details. A labelled sample preview illustrates up/down states. It does **not** ping devices, monitor BGP, or perform SNMP discovery yet.
+A local-first network operations dashboard with a supporting topology editor. The dashboard shows inventory, health filters, an interactive map, endpoint-colored connection paths, and click-to-open device details. A labelled sample preview illustrates up/down states. It does **not** ping devices, monitor BGP, or perform SNMP discovery yet.
 
 ## Requirements
 - Windows 10/11
@@ -129,7 +129,7 @@ With preview running, `node scripts/check-recovery-browser.mjs` runs optional re
 
 ## Larger-map checks
 
-The dashboard defaults to the full network map. Fit view can zoom out far enough for the tested 100-device/180-link fixture on desktop and narrow screens. At overview scale, use zoom, search plus Fit view, or Devices to read individual labels. Manual node positions stay unchanged.
+The dashboard defaults to the full network map. Fit view can zoom out far enough for the tested 100-device/180-link fixture on desktop and narrow screens. At overview scale, use zoom, search plus Fit view, or Devices to read individual labels. Fit/zoom leave manual node positions unchanged.
 
 See [scale validation](docs/SCALE-VALIDATION.md) for fixture/browser commands, timings, screenshots and measured limits. `scripts/check-scale-browser.mjs` is an optional development-server QA check; it injects synthetic sample checks only into isolated test browsers. It does not enable real monitoring or establish production capacity.
 
@@ -137,8 +137,17 @@ See [scale validation](docs/SCALE-VALIDATION.md) for fixture/browser commands, t
 
 In **View options → Map layout**, choose **Radial** to show connected devices in concentric graph-distance rings. Automatic centers prefer the router with the most connected peers (or the most connected device if there is no router). Use **Radial center** to choose a device; other disconnected groups keep their own automatic centers. Switch to **Saved positions** to restore the original arrangement exactly.
 
-Radial layout changes only the read-only dashboard display. It preserves IDs, configured links, health, manual positions, backups and editor data. The map refits after layout/center changes. Filters hide matching devices/links without rearranging the full radial layout. Dense meshes may still have crossing links and tiny overview labels; zoom or use Devices for detail. Layout preference is temporary for the current dashboard session, with saved positions remaining the default after reload or an editor round-trip.
+Radial layout changes only the dashboard display. It preserves IDs, configured links, health, manual positions, backups and editor data. The map refits after layout/center changes. Filters hide matching devices/links without rearranging the full radial layout. Dense meshes may still have crossing links and tiny overview labels; zoom or use Devices for detail. Layout preference is temporary for the current dashboard session, with saved positions remaining the default after reload or an editor round-trip.
 
-Click a map device, press Enter/Space on it, or use **Inspect** in Devices to highlight its directly connected peers. The focus device gets a solid blue outline, peers get dashed blue outlines, and incident links are emphasized; other items are subdued. Device/path health colors stay unchanged. Close the details popup to explore the highlight. Use **Clear highlight** or click the canvas background to clear it. Incoming and outgoing configured links both count; indirect/transitive neighbors are not highlighted. Filters still apply, and selecting an isolated device shows zero direct peers.
+Click a map device, press Enter/Space on it, or use **Inspect** in Devices to highlight its directly connected peers. The focus device gets a solid blue outline, peers get dashed blue outlines, and incident links are emphasized; other items are subdued. Device/path health colors stay unchanged. Close the details popup to explore the highlight. Use **Clear highlight** or click the canvas background to clear it. You can also drag a device to move it and highlight its peers without opening a popup. Incoming and outgoing configured links both count; indirect/transitive neighbors are not highlighted. Filters still apply, and selecting an isolated device shows zero direct peers.
 
 `node scripts/check-radial-browser.mjs` runs the optional radial/highlight browser checks with the same external Playwright configuration as the other checks. It includes manual-position restoration, custom centers, storage/sample isolation, keyboard inspection, short-screen controls, and a 101-device/180-link graph with an isolated device. No dependency or persisted-schema change is needed.
+
+## Drag devices directly on the dashboard
+
+Drag an individual router or switch to reposition it. Its direct incoming/outgoing peers and attached configured links highlight immediately, and those lines follow the device while it moves. Neighboring devices stay in place. Releasing a drag leaves the highlight visible without opening a details popup; click or press Enter/Space for details as before.
+
+- **Saved positions, your network:** releasing a drag updates that device's saved position through the existing autosave and recovery rules. Changes survive reload and appear in the editor/export. A failed save keeps the moved in-memory map available for export and shows the normal warning; unreadable original content remains protected while autosave is paused.
+- **Radial layout or sample preview:** movement adjusts only the current view. **Reset radial positions** / **Reset sample positions** restores the generated arrangement and refits it. Changing layout, center or sample mode clears temporary adjustments. Saved manual geometry and sample isolation are preserved.
+
+Clear highlight and reset controls sit over the map so selecting/dragging does not resize the canvas. Only existing configured connections are emphasized; the app does not discover or verify physical switch-port state. Connections/ports can still be edited through the topology editor. Optional `scripts/check-dashboard-drag-browser.mjs` tests drag/highlight, line following, independent-node movement, persistence/reload, radial/sample reset, narrow screens and failed-save preservation.
