@@ -45,11 +45,16 @@ export function validateTopology(value) {
 }
 
 export function readTopology(storage, fallback) {
+  let raw
   try {
-    const raw = storage.getItem(STORAGE_KEY)
-    return { topology: raw === null ? fallback : validateTopology(JSON.parse(raw)), error: '' }
+    raw = storage.getItem(STORAGE_KEY)
   } catch {
-    return { topology: fallback, error: 'Saved map could not be loaded. Autosave is paused to preserve it. Export your map before replacing the saved data.' }
+    return { topology: fallback, recovery: { raw: null }, error: 'Browser storage could not be read. Autosave is paused. Export the visible map before reloading; allow storage access and reload to recover the original saved content.' }
+  }
+  try {
+    return { topology: raw === null ? fallback : validateTopology(JSON.parse(raw)), recovery: null, error: '' }
+  } catch {
+    return { topology: fallback, recovery: { raw }, error: 'Saved map could not be loaded. Autosave is paused to preserve it. A fallback map was loaded instead of the saved original. Download the original saved content before replacing it.' }
   }
 }
 

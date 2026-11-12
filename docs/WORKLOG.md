@@ -59,3 +59,20 @@
 - Thirteen Node tests and production build pass. Browser tests against the production build passed for edit preservation, invalid/duplicate input, IPv6 normalization, empty-address creation, modal focus/escape/return, save/cancel, numerical move, keyboard link add/remove, delete with attached-link cleanup, duplicate import rejection and import cancellation.
 - Desktop (1440×1000) and narrow (390×844) checked; screenshots: `docs/screenshots/inventory-desktop.jpg` and `docs/screenshots/inventory-narrow.jpg`. No live probes, host API, SNMP or real-device checks are included. Host API must revalidate before probing (#4/#5). Raw corrupt-data download and import/recovery dialog replacements remain #3 work.
 - Issue #2 stays open until the implementation is merged and acceptance evidence is reviewed. Next: saved-map recovery #3 or the live-monitoring critical path #4.
+
+
+## Issue 1.3 — Saved-map recovery and inventory navigation (2026-11-12)
+
+- #1 and #2 were completed and closed through merged PRs #20/#21. This change implements #3, keeping the existing dashboard/device list/navigation.
+- `readTopology` retains unreadable original text separately from the visible fallback, distinguishing read-access denial from invalid content. The original is downloadable unchanged, including empty text. Denied access offers accurate recovery guidance without pretending an original backup is available.
+- Backup/import/save controls and failure feedback are available in both views. Export always uses actual inventory, even in sample mode. Import validates before a native accessible confirmation; invalid input, Cancel and Escape preserve saved and visible maps. Imports during recovery change only the visible map, keeping autosave paused until separate explicit saved-map replacement succeeds.
+- Recovery dialogs share the tested modal focus logic with device dialogs, start on Cancel, trap forward/reverse Tab, close on Escape and restore focus. Import errors are inline; native import/replacement alert/confirm calls are removed.
+- Fourteen Node tests and production build pass. Optional `scripts/check-recovery-browser.mjs` verifies exact original downloads vs visible exports, malformed/future/invalid/oversize import rejection, cancellation, paused import, explicit replacement, backup/restore, empty/no-match states, sample-safe exports, editor/device-list navigation, denied reads, quota failures and successful retries. Failed replacement retains the raw recovery copy. Existing inventory regression checks also pass after the shared-dialog refactor.
+- Desktop 1440×1000 and narrow 390×844 checked with no document overflow. Review images: `docs/screenshots/recovery-desktop.jpg` and `docs/screenshots/recovery-narrow.jpg`. Browser tests use isolated contexts; they do not probe devices.
+- No dependency or persisted topology schema change. Multi-tab conflict resolution and host persistence remain future work; screen-reader/hardware verification is not claimed. #3 stays open until merge/review of the acceptance evidence.
+- Next: #15 for larger-map evidence in the solo sequence; #4 for the host API on the monitoring critical path.
+
+
+### PR #22 review follow-up
+
+A fresh Node 22 install, fourteen tests and build passed during review. The first recovery browser run timed out only at its final screenshot readiness wait after switching browser contexts; four subsequent diagnostic runs passed all checks. The screenshot setup now explicitly brings the main page forward and scrolls the map into view before checking initialized nodes. Recovery and inventory suites were rerun after this change. No application behavior changed in this follow-up.

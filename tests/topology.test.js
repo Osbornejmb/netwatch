@@ -26,7 +26,7 @@ test('rejects malformed devices and links', () => {
 
 test('missing storage loads defaults; corrupt and inaccessible storage preserve data', () => {
   const fallback = topology()
-  assert.deepEqual(readTopology({ getItem: () => null }, fallback), { topology: fallback, error: '' })
+  assert.deepEqual(readTopology({ getItem: () => null }, fallback), { topology: fallback, error: '', recovery: null })
   for (const getItem of [() => '{', () => '{"nodes":{},"edges":[]}', () => { throw Error('denied') }]) {
     const result = readTopology({ getItem }, fallback)
     assert.equal(result.topology, fallback)
@@ -39,4 +39,20 @@ test('accepts legacy exports and rejects future schemas and size limits', () => 
   assert.equal(validateTopology(topology()).schemaVersion, 1)
   assert.throws(() => validateTopology({ ...topology(), schemaVersion: 2 }), /schema/)
   assert.throws(() => validateTopology({ nodes: Array(2001).fill(null), edges: [] }), /2,000/)
+})
+
+
+test('recovery retains exact unreadable saved text and distinguishes denied access', () => {
+  const fallback = topology()
+  for (const raw of ['', ' {broken\ntext', JSON.stringify({ schemaVersion: 99, nodes: [], edges: [] })]) {
+    const storage = { getItem: () => raw, setItem: () => assert.fail('must not overwrite') }
+    const result = readTopology(storage, fallback)
+    assert.equal(result.recovery.raw, raw)
+    assert.equal(result.topology, fallback)
+    assert.match(result.error, /fallback/)
+  }
+  const result = readTopology({ getItem() { throw Error('denied') } }, fallback)
+  assert.equal(result.recovery.raw, null)
+  assert.match(result.error, /storage.*read/)
+  assert.equal(readTopology({ getItem: () => null }, fallback).recovery, null)
 })

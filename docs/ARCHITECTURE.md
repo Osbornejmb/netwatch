@@ -23,7 +23,7 @@ Bind development and the future API to loopback by default. LAN development is e
 
 ## Recovery and delivery
 
-A failed storage read pauses autosave until the user explicitly replaces the saved data. Failed writes display a warning and preserve the in-memory map for export. Import replacement requires confirmation. CI runs the topology self-checks and production build. Browser interaction and Windows hardware checks remain separate acceptance work in the roadmap.
+A failed storage read pauses autosave until the user explicitly replaces the saved data. Failed writes display a warning and preserve the in-memory map for export. Import replacement requires an accessible confirmation dialog. Unreadable original storage text is retained separately for download; denied access is distinguished from invalid content. Importing while recovery is active changes only the in-memory map and keeps autosave paused. A separate explicit replacement resumes autosave only after a successful write. Recovery/backup controls and failed-save warnings appear in both views. CI runs the topology self-checks and production build. Browser interaction and Windows hardware checks remain separate acceptance work in the roadmap.
 
 ## Dashboard observations
 
@@ -35,4 +35,4 @@ System fonts replace the starter's Google Fonts import so the dashboard does not
 
 `src/inventory.js` defines literal-address normalization and duplicate comparison, shared by add/edit forms and topology import/storage validation. It rejects hostnames, CIDR/zone/bracket syntax and ambiguous IPv4 notation. IPv6 uses the WHATWG URL parser for validation and canonical compression, without network requests; IPv4-mapped IPv6 remains canonical IPv6. Empty addresses are unmonitored inventory entries. Invalid legacy saved maps pause autosave without changing the raw data; no persisted schema change is required.
 
-`DeviceDialog.jsx` uses a modal native dialog, explicit Tab wrapping, Escape handling, associated field errors and focus restoration after close. Edits replace only device data, preserving type, ID, position and connections. Selection is derived from current nodes by ID, so edited/dragged details stay current. `InventoryControls.jsx` provides device selection, X/Y position updates and directed link creation/removal without canvas gestures. The existing pointer workflows remain available.
+`DeviceDialog.jsx` and `RecoveryDialog.jsx` share `useModal.js` for native modal dialogs, explicit Tab wrapping, Escape handling and focus restoration after close. Device fields have associated validation errors. Edits replace only device data, preserving type, ID, position and connections. Selection is derived from current nodes by ID, so edited/dragged details stay current. `InventoryControls.jsx` provides device selection, X/Y position updates and directed link creation/removal without canvas gestures. The existing pointer workflows remain available.
