@@ -38,6 +38,8 @@ Stack: React 18, Vite 6, plain JavaScript (ESM, no TypeScript), React Flow (`@xy
 
 ## Reading order (read what the task needs, not everything)
 
+For NetWatch implementation, debugging and review, use [netwatch-context](.agents/skills/netwatch-context/SKILL.md) to locate connected code/tests and keep context reads focused. This does not relax the requirements below.
+
 1. The user's current request and this file.
 2. `docs/PROJECT.md` (short), then only the relevant section of `docs/ARCHITECTURE.md`; for planned work, the relevant part of `docs/ROADMAP.md` and its GitHub issue.
 3. `docs/WORKLOG.md`: read only the "Current status" block at the top; the rest is dated history, so Grep it for your topic. Confirm against the code; it is not proof.

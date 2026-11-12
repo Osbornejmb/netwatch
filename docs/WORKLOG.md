@@ -1,5 +1,10 @@
 # Working checkpoint
 
+## Repo-local context skill (2026-11-13)
+
+- Added .agents/skills/netwatch-context/SKILL.md and an AGENTS.md entry point. It routes implementation/debug/review to connected code, contracts and checks, promotes targeted reads instead of repeated full-document discovery, and preserves existing verification/authorization rules. Token savings are not benchmarked. Skill format and all referenced file paths were validated.
+- Base checkpoint: PR #29 merged as 39c551d; launcher issue #28 is closed. Real-time dashboard issue 2.3 (#6) remains next. Earlier pending-merge launcher entries below are historical.
+
 ## Current work (2026-11-13): Windows local controls #28
 
 - Bounded Ubuntu rerun identified the actual CI hang in a redundant post-crash restart assertion: TCP closed before lock cleanup, but cleanup could finish before the restart, so the supposedly refused host actually started. Removed that racy duplicate assertion; dedicated existing-lock refusal and no-orphan-listener checks remain. The independent delayed-listener production bug also remains fixed/covered. No platform tests were disabled; fresh CI is required before acceptance.
