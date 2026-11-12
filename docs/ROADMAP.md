@@ -60,7 +60,7 @@ Issues: [#10](https://github.com/Osbornejmb/netwatch/issues/10), [#12](https://g
 
 - The original topology/storage foundation is on main. Dashboard UI and solo instructions were merged through [PR #14](https://github.com/Osbornejmb/netwatch/pull/14); its seven tests and production build passed locally and on GitHub, and desktop/narrow browser evidence is attached.
 - #13, #1 and #2 are closed following the dashboard, verification and inventory-editing merges (#14/#20/#21). Other issues are not complete merely because a prerequisite has a prototype or green CI.
-- Saved-map recovery #3 is implemented on its feature branch pending review/merge. Next: larger-map verification #15 in the recommended solo order, or host API #4 on the live-monitoring critical path. Both remain release prerequisites.
+- Saved-map recovery #3 and map-first layout #18 are merged through PRs #22/#19. Issue #15 has 100-device/180-link fixture evidence on its feature branch pending review/merge; see SCALE-VALIDATION.md. Next critical-path work is host API #4.
 - No live probes, host database, SNMP/LLDP, alerts, or remote access are implemented yet. #16 requires actual approved Windows/device evidence; fixtures alone cannot close it.
 
 ## Plan maintenance

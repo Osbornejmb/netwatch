@@ -126,3 +126,9 @@ With preview running, `node scripts/check-recovery-browser.mjs` runs optional re
 ## Optional topology browser check
 
 `node scripts/check-topology-browser.mjs` uses the same external Playwright/browser configuration as the inventory and recovery scripts. It checks the viewport-filling layout, optional filters, independent device/path states, primary-router sample failure/restore, keyboard/mouse popups, focus restoration, sample isolation, and desktop/narrow navigation. Dashboard cards retain React Flow measurement state across freshness-clock updates so the map stays initialized while observations age.
+
+## Larger-map checks
+
+The dashboard defaults to the full network map. Fit view can zoom out far enough for the tested 100-device/180-link fixture on desktop and narrow screens. At overview scale, use zoom, search plus Fit view, or Devices to read individual labels. Manual node positions stay unchanged.
+
+See [scale validation](docs/SCALE-VALIDATION.md) for fixture/browser commands, timings, screenshots and measured limits. `scripts/check-scale-browser.mjs` is an optional development-server QA check; it injects synthetic sample checks only into isolated test browsers. It does not enable real monitoring or establish production capacity.
