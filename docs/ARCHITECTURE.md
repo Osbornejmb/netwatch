@@ -4,14 +4,14 @@
 
 React + Vite opens the network health dashboard by default. `src/Dashboard.jsx` renders a viewport-filling interactive React Flow map with title/status, optional View controls, and click-to-open detail dialogs. App.jsx provides horizontal Dashboard/Topology editor/Devices navigation; the supporting device table is shown only for the Devices view. The existing topology canvas remains available through Edit topology. Router and switch components share the topology data contract. `src/topology.js` validates imported and saved maps and strips untrusted rendering properties. The browser stores a versioned topology; export/import is the portability boundary. Valid v1 exports remain readable; invalid or duplicate management addresses are rejected without replacement (see README recovery guidance).
 
-The system has no active probes, backend, authentication, or live status. Example addresses are inventory placeholders. Management addresses are validated as IPv4/IPv6 literals (or empty), with canonical IPv6 comparison and duplicate rejection. Backend address validation remains mandatory before any probes exist.
+The system has no active probes, authentication, or live status. A loopback-only Node API and SQLite inventory/history store are implemented; see HOST-API.md for the versioned contract, explicit browser transfer, monitoring opt-in and recovery. Example addresses are inventory placeholders. Management addresses are validated as IPv4/IPv6 literals (or empty), with canonical IPv6 comparison and duplicate rejection. Backend address validation remains mandatory before any probes exist.
 
 ## Planned system
 
-Browser UI → authenticated API → SQLite inventory/history.
+Browser working copy → explicit preview/confirmed loopback API transfer → SQLite inventory/history. Authentication is planned before remote access.
 The Windows service will own bounded ICMP workers and SNMP/LLDP collectors; browsers will never launch probes or receive device credentials. Start with one service and one database. Add separate workers only when measured load requires them.
 
-API routes proposed for M2: GET /api/v1/health, GET/PUT /api/v1/topology, GET /api/v1/devices/:id/checks. Define pagination, error responses, and authorization before implementation. These routes do not exist yet.
+Implemented API routes: GET /api/v1/health, GET/PUT /api/v1/topology, GET /api/v1/snapshot and paginated GET /api/v1/devices/:id/checks. The production host serves the compiled UI on the same origin, enforces Host/Origin/write intent, and binds only to 127.0.0.1:4317. There is no observation-write route. See HOST-API.md for exact shapes, revision conflict rules and retention.
 
 Topology JSON: schemaVersion 1, nodes[{id,type,position:{x,y},data:{label,ip,description}}], edges[{id,source,target,label,sourceHandle,targetHandle}]. Node IDs and link IDs are unique within their collections. Links reference existing distinct nodes. Limits: 2,000 nodes, 10,000 links, 5 MB import. This version has no credentials or monitoring results. Reject unsupported future schema versions rather than silently migrating them.
 
@@ -29,7 +29,7 @@ A failed storage read pauses autosave until the user explicitly replaces the sav
 
 `src/health.js` defines the UI health policy separately from inventory: up/down only from valid timestamped observations, stale after 90 seconds, unknown for absent/invalid/future data. The freshness threshold is a prototype limit to replace with the collector polling policy. Actual inventory currently has no observations and is always unmonitored. Sample mode uses a separate documentation-address fixture, frozen timestamps, and an explicit banner. It never writes sample nodes/checks to storage. Connection lines use connectionHealth(source, target): a down endpoint is red, missing/unknown evidence is gray, stale evidence amber, and two up endpoints green. This is an endpoint-reachability summary, not measured interface health or BGP session state. Device observations remain independent, so a responding switch stays up when a router fails. A monitoring service connection failure must not be translated into device failures when the backend is added.
 
-System fonts replace the starter's Google Fonts import so the dashboard does not need a font CDN at runtime. `src/dashboard.css` contains the light dashboard tokens; the editor retains its original dark workspace. No dependencies or storage schema changes were added.
+System fonts replace the starter's Google Fonts import so the dashboard does not need a font CDN at runtime. `src/dashboard.css` contains the light dashboard tokens; the editor retains its original dark workspace. The dashboard itself adds no runtime dependencies. Host SQLite schema v1 is separate from the unchanged browser v1 JSON contract.
 
 ## Device selection
 

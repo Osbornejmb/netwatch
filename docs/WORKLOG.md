@@ -4,7 +4,7 @@
 
 - Completed/closed: #13, #1, #2, #3, #15, #18 and #24. Their implementations/evidence were merged through #14/#20/#21/#22/#23/#19/#25 respectively.
 - Latest application checkpoint: #25, commit `5aa9200a2ea3ff8d1c6bd83121457ecbeab1c7be`. All 21 tests, production build, six browser suites and pre-merge GitHub checks passed. The default full-map dashboard supports saved/radial layouts, direct-peer highlighting and individual dragging; saved-layout movement autosaves while radial/sample adjustments are temporary.
-- Next: #4 host API/SQLite persistence, followed by #5 bounded Windows ICMP and #6 real observations. No live probes, host database, SNMP/LLDP, alerts or remote access are implemented.
+- In review: #4 host API/SQLite persistence and explicit browser transfer (see HOST-API.md). Next after acceptance: #5 bounded Windows ICMP, then #6 real observations. No live probes, dashboard observation integration, SNMP/LLDP, alerts or remote access are implemented.
 - The dated and feature-specific entries below are historical checkpoints. Their then-current next steps and open/closed notes are superseded by this current status. The 100-device fixture is provisional, not a production capacity claim; confirm deployment size and target-machine behavior before release.
 
 ## Current work: topology-first status and popup details (#18)
@@ -144,3 +144,23 @@ A fresh Node 22 install, fourteen tests and build passed during review. The firs
 - A narrow browser gesture after resize initially started before Fit view completed. The test now waits for resize observation and fully fitted node bounds before dragging; no timing logs remain in application code.
 - Screenshots: dashboard-drag-saved.jpg, dashboard-drag-radial.jpg and dashboard-drag-narrow.jpg. Highlighting refers to configured incident links, not verified hardware port state. Full hardware/touch-device/screen-reader testing is not claimed.
 - Final verification: Node 22.23.5 passes all 21 tests and production build; dashboard-drag, radial, topology, recovery, inventory and 100-device scale browser checks pass. The scale QA server was restarted after a connection-refused setup failure; the rerun passed. Commit/push requested on the existing feat/radial-map branch.
+
+
+## Issue 2.1 — Local host API and durable storage (2026-11-12)
+
+- Added a Node 22.13+ loopback-only HTTP host serving the compiled dashboard and versioned health/topology/snapshot/paginated-history APIs. SQLite schema v1 uses transactional migrations and inventory/observation writes, optimistic revision checks, canonical address/graph/monitoring validation, timestamped independent observations, 30-day/100,000-row retention and bounded reads. No probe or browser observation-write route exists.
+- Host inventory starts empty. Backup now includes Check host, preview/confirmed Load host and Save to host, cancel, conflict guidance and explicit per-device future monitoring opt-in. Browser working-copy autosave and original v1 JSON backup/recovery remain separate. Imports/new or address/type-changed devices default monitoring off; sample mode never supplies host inventory.
+- Offline maintenance uses a shared process lock, compact validated SQLite backups, staged validated restore and a revision increase to reject old browser writes. HOST-API.md documents start/stop, contracts, origin/write boundaries, bounded retention, migration rollback, interrupted restore and stale-lock recovery.
+- Thirty Node tests pass on Node 22.23.5 and Node 24; nine new host tests cover restart persistence, independent connections/stale writes, injected transaction/migration failures, invalid inventory/observations, history pagination/retention/cap, valid/corrupt backup/restore and HTTP Host/Origin/write/size limits (including chunked input). Production build passes. Existing inventory, recovery, topology, radial and dashboard-drag browser suites pass against the host-served build.
+- New check-host-browser.mjs verifies explicit migration/cancel, stored IDs/links/defaults, monitoring opt-in, imported authorization reset, sample isolation, concurrent conflict rejection, host load, empty inventory and disconnected state on desktop/narrow. Screenshots: host-storage-desktop.jpg and host-storage-narrow.jpg. Visual review corrected select contrast.
+- GitHub CI now runs tests/build on Ubuntu and Windows. Issue #4 stays open pending PR review/merge. Windows hardware, a packaged Windows service, live observations and remote authentication are outside this issue; full Windows process shutdown/file recovery remains a release acceptance check, not a claim from Linux browser tests.
+
+- First Windows CI run exposed test teardown ordering (a second database connection was still open at directory removal) and an oversized-request early response that could reset the client socket on Windows. Closed the secondary connection before fixture cleanup and now drain oversized request bodies without retaining their contents before returning HTTP 413; request timeout still bounds the connection. Both fixed-size and chunked oversized inputs remain tested.
+
+
+## PR #26 review follow-up (2026-11-12)
+
+- Review found restore's finally block removed a pre-existing `.restoring` file even when overwrite was refused. Cleanup now removes only the temporary file created by that restore invocation; a regression verifies existing recovery bytes and the original database survive.
+- Host preview added expandable review lists, but the shared modal focus loop omitted summary elements. Included summary/link/textarea controls in focus traversal and added a host browser keyboard check reaching and opening both review sections.
+- Corrected an inherited-property edge case so a valid device ID such as `toString` with no management address defaults to monitoring disabled rather than being rejected by the host. Regression coverage includes the ID.
+- Review verification: all 30 tests and production build pass on Node 22.23.5. Host transfer (including preview keyboard review), inventory, recovery and topology browser suites pass on desktop/narrow layouts. Final GitHub Ubuntu/Windows checks are required before the authorized merge.

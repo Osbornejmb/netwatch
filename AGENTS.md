@@ -4,7 +4,7 @@
 
 NetWatch is a local-first Windows network monitoring dashboard. The primary job is to show which devices are up, down, stale, or not yet monitored on a readable network map. The topology editor supports that dashboard; it is not the product's main screen.
 
-Current foundation: React 18, Vite, JavaScript, React Flow, Lucide, browser-local topology, JSON backup/restore. Monitoring, Node API/SQLite, SNMP/LLDP, alerts, and secure remote access are separate roadmap work. Do not describe a planned feature as implemented.
+Current foundation: React 18, Vite, JavaScript, React Flow, Lucide, browser-local topology, JSON backup/restore. A loopback Node API/SQLite store and explicit browser transfer are implemented (docs/HOST-API.md). Monitoring collectors, dashboard observation integration, SNMP/LLDP, alerts, and secure remote access remain roadmap work. Do not describe a planned feature as implemented.
 
 ## Read before changing code
 
