@@ -32,11 +32,13 @@ export function backupDatabase(path,destination) {
 export function restoreDatabase(path,source) {
   const release=lock(path)
   const temporary=`${path}.restoring`
+  let ownsTemporary=false
   try {
     const incoming=validateDatabase(source)
     const current=existsSync(path)?validateDatabase(path):-1
     mustNotExist(temporary)
     copyFileSync(source,temporary)
+    ownsTemporary=true
     const db=new DatabaseSync(temporary)
     try {db.prepare('UPDATE inventory SET revision=?,updated_at=?').run(Math.max(current,incoming)+1,new Date().toISOString());db.exec('PRAGMA wal_checkpoint(TRUNCATE)')} finally {db.close()}
     validateDatabase(temporary)
@@ -46,7 +48,7 @@ export function restoreDatabase(path,source) {
       try {existing.exec('PRAGMA wal_checkpoint(TRUNCATE)')} finally {existing.close()}
     }
     renameSync(temporary,path)
-  } finally {rmSync(temporary,{force:true});release()}
+  } finally {if(ownsTemporary)rmSync(temporary,{force:true});release()}
 }
 if(process.argv[1] && resolve(process.argv[1])===resolve(import.meta.filename)) {
   const [command,file,confirm]=process.argv.slice(2)

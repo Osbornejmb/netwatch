@@ -30,6 +30,7 @@ test('host rejects bad graph, target, IDs, monitoring and sample source without 
  const {store}=fixture(t)
  const variants=[v=>v.source='sample',v=>v.topology.nodes[0].data.ip='127.1',v=>v.topology.nodes[0].type='server',v=>v.topology.nodes[0].id='a'.repeat(101),v=>v.topology.edges[0].target='missing',v=>v.topology.nodes[0].position.x=1e20,v=>v.monitoring={unknown:true},v=>v.monitoring={r1:'true'},v=>{v.topology.nodes[0].data.ip='';v.monitoring={r1:true}}]
  for(const mutate of variants){const value=input();mutate(value);assert.throws(()=>store.write(value,0));assert.equal(store.read().revision,0)}
+ const special=input();special.topology.nodes[0].id='toString';special.topology.nodes[0].data.ip='';special.topology.edges[0].source='toString';assert.equal(store.write(special,0).monitoring.toString,false)
 })
 test('observations require opt-in; bad batches rollback; snapshots retain timestamped independent evidence',t=>{
  const now=Date.now();const {store}=fixture(t,{now:()=>now});store.write(input({r1:true,s1:true}),0)
@@ -65,6 +66,7 @@ test('offline backup/restore validates data, advances revision and rejects corru
  const backup=join(dir,'backup.sqlite');backupDatabase(path,backup);assert.equal(validateDatabase(backup),1)
  const running=openStore(path);running.write(input(),1);running.close();restoreDatabase(path,backup)
  const restored=openStore(path);assert.equal(restored.read().revision,3);assert.equal(restored.history('r1').checks.length,1);restored.close()
+ const interrupted=`${path}.restoring`;writeFileSync(interrupted,'preserved recovery bytes');assert.throws(()=>restoreDatabase(path,backup),/already exists/);assert.equal(readFileSync(interrupted,'utf8'),'preserved recovery bytes');assert.equal(validateDatabase(path),3);rmSync(interrupted)
  const bad=join(dir,'bad');writeFileSync(bad,'not sqlite');assert.throws(()=>restoreDatabase(path,bad));assert.equal(validateDatabase(path),3)
  const release=lock(path);assert.throws(()=>backupDatabase(path,join(dir,'other')),/in use/);release();assert.throws(()=>backupDatabase(path,backup),/already exists/)
 })

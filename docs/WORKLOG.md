@@ -156,3 +156,11 @@ A fresh Node 22 install, fourteen tests and build passed during review. The firs
 - GitHub CI now runs tests/build on Ubuntu and Windows. Issue #4 stays open pending PR review/merge. Windows hardware, a packaged Windows service, live observations and remote authentication are outside this issue; full Windows process shutdown/file recovery remains a release acceptance check, not a claim from Linux browser tests.
 
 - First Windows CI run exposed test teardown ordering (a second database connection was still open at directory removal) and an oversized-request early response that could reset the client socket on Windows. Closed the secondary connection before fixture cleanup and now drain oversized request bodies without retaining their contents before returning HTTP 413; request timeout still bounds the connection. Both fixed-size and chunked oversized inputs remain tested.
+
+
+## PR #26 review follow-up (2026-11-12)
+
+- Review found restore's finally block removed a pre-existing `.restoring` file even when overwrite was refused. Cleanup now removes only the temporary file created by that restore invocation; a regression verifies existing recovery bytes and the original database survive.
+- Host preview added expandable review lists, but the shared modal focus loop omitted summary elements. Included summary/link/textarea controls in focus traversal and added a host browser keyboard check reaching and opening both review sections.
+- Corrected an inherited-property edge case so a valid device ID such as `toString` with no management address defaults to monitoring disabled rather than being rejected by the host. Regression coverage includes the ID.
+- Review verification: all 30 tests and production build pass on Node 22.23.5. Host transfer (including preview keyboard review), inventory, recovery and topology browser suites pass on desktop/narrow layouts. Final GitHub Ubuntu/Windows checks are required before the authorized merge.

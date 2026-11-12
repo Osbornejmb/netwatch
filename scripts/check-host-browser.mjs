@@ -11,7 +11,7 @@ const open=async()=>{await page.locator('summary[aria-label="Map backup and reco
 const save=async()=>{await host.getByRole('button',{name:'Save to host…',exact:true}).click();await preview.getByRole('button',{name:'Confirm replacement'}).click();await host.getByText(/Saved host revision/).waitFor()}
 try {
  await page.goto(base);await open();const initial=await read()
- await host.getByRole('button',{name:'Save to host…',exact:true}).click();await preview.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal((await read()).revision,initial.revision)
+ await host.getByRole('button',{name:'Save to host…',exact:true}).click();await page.keyboard.press('Shift+Tab');assert.equal(await preview.locator('summary').nth(1).evaluate(el=>el===document.activeElement),true);await page.keyboard.press('Shift+Tab');assert.equal(await preview.locator('summary').nth(0).evaluate(el=>el===document.activeElement),true);await page.keyboard.press('Enter');await preview.getByText('CORE-ROUTER-01 · r1',{exact:false}).waitFor();await preview.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal((await read()).revision,initial.revision)
  await save();const migrated=await read();assert.equal(migrated.topology.nodes.length,5);assert.equal(migrated.topology.edges.length,4);assert.ok(Object.values(migrated.monitoring).every(v=>v===false))
  await page.locator('summary[aria-label="Map backup and recovery"]').click();await page.getByRole('button',{name:'Preview sample statuses'}).click();await open();await save();assert.equal((await read()).topology.nodes.length,5)
  await page.locator('summary[aria-label="Map backup and recovery"]').click();await page.getByRole('button',{name:'Return to my network'}).click();await open()

@@ -13,7 +13,7 @@ export function inventory(value) {
   if (!monitoring || Array.isArray(monitoring) || typeof monitoring !== 'object') throw invalid('Invalid monitoring settings.')
   const ids = new Set(topology.nodes.map(n => n.id))
   for (const [id, enabled] of Object.entries(monitoring)) if (!ids.has(id) || typeof enabled !== 'boolean') throw invalid('Monitoring requires an existing ID and a boolean.')
-  for (const n of topology.nodes) if (monitoring[n.id] && !n.data.ip) throw invalid('Monitoring requires a management address.')
+  for (const n of topology.nodes) if (monitoring[n.id] === true && !n.data.ip) throw invalid('Monitoring requires a management address.')
   return { topology, monitoring: Object.fromEntries(topology.nodes.map(n => [n.id, monitoring[n.id] === true])) }
 }
 export function openStore(path, { now = () => Date.now(), migrate } = {}) {
