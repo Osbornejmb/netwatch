@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ReactFlow, Background, Controls, Handle, Position } from '@xyflow/react'
 import { Activity, ArrowDownCircle, ArrowUpCircle, ArrowUpRight, CheckCircle2, CircleHelp, Clock3, GitBranch, Network, Router, Search, SlidersHorizontal, X } from 'lucide-react'
 import { HEALTH, createSampleNetwork, deviceHealth, summarizeHealth } from './health'
@@ -30,11 +30,25 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, onE
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState(null)
   const [flow, setFlow] = useState(null)
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (sampleMode) return
+    const update = () => setNow(Date.now())
+    update()
+    const timer = window.setInterval(update, 1000)
+    window.addEventListener('focus', update)
+    document.addEventListener('visibilitychange', update)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', update)
+      document.removeEventListener('visibilitychange', update)
+    }
+  }, [sampleMode])
   const sampleTime = useMemo(() => Date.now(), [])
   const sample = useMemo(() => createSampleNetwork(sampleTime), [sampleTime])
   const { nodes, edges, checks } = sampleMode ? sample : { nodes: inventory, edges: inventoryEdges, checks: NO_CHECKS }
-  const counts = summarizeHealth(nodes, checks, sampleTime)
-  const devices = nodes.map(node => ({ ...node, health: deviceHealth(checks[node.id], sampleTime) }))
+  const counts = summarizeHealth(nodes, checks, sampleMode ? sampleTime : now)
+  const devices = nodes.map(node => ({ ...node, health: deviceHealth(checks[node.id], sampleMode ? sampleTime : now) }))
   const visible = devices.filter(node => (statusFilter === 'all' || node.health === statusFilter) && `${node.data.label} ${node.data.ip}`.toLowerCase().includes(query.trim().toLowerCase()))
   const visibleIds = new Set(visible.map(node => node.id))
   const attention = devices.filter(node => ['down', 'stale'].includes(node.health)).sort((a, b) => (a.health === 'down' ? 0 : 1) - (b.health === 'down' ? 0 : 1))

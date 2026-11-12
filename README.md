@@ -8,8 +8,8 @@ A local-first network operations dashboard with a supporting topology editor. Th
 - npm
 
 ## Run on the Windows host
-1. Extract this folder.
-2. Open PowerShell in the `netwatch-starter` folder.
+1. Clone or download this repository.
+2. Open PowerShell in the `netwatch` repository folder.
 3. Run:
 
 ```powershell
@@ -46,20 +46,22 @@ The initial canvas contains example router and switch names/IPs for layout testi
 ## Project structure
 
 ```text
-netwatch-starter/
-├── index.html
+netwatch/
+├── src/
+│   ├── App.jsx             # Topology editor and persistence
+│   ├── Dashboard.jsx       # Health dashboard and sample preview
+│   ├── health.js           # Observation freshness and sample data
+│   ├── id.js               # IDs compatible with HTTP LAN development
+│   ├── topology.js         # JSON/storage validation
+│   ├── main.jsx
+│   ├── styles.css
+│   ├── dashboard.css
+│   └── nodes/
+├── tests/
+├── docs/
+├── .github/workflows/
 ├── package.json
-├── vite.config.js
-├── tailwind.config.js
-├── postcss.config.js
-├── README.md
-└── src/
-    ├── main.jsx
-    ├── App.jsx
-    ├── styles.css
-    └── nodes/
-        ├── RouterNode.jsx
-        └── SwitchNode.jsx
+└── vite.config.js
 ```
 
 ## Important deployment/security note
