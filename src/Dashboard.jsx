@@ -3,6 +3,8 @@ import { ReactFlow, Controls, Handle, Position } from '@xyflow/react'
 import { ArrowDownCircle, ArrowUpRight, CheckCircle2, CircleHelp, Clock3, Network, Router, Search } from 'lucide-react'
 import { HEALTH, createSampleNetwork, deviceHealth, summarizeHealth, connectionHealth } from './health'
 import DeviceDetails from './DeviceDetails'
+import useMonitoring from './useMonitoring'
+import { formatCheckTime, collectorLabel } from './monitoring'
 import { radialLayout, radialHandles, connectedDevices } from './radial'
 
 import './dashboard.css'
@@ -30,6 +32,10 @@ const NO_CHECKS = {}
 
 export default function Dashboard({ nodes: inventory, edges: inventoryEdges, showInventory = false, onEdit, onMoveDevice }) {
   const [sampleMode, setSampleMode] = useState(false)
+  const [source, setSource] = useState('host')
+  const host = useMonitoring(!sampleMode && source === 'host')
+  const live = !sampleMode && source === 'host' && host.snapshot
+  const staleAfterMs = live ? live.freshness.staleAfterMs : 90_000
   const [sampleRouterDown, setSampleRouterDown] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
   const [query, setQuery] = useState('')
@@ -56,12 +62,12 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
   }, [sampleMode])
   const sampleTime = useMemo(() => Date.now(), [])
   const sample = useMemo(() => createSampleNetwork(sampleTime), [sampleTime])
-  const { nodes, edges, checks } = sampleMode ? { ...sample, checks: { ...sample.checks, 'core-a': { ...sample.checks['core-a'], status: sampleRouterDown ? 'down' : 'up' } } } : { nodes: inventory, edges: inventoryEdges, checks: NO_CHECKS }
+  const { nodes, edges, checks } = sampleMode ? { ...sample, checks: { ...sample.checks, 'core-a': { ...sample.checks['core-a'], status: sampleRouterDown ? 'down' : 'up' } } } : live ? { nodes: live.inventory.topology.nodes, edges: live.inventory.topology.edges, checks: live.checks } : { nodes: inventory, edges: inventoryEdges, checks: NO_CHECKS }
   const effectiveCenterId = nodes.some(node => node.id === centerId) ? centerId : ''
   const layoutNodes = useMemo(() => mapLayout === 'radial' ? radialLayout(nodes, edges, effectiveCenterId) : nodes, [nodes, edges, mapLayout, effectiveCenterId])
-  const layoutKey = `${sampleMode ? 'sample' : 'inventory'}-${mapLayout}-${effectiveCenterId}`
+  const layoutKey = `${sampleMode ? 'sample' : live ? 'host' : 'inventory'}-${mapLayout}-${effectiveCenterId}`
   const positionOverrides = dragState.source === nodes && dragState.key === layoutKey ? dragState.positions : {}
-  const hasViewPositions = (sampleMode || mapLayout === 'radial') && Object.keys(positionOverrides).length > 0
+  const hasViewPositions = (sampleMode || live || mapLayout === 'radial') && Object.keys(positionOverrides).length > 0
   // Preserve React Flow's measured health-card dimensions across clock/filter
   // renders. Replacing controlled nodes without them resets initialization.
   const onNodesChange = useCallback(changes => {
@@ -83,8 +89,8 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
       return next
     })
   }, [nodes, layoutKey])
-  const counts = summarizeHealth(nodes, checks, sampleMode ? sampleTime : now)
-  const devices = layoutNodes.map(node => ({ ...node, position: positionOverrides[node.id] || node.position, health: deviceHealth(checks[node.id], sampleMode ? sampleTime : now) }))
+  const counts = summarizeHealth(nodes, checks, sampleMode ? sampleTime : now, staleAfterMs)
+  const devices = layoutNodes.map(node => ({ ...node, position: positionOverrides[node.id] || node.position, health: deviceHealth(checks[node.id], sampleMode ? sampleTime : now, staleAfterMs) }))
 
   const visible = devices.filter(node => (statusFilter === 'all' || node.health === statusFilter) && `${node.data.label} ${node.data.ip}`.toLowerCase().includes(query.trim().toLowerCase()))
   const visibleIds = new Set(visible.map(node => node.id))
@@ -113,7 +119,7 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
   const selectDevice = node => { setHighlightedId(node.id); setSelectedId(node.id) }
 
   const finishDrag = (_, node) => {
-    if (!sampleMode && mapLayout === 'manual' && onMoveDevice && Number.isFinite(node.position.x) && Number.isFinite(node.position.y)) onMoveDevice(node.id, node.position)
+    if (!sampleMode && !live && mapLayout === 'manual' && onMoveDevice && Number.isFinite(node.position.x) && Number.isFinite(node.position.y)) onMoveDevice(node.id, node.position)
   }
   const resetViewPositions = () => {
     setDragState({ source: null, key: '', positions: {} })
@@ -126,8 +132,9 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
 
   return <section className={`health-dashboard${showInventory ? ' is-inventory' : ''}`} id={showInventory ? 'inventory-page' : 'dashboard'} aria-label="Network health dashboard">
     <header className="health-page-titlebar">
-      <div><h1>{showInventory ? 'Devices' : 'Network dashboard'}</h1><p role="status">{sampleMode ? 'Sample preview · Not live' : 'Monitoring not connected'}</p>{showInventory && highlightedDevice && <p className="health-highlight-status" role="status">Connections: {highlightedDevice.data.label} · {connectedIds.size} direct {connectedIds.size === 1 ? 'peer' : 'peers'}</p>}</div>
+      <div><h1>{showInventory ? 'Devices' : 'Network dashboard'}</h1><p role="status">{sampleMode ? 'Sample preview · Not live' : source === 'browser' ? 'Browser map · Checks unavailable' : `${host.state === 'loading' ? 'Loading device checks…' : host.state === 'disconnected' ? 'Host disconnected · Reconnecting' : 'Host connected'}${live ? ` · ${collectorLabel(live.collector.state)} · Last update: ${formatCheckTime(live.generatedAt)}` : ' · Showing browser map without checks'}`}</p>{showInventory && highlightedDevice && <p className="health-highlight-status" role="status">Connections: {highlightedDevice.data.label} · {connectedIds.size} direct {connectedIds.size === 1 ? 'peer' : 'peers'}</p>}</div>
       <div className="health-map-tools">
+        {!sampleMode && <><label className="health-filter">Network <select aria-label="Network source" value={source} onChange={event => { setSource(event.target.value); setSelectedId(null); setHighlightedId(null); setDragState({ source: null, key: '', positions: {} }) }}><option value="host">Saved host network</option><option value="browser">Browser working copy</option></select></label>{source === 'host' && <button className="health-button" onClick={host.refresh}>Refresh host</button>}</>}
         {showInventory && highlightedDevice && <button className="health-button" aria-label="Clear connection highlight" onClick={() => { setHighlightedId(null); setSelectedId(null) }}>Clear highlight</button>}
         {sampleMode && <button className="health-button" onClick={() => setSampleRouterDown(value => !value)}>{sampleRouterDown ? 'Restore primary router' : 'Fail primary router'}</button>}
         <button className="health-button" aria-label={sampleMode ? 'Return to my network' : 'Preview sample statuses'} aria-pressed={sampleMode} onClick={switchSample}>{sampleMode ? 'My network' : 'Sample preview'}</button>
@@ -136,13 +143,15 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
           {mapLayout === 'radial' && <><label className="health-filter">Center <select aria-label="Radial center" value={effectiveCenterId} onChange={event => { setDragState({ source: null, key: '', positions: {} }); setCenterId(event.target.value) }}><option value="">Automatic</option>{nodes.map(node => <option key={node.id} value={node.id}>{node.data.label}</option>)}</select></label><p className="health-map-count">Display only: saved positions and connections stay unchanged. Automatic centers prefer a connected router; rings follow configured links.</p></>}
           <label className="health-search"><Search size={15} aria-hidden="true"/><input aria-label="Search dashboard devices" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search name or IP"/></label>
           <label className="health-filter">Status <select aria-label="Device status filter" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="all">All devices ({counts.all})</option>{Object.entries(HEALTH).map(([key, value]) => <option key={key} value={key}>{value.label} ({counts[key]})</option>)}</select></label>
-          <p className="health-map-count">{visible.length} of {nodes.length} devices</p><p className="health-map-count">Drag a device to move it and highlight its direct connections. Saved-layout drags autosave; radial and sample adjustments stay in this view. Click or press Enter for details.</p><p className="health-map-count">Path colors summarize device reachability, not verified interface state.</p>
+          <div className="health-attention"><p>Needs attention ({devices.filter(node => ['down', 'stale'].includes(node.health)).length})</p>{devices.filter(node => ['down', 'stale'].includes(node.health)).map(node => <button className="health-button" key={node.id} onClick={() => selectDevice(node)}>{node.data.label} · {HEALTH[node.health].label}</button>)}</div>
+          <p className="health-map-count">{visible.length} of {nodes.length} devices</p><p className="health-map-count">Drag a device to move it and highlight its direct connections. Browser saved-layout drags autosave; host, radial and sample adjustments stay in this view. Click or press Enter for details.</p><p className="health-map-count">Path colors summarize device reachability, not verified interface state.</p>
         </div></details>
       </div>
     </header>
+    {!sampleMode && source === 'host' && host.error && <p className="health-connection-note" role="status">Unable to update checks; start monitoring in the Windows app or choose Refresh host to retry while saved results continue aging.</p>}
     {showInventory ? (
-    <section className="health-inventory health-panel" id="inventory"><div className="health-panel-title"><h2>Device inventory <span className="health-inventory-count">{visible.length}</span></h2><span>{sampleMode ? 'Sample network' : 'Your configured network'}</span></div>
-      <div className="health-table-wrap"><table><thead><tr><th scope="col">Device</th><th scope="col">Management IP</th><th scope="col">Status</th><th scope="col">Last check</th><th scope="col">Details</th></tr></thead><tbody>{visible.map(node => <tr key={node.id} className={highlightedDevice && (node.id === highlightedId || connectedIds.has(node.id)) ? 'is-connected' : selectedId === node.id ? 'is-selected' : ''}><th scope="row"><span className="health-table-device">{node.type === 'router' ? <Router size={16} aria-hidden="true"/> : <Network size={16} aria-hidden="true"/>}{node.data.label}</span></th><td className="health-address">{node.data.ip || 'Not configured'}</td><td><Status status={node.health}/></td><td>{checks[node.id] ? new Date(checks[node.id].checkedAt).toLocaleTimeString() : 'Never checked'}</td><td><button className="health-row-button" aria-haspopup="dialog" aria-label={`View details for ${node.data.label}`} onClick={() => selectDevice(node)}>Inspect <ArrowUpRight size={14} aria-hidden="true"/></button></td></tr>)}</tbody></table>{!visible.length && <p className="health-table-empty">No devices match this view.</p>}</div>
+    <section className="health-inventory health-panel" id="inventory"><div className="health-panel-title"><h2>Device inventory <span className="health-inventory-count">{visible.length}</span></h2><span>{sampleMode ? 'Sample network' : live ? 'Saved host network' : 'Browser working copy'}</span></div>
+      <div className="health-table-wrap"><table><thead><tr><th scope="col">Device</th><th scope="col">Management IP</th><th scope="col">Status</th><th scope="col">Last check</th><th scope="col">Details</th></tr></thead><tbody>{visible.map(node => <tr key={node.id} className={highlightedDevice && (node.id === highlightedId || connectedIds.has(node.id)) ? 'is-connected' : selectedId === node.id ? 'is-selected' : ''}><th scope="row"><span className="health-table-device">{node.type === 'router' ? <Router size={16} aria-hidden="true"/> : <Network size={16} aria-hidden="true"/>}{node.data.label}</span></th><td className="health-address">{node.data.ip || 'Not configured'}</td><td><Status status={node.health}/></td><td>{formatCheckTime(checks[node.id]?.checkedAt)}</td><td><button className="health-row-button" aria-haspopup="dialog" aria-label={`View details for ${node.data.label}`} onClick={() => selectDevice(node)}>Inspect <ArrowUpRight size={14} aria-hidden="true"/></button></td></tr>)}</tbody></table>{!visible.length && <p className="health-table-empty">No devices match this view.</p>}</div>
     </section>
     ) : (
         <div className="health-map">
@@ -159,11 +168,11 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
           {(highlightedDevice || hasViewPositions) && <div className="health-map-focus-controls nodrag nopan">
             {highlightedDevice && <p className="health-highlight-status" role="status">Connections: {highlightedDevice.data.label} · {connectedIds.size} direct {connectedIds.size === 1 ? 'peer' : 'peers'}</p>}
             {highlightedDevice && <button className="health-button" aria-label="Clear connection highlight" onClick={() => { setHighlightedId(null); setSelectedId(null) }}>Clear highlight</button>}
-            {hasViewPositions && <button className="health-button" aria-label="Reset view positions" onClick={resetViewPositions}>{mapLayout === 'radial' ? 'Reset radial positions' : 'Reset sample positions'}</button>}
+            {hasViewPositions && <button className="health-button" aria-label="Reset view positions" onClick={resetViewPositions}>{mapLayout === 'radial' ? 'Reset radial positions' : 'Reset view positions'}</button>}
           </div>}
           {sampleMode && <span className="health-sample-watermark">SAMPLE DATA</span>}
         </div>
     )}
-    {selected && <DeviceDetails device={selected} check={checks[selected.id]} connections={connections} sampleMode={sampleMode} onClose={() => setSelectedId(null)}/>}
+    {selected && <DeviceDetails key={`${sampleMode}-${source}-${selected.id}-${live ? live.inventory.revision : "local"}`} host={live ? host : null} device={selected} check={checks[selected.id]} connections={connections} sampleMode={sampleMode} onClose={() => setSelectedId(null)}/>}
   </section>
 }

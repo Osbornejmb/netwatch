@@ -13,7 +13,7 @@ function Preview({ action,onClose,onConfirm,busy }) {
   return <dialog {...modal} className="modal device-dialog" aria-labelledby="host-preview-title">
     <h2 id="host-preview-title">{action.kind==='load'?'Load host inventory?':'Save inventory to host?'}</h2>
     <p>{action.kind==='load'?'Replace the visible browser map':'Replace the host inventory'} with {action.topology.nodes.length} devices and {action.topology.edges.length} links. IDs and connections are preserved. This is a replacement, not an append.</p>
-    <p>Host revision: {action.revision}. Export the current map before replacing it. Browser backups remain v1 JSON. New, imported or address-changed devices have monitoring disabled. Checks run only when explicitly enabled on the Windows host. This dashboard does not display live checks yet.</p>
+    <p>Host revision: {action.revision}. Export the current map before replacing it. Browser backups remain v1 JSON. New, imported or address-changed devices have monitoring disabled. Checks run only when explicitly enabled on the Windows host. The Saved host network dashboard displays host checks separately from the browser working copy.</p>
     <details><summary>Review devices and authorization</summary><ul className="host-preview-list">{action.topology.nodes.map(n=><li key={n.id}>{n.data.label} · {n.id} · {n.data.ip||'no address'} · monitoring {action.monitoring[n.id]?'enabled':'disabled'}</li>)}</ul></details>
     <details><summary>Review connections</summary><ul className="host-preview-list">{action.topology.edges.map(e=><li key={e.id}>{e.id}: {e.source} → {e.target}</li>)}</ul></details>
     <div className="modal-actions"><button data-initial-focus className="button secondary" disabled={busy} onClick={onClose}>Cancel</button><button className="button primary" disabled={busy} onClick={onConfirm}>{busy?'Saving…':'Confirm replacement'}</button></div>
@@ -30,7 +30,7 @@ export default function HostStorage({nodes,edges,onLoad,paused,importGeneration}
   useEffect(()=>{if(importGeneration>0){imported.current=true;setMonitoring({});setAction(null)}},[importGeneration])
   const check=async()=>{
     setBusy(true)
-    try {const value=await request();validateTopology(value.topology);setHost(value);setMonitoring(imported.current?{}:value.monitoring);setMessage(`Host ready · revision ${value.revision} · ${value.topology.nodes.length} devices. Monitoring runs on the Windows host when explicitly enabled; live dashboard integration is separate.`)}
+    try {const value=await request();validateTopology(value.topology);setHost(value);setMonitoring(imported.current?{}:value.monitoring);setMessage(`Host ready · revision ${value.revision} · ${value.topology.nodes.length} devices. Monitoring runs on the Windows host when explicitly enabled; open Saved host network on the dashboard to see observations.`)}
     catch {setHost(null);setMessage('Host unavailable. Browser inventory is unchanged. Build and run npm start, then open http://127.0.0.1:4317. A disconnected host does not mean devices are down.')}
     finally {setBusy(false)}
   }

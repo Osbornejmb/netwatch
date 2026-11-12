@@ -1,0 +1,88 @@
+{
+  "scope": "USB-authorized phone only, temporary host/database; addresses, identifiers and absolute timestamps omitted",
+  "sourceBase": "9abef87",
+  "uncommittedIssue6Implementation": true,
+  "policy": {
+    "intervalMs": 30000,
+    "failuresForDown": 3,
+    "successesForRecovery": 1
+  },
+  "events": [
+    {
+      "relativeToOffCommandMs": -4916,
+      "status": "up",
+      "outcome": "reachable",
+      "reason": "success",
+      "latencyMs": 61
+    },
+    {
+      "relativeToOffCommandMs": 24444,
+      "status": "up",
+      "outcome": "unreachable",
+      "reason": "TimedOut",
+      "latencyMs": null
+    },
+    {
+      "relativeToOffCommandMs": 54450,
+      "status": "up",
+      "outcome": "unreachable",
+      "reason": "TimedOut",
+      "latencyMs": null
+    },
+    {
+      "relativeToOffCommandMs": 84444,
+      "status": "down",
+      "outcome": "unreachable",
+      "reason": "TimedOut",
+      "latencyMs": null
+    },
+    {
+      "relativeToOffCommandMs": 113364,
+      "status": "up",
+      "outcome": "reachable",
+      "reason": "success",
+      "latencyMs": 9
+    }
+  ],
+  "baselineLatencyMs": 61,
+  "dashboardBaselineUp": true,
+  "offCommandDurationMs": 157,
+  "dashboardDownDelayFromObservationMs": 1265,
+  "downDelayFromOffCommandMs": {
+    "fromCommandStart": 84444,
+    "fromCommandCompletion": 84287
+  },
+  "onCommandDurationMs": 177,
+  "recoveryDelayFromOnCommandMs": {
+    "fromCommandStart": 27563,
+    "fromCommandCompletion": 27386
+  },
+  "dashboardRecoveryDelayFromObservationMs": 1980,
+  "dashboardRecoveryUp": true,
+  "finalCollector": {
+    "errors": 0,
+    "diagnostics": [],
+    "cycleDurationMs": 111
+  },
+  "phoneWifiRestored": true,
+  "phoneAddressUnchanged": true,
+  "gracefulShutdownMs": 27,
+  "databaseLockReleased": true,
+  "disconnectPreservesUp": true,
+  "disconnectedAgedToStale": true,
+  "reconnectRestoresUp": true,
+  "dashboardHistoryTransitions": true,
+  "narrowOverflow": false,
+  "pageErrors": [],
+  "limitationsExtra": [
+    "One physical phone and Wi-Fi path only",
+    "Screenshots mask the private address",
+    "Test host downtime intentionally ages real retained checks; no simulated observations used"
+  ],
+  "limitations": [
+    "Timings start at USB ADB command invocation/completion, not the inaccessible exact radio transition instant",
+    "Recovery includes phone reassociation plus next regular collector cycle",
+    "SIGINT handler invoked via IPC; physical console Ctrl+C delivery remains unverified",
+    "Single phone/Wi-Fi path; no general hardware-capacity or internet-health claim"
+  ]
+}

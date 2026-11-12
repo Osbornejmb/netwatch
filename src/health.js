@@ -5,17 +5,17 @@ export const HEALTH = {
   unknown: { label: 'Not monitored', note: 'No verified check', color: '#64748b' },
 }
 
-export function deviceHealth(check, now = Date.now()) {
+export function deviceHealth(check, now = Date.now(), staleAfterMs = 90_000) {
   if (!check || !['up', 'down'].includes(check.status) || typeof check.checkedAt !== 'string') return 'unknown'
   const checkedAt = Date.parse(check.checkedAt)
   if (!Number.isFinite(checkedAt) || checkedAt > now) return 'unknown'
-  // shortcut: fixed 90-second freshness for the UI prototype, use the collector's polling policy when the backend is added.
-  return now - checkedAt > 90_000 ? 'stale' : check.status
+  if (!Number.isFinite(staleAfterMs) || staleAfterMs <= 0) return 'unknown'
+  return now - checkedAt > staleAfterMs ? 'stale' : check.status
 }
 
-export function summarizeHealth(nodes, checks, now) {
+export function summarizeHealth(nodes, checks, now, staleAfterMs) {
   const counts = { all: nodes.length, up: 0, down: 0, stale: 0, unknown: 0 }
-  for (const node of nodes) counts[deviceHealth(checks[node.id], now)]++
+  for (const node of nodes) counts[deviceHealth(checks[node.id], now, staleAfterMs)]++
   return counts
 }
 

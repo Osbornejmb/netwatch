@@ -181,7 +181,7 @@ export default function App() {
 
         {view !== 'editor' ? <Dashboard nodes={nodes} edges={edges} showInventory={view === 'inventory'} onMoveDevice={(id, position) => setNodes(current => current.map(node => node.id === id ? { ...node, position } : node))} onEdit={() => setView('editor')}/> : <section className="page-content" id="topology">
           <div className="page-heading">
-            <div><div className="eyebrow">NETWORK MANAGEMENT / PHASE 01</div><h1>Topology builder</h1><p>Map your infrastructure first. Monitoring will be connected in the next phase.</p></div>
+            <div><div className="eyebrow">NETWORK MANAGEMENT / PHASE 01</div><h1>Topology builder</h1><p>Edit the browser working copy, then use Backup to save it to the host for monitoring.</p></div>
             <div className="heading-actions"><button className="button secondary" disabled={importBusy} onClick={() => importInput.current.click()}>Import JSON</button><button className="button secondary" onClick={exportTopology}><Download size={16}/> Export JSON</button><button className="button primary" onClick={() => setShowModal('add')}><Plus size={17}/> Add device</button></div>
           </div>
 
@@ -189,7 +189,7 @@ export default function App() {
             <div className="stat-card"><div className="stat-icon blue"><Router size={18}/></div><div><span>ROUTERS</span><strong>{routerCount}</strong><small>Configured devices</small></div></div>
             <div className="stat-card"><div className="stat-icon green"><Network size={18}/></div><div><span>SWITCHES</span><strong>{switchCount}</strong><small>Configured devices</small></div></div>
             <div className="stat-card"><div className="stat-icon violet"><Cable size={18}/></div><div><span>CONNECTIONS</span><strong>{edges.length}</strong><small>Defined topology links</small></div></div>
-            <div className="stat-card"><div className="stat-icon amber"><Radio size={18}/></div><div><span>MONITORING</span><strong className="pending">NOT ACTIVE</strong><small>Available in Phase 2</small></div></div>
+            <div className="stat-card"><div className="stat-icon amber"><Radio size={18}/></div><div><span>MONITORING</span><strong className="pending">HOST OPT-IN</strong><small>Manage saved host devices from the dashboard</small></div></div>
           </div>
 
           <div className="canvas-toolbar">
@@ -228,10 +228,10 @@ export default function App() {
 
           <InventoryControls nodes={nodes} edges={edges} selectedId={selectedId} onSelect={setSelectedId} onEdit={() => setShowModal('edit')} onRemove={removeSelected} onMove={(id, position) => setNodes(ns => ns.map(node => node.id === id ? { ...node, position } : node))} onConnect={onConnect} onRemoveLink={id => setEdges(es => es.filter(edge => edge.id !== id))}/>
           <div className="bottom-grid">
-            <div className="info-card"><div className="info-icon"><Zap size={17}/></div><div><strong>Automatic discovery comes next</strong><p>Phase 2 will add network scanning and ICMP checks. SNMP/LLDP will be used later to verify interface state and discover neighboring devices.</p></div></div>
+            <div className="info-card"><div className="info-icon"><Zap size={17}/></div><div><strong>Explicit device monitoring</strong><p>Authorize ICMP checks on saved host devices. SNMP/LLDP interface verification remains planned. No networks are scanned.</p></div></div>
             <div className="info-card"><div className="info-icon"><Database size={17}/></div><div><strong>Saved locally</strong><p>Your current map is stored in this browser. Export JSON to back it up or import it on another workstation.</p></div></div>
           </div>
-          <footer>NETWATCH <span>•</span> PHASE 1 FOUNDATION <span>•</span> NO LIVE NETWORK PROBES YET</footer>
+          <footer>NETWATCH <span>•</span> PHASE 1 FOUNDATION <span>•</span> BROWSER WORKING COPY</footer>
         </section>}
       </main>
       {pendingAction && <RecoveryDialog action={pendingAction} paused={autosavePaused} unavailable={recovery?.raw === null} hasOriginal={typeof recovery?.raw === 'string'} onDownloadOriginal={downloadOriginal} onClose={() => setPendingAction(null)} onConfirm={confirmRecovery}/>}

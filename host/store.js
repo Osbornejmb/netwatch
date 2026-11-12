@@ -98,17 +98,22 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2 } =
       })
     },
     history(id, { before, limit = 50 } = {}) {
-      if (!read().topology.nodes.some(n => n.id === id)) throw invalid('Device not found.',404)
+      return transaction(() => {
+      const state=read()
+      if (!state.topology.nodes.some(n => n.id === id)) throw invalid('Device not found.',404)
       if (!Number.isSafeInteger(limit) || limit < 1 || limit > 200 || (before !== undefined && (!Number.isSafeInteger(before) || before < 1))) throw invalid('Invalid history pagination.')
       cleanup()
       const rows = db.prepare('SELECT * FROM checks WHERE device_id=? AND seq < ? ORDER BY seq DESC LIMIT ?').all(id,before ?? Number.MAX_SAFE_INTEGER,limit+1)
       const checks = rows.slice(0,limit).map(r=>({id:r.seq,deviceId:r.device_id,status:r.status,checkedAt:new Date(r.checked_at).toISOString(),outcome:r.outcome,reason:r.reason,latencyMs:r.latency_ms}))
-      return {checks,nextBefore:rows.length>limit?checks.at(-1).id:null}
+      return {revision:state.revision,checks,nextBefore:rows.length>limit?checks.at(-1).id:null}
+      })
     },
     snapshot() {
+      return transaction(() => {
       cleanup()
       const observations = db.prepare('SELECT c.* FROM checks c JOIN (SELECT device_id,MAX(checked_at) time FROM checks GROUP BY device_id) latest ON c.device_id=latest.device_id AND c.checked_at=latest.time ORDER BY c.seq').all()
-      return {generatedAt:new Date(now()).toISOString(),collector:{state:'not-implemented',lastSeenAt:null},freshness:{staleAfterMs:90000},observations:Object.values(Object.fromEntries(observations.map(r=>[r.device_id,{deviceId:r.device_id,status:r.status,checkedAt:new Date(r.checked_at).toISOString(),outcome:r.outcome,reason:r.reason,latencyMs:r.latency_ms}])))}
+      return {inventory:read(),generatedAt:new Date(now()).toISOString(),collector:{state:'not-implemented',lastSeenAt:null},freshness:{staleAfterMs:90000},observations:Object.values(Object.fromEntries(observations.map(r=>[r.device_id,{deviceId:r.device_id,status:r.status,checkedAt:new Date(r.checked_at).toISOString(),outcome:r.outcome,reason:r.reason,latencyMs:r.latency_ms}])))}
+      })
     },
     close:()=>db.close(), db,
   }

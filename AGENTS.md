@@ -7,7 +7,7 @@ NetWatch is a local-first Windows network monitoring dashboard. Its job is to sh
 Stack: React 18, Vite 6, plain JavaScript (ESM, no TypeScript), React Flow (`@xyflow/react`), Lucide, Tailwind. Host: Node >= 22.13 using built-in `node:sqlite` (no runtime packages). No linter or formatter is configured.
 
 **Implemented:** dashboard and topology editor, browser-local topology with JSON backup/restore and recovery, loopback Node API + SQLite store with explicit browser transfer (`docs/HOST-API.md`), opt-in bounded Windows ICMP collector (`docs/ICMP-COLLECTOR.md`).
-**Not implemented:** dashboard showing real observations (issue #6), incidents/alerts, SNMP/LLDP, BGP, authentication, remote access, Windows service packaging. Never describe a planned feature as implemented. Docs can lag the code: confirm status with `git log` and the code, and never hardcode test counts or PR/issue states from memory.
+**Issue #6 implementation:** dashboard snapshot polling, host freshness, per-device authorization and bounded history; see WORKLOG.md for verification and publication status. **Not implemented:** incidents/alerts, SNMP/LLDP, BGP, authentication, remote access, Windows service packaging. Never describe a planned feature as implemented. Docs can lag the code: confirm status with `git log` and the code, and never hardcode test counts or PR/issue states from memory.
 
 ## Commands
 
@@ -68,6 +68,17 @@ The latest explicit user decision defines scope. Code and passing checks establi
 - Do not spawn agents unless the user explicitly asks for delegation. Keep one working checkout unless isolation is truly needed.
 - Make the smallest complete change. Reuse existing components and installed dependencies. No speculative services, wrappers, configuration or framework migration. Match the surrounding file's style and do not reformat untouched lines (`host/` uses a compact, dense style).
 
+## Git Workflow & Branch Hygiene
+
+- **Post-Merge Cleanup:** After a feature or bugfix branch is successfully merged, automatically prune stale remote tracking references and delete the local branch (`git branch -d <branch>`).
+- **Protected Branches:** Never delete or force-push to core branches (`main`, `master`, `dev`, `develop`). Always switch back to the main branch before running cleanup commands.
+
+## UI & UX Copywriting Rules
+
+- Write all UI text for a non-technical everyday user. Never expose raw error codes, database terms, or developer jargon.
+- Prioritize clarity over completeness: show only essential controls by default and tuck secondary options into collapsible menus.
+- Use short, action-oriented labels (1–3 words for buttons, 1 sentence max for helper text).
+
 ## UI rules
 
 - The map fills the opening dashboard below a small horizontal top menu and title/status strip. No sidebar, summary-card row or inventory table on the landing screen (use Devices and View options). Show failures and staleness on devices and paths. Device details open in a popup; search, compact filters and a keyboard-operable device list support the map.
@@ -95,7 +106,7 @@ The latest explicit user decision defines scope. Code and passing checks establi
 - `npm start` serves `./dist` relative to the working directory, so build first. The host is hard-coded to 127.0.0.1:4317 and rejects any other Host header (including `localhost`), unexpected Origin, and cross-site requests.
 - `PUT /api/v1/topology` needs `Content-Type: application/json`, `X-NetWatch-Write: 1`, `source: "inventory"` and the current `baseRevision`. There is no observation-write route and no probe-trigger route; keep it that way.
 - `node:sqlite` prints an experimental warning on Node 22; that is expected. The DB is `user_version=2`; a newer schema is rejected. Never delete a database to get past a migration error.
-- The collector reports `unsupported` off Windows. The stale threshold in `src/health.js` (90 s) is a prototype constant; the host exposes `freshness.staleAfterMs`, and wiring it in is issue #6.
+- The collector reports `unsupported` off Windows. Live dashboard freshness uses the host's `freshness.staleAfterMs`; the 90-second default in `src/health.js` remains for the sample fixture and callers without a host policy.
 - Dashboard drag moves are view-local overrides; only the Saved-positions layout persists, through App's existing autosave callback. Keep measured React Flow node dimensions across freshness-clock updates or cards disappear.
 - Never commit `.env*`, `data/`, `*.sqlite*`, `dist/`, `node_modules/`, `.tools/` (all gitignored), device credentials, or real topology exports (these are not gitignored, so check `git status` before committing).
 

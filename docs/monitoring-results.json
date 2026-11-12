@@ -1,0 +1,26 @@
+{
+  "verifiedAt": "2026-11-12T17:48:05.237Z",
+  "platform": "win32",
+  "controlledObservations": true,
+  "probes": 0,
+  "checks": [
+    "host inventory source",
+    "filter counts",
+    "keyboard details and focus trap",
+    "history pagination and transitions",
+    "independent failure and recovery",
+    "disconnect, clock-driven stale, reconnect",
+    "explicit monitoring disable/enable",
+    "revision conflict",
+    "missing address",
+    "sample isolation",
+    "390px overflow and details",
+    "deleted device and empty host"
+  ],
+  "screenshots": [
+    "monitoring-desktop.png",
+    "monitoring-disconnected.png",
+    "monitoring-narrow.png"
+  ],
+  "pageErrors": []
+}

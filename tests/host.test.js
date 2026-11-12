@@ -38,6 +38,7 @@ test('observations require opt-in; bad batches rollback; snapshots retain timest
  assert.throws(()=>store.append([{deviceId:'r1',status:'up',checkedAt:new Date(now).toISOString()},{deviceId:'missing',status:'up',checkedAt:new Date(now).toISOString()}]))
  assert.equal(store.history('r1').checks.length,1)
  assert.equal(store.snapshot().collector.state,'not-implemented');assert.equal(store.snapshot().observations.length,2)
+ assert.deepEqual(store.snapshot().inventory,store.read());assert.equal(store.history('r1').revision,store.read().revision)
  const changed=input({s1:true});changed.topology.nodes[0].data.ip='2001:db8::2';store.write(changed,1);assert.equal(store.history('r1').checks.length,0);assert.equal(store.history('s1').checks.length,1)
  assert.throws(()=>store.append([{deviceId:'r1',status:'up',checkedAt:new Date(now).toISOString()}]))
  assert.throws(()=>store.append([{deviceId:'toString',status:'up',checkedAt:new Date(now).toISOString()}]))
