@@ -113,6 +113,19 @@ test('v1 schema migration preserves inventory/history; interrupted v2 migration 
  const backup=join(dir,'backup');backupDatabase(path,backup);restoreDatabase(path,backup);const restored=openStore(path);assert.equal(restored.history('d0').checks[0].latencyMs,2);restored.close()
  restoreDatabase(path,legacy);const legacyRestored=openStore(path);assert.equal(legacyRestored.history('d0').checks[0].reason,'legacy');assert.equal(legacyRestored.history('d0').checks[0].id,1);legacyRestored.close()
 })
+test('v1 migration never reuses history IDs after the newest rows were deleted',t=>{
+ const {store,path}=setup(t);store.close()
+ const old=new DatabaseSync(path)
+ old.exec(`DROP TABLE checks;CREATE TABLE checks(seq INTEGER PRIMARY KEY AUTOINCREMENT,device_id TEXT NOT NULL,status TEXT NOT NULL,checked_at INTEGER NOT NULL);PRAGMA user_version=1;`)
+ old.prepare('INSERT INTO checks VALUES(500,?,?,?)').run('d0','up',Date.now())
+ old.exec('DELETE FROM checks');old.close()
+ const migrated=openStore(path)
+ try {
+  migrated.append([{deviceId:'d0',status:'up',...up,checkedAt:new Date().toISOString()}])
+  assert.equal(migrated.history('d0').checks[0].id,501)
+ } finally {migrated.close()}
+})
+
 test('cycle/freshness budget scales with worker capacity and collector errors never refresh old observations',async t=>{
  assert.equal(cycleBudget(1),30000);assert.equal(cycleBudget(100),52000);assert.equal(cycleBudget(2000),1000000);assert.equal(freshnessPolicy(100).staleAfterMs,114000)
  const {store}=setup(t);let result=up;const c=collector(store,async()=>result);await c.runOnce();const previous=store.history('d0').checks[0];const successful=c.snapshot().lastSuccessfulCycleAt

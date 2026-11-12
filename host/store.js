@@ -43,6 +43,7 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2 } =
           latency_ms REAL CHECK(latency_ms IS NULL OR (latency_ms >= 0 AND latency_ms <= 1500)));
         INSERT INTO checks(seq,device_id,status,checked_at,outcome,reason,latency_ms)
           SELECT seq,device_id,status,checked_at,CASE status WHEN 'up' THEN 'reachable' ELSE 'unreachable' END,'legacy',NULL FROM checks_v1;
+        UPDATE sqlite_sequence SET seq=MAX(seq,COALESCE((SELECT seq FROM sqlite_sequence WHERE name='checks_v1'),0)) WHERE name='checks';
         DROP TABLE checks_v1;
         CREATE INDEX checks_device_time ON checks(device_id, seq);
         CREATE INDEX checks_time ON checks(checked_at);`)

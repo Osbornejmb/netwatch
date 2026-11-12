@@ -2,6 +2,8 @@
 
 ## Current status (2026-11-12)
 
+- Continued PR #27 review found a v1→v2 migration bug: rebuilding history from remaining rows reset the AUTOINCREMENT high-water mark, reusing deleted sequence IDs. Migration now preserves sqlite_sequence before dropping the old table. Regression reproduced ID 1 instead of 501 after deleted v1 history; the fix preserves 501. All 43 tests and production build pass on the Windows computer; real loopback repeat was 305 ms with both targets reachable at 0 ms measured latency and no errors. External-device acceptance remains outstanding; no normal database was migrated during this check.
+
 - PR #27 / feat/windows-icmp validated on the owner's Windows 10 build 19045 x64, Node 26.13.1/npm.cmd 11.20.0. npm.cmd ci, 42 tests and production build pass. Real IPv4/IPv6 loopbacks replied up/reachable at 0 ms timer resolution: cold cycle 1,659 ms, cached repeat 211 ms. Host health/snapshot/history, UI serving, restart persistence, offline backup and lock release pass with isolated temporary databases only. Evidence: windows-local-loopback-results.json and windows-host-results.json.
 - Fixed a reproduced shutdown race: collector stop previously returned before pending helper preparation/aborted child closure. It now drains both before database/lock release; regression fails on the old implementation, and a real canceled helper closes before stop returns. Three actual missing-executable cycles produce only process diagnostics with unchanged observations/history. Host shutdown handler was invoked via IPC, not a physical Ctrl+C; external-device unreachability/failure/recovery timing remain unverified. PR #27 remains draft, #5 open, #6 untouched. See ICMP-COLLECTOR.md for commands and limits.
 
