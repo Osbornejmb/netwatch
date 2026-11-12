@@ -8,6 +8,8 @@ An optional bounded Windows ICMP collector is implemented; authentication and li
 
 ## Planned system
 
+An optional Windows WinForms tray/desktop controller (#28) now starts/stops its own Node host through `host/desktop.js` and private IPC. A single controller is allowed per user/session; no remote shutdown route is added. The default database/settings live under LOCALAPPDATA/NetWatch, separate from the checkout and without automatically migrating existing inventory. See WINDOWS-LAUNCHER.md. The controller requires a signed-in interactive session; the future #12 Windows service remains the unattended owner, with the tray attaching rather than creating a second collector. Remote browsers never own collector lifetime.
+
 Browser working copy → explicit preview/confirmed loopback API transfer → SQLite inventory/history. Authentication is planned before remote access.
 The current host owns bounded optional ICMP workers (ICMP-COLLECTOR.md); a packaged Windows service and SNMP/LLDP collectors remain planned, and browsers will never launch probes or receive device credentials. Start with one service and one database. Add separate workers only when measured load requires them.
 

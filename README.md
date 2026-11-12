@@ -25,6 +25,8 @@ To open the development UI from another computer on the LAN, use the Windows hos
 
 ## Local host database (2.1)
 
+For local Start/Stop/Open Dashboard controls without a persistent PowerShell window, see [Windows tray app and optional desktop shortcut](docs/WINDOWS-LAUNCHER.md). One-time setup: `npm.cmd run build`, then `npm.cmd run desktop:setup -- --desktop-shortcut`. This is interactive local mode; unattended Windows service and secured remote-browser deployment remain #12/#10.
+
 Run `npm run build` then `npm start` and open **http://127.0.0.1:4317**. On PowerShell use `npm.cmd` if execution policy blocks npm.ps1. Stop with Ctrl+C. The host serves the build and a loopback-only SQLite API. Collection is disabled by default; enable it deliberately only for approved opted-in Windows inventory.
 
 Use Backup → Local host storage → Check host, then explicitly preview/confirm Load host or Save to host. The host starts empty; browser autosave remains a separate working copy. Monitoring opt-in defaults off. See [host API, migration and backup/restore instructions](docs/HOST-API.md).

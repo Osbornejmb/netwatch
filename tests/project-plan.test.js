@@ -37,7 +37,7 @@ test('project plan publishes linked issues once and preserves user bodies/states
   const publish = value => run(withPlan(value), github, { repo: { owner: 'owner', repo: 'repo' } }, core)
   await publish(plan)
   assert.equal(milestones.length, 4)
-  assert.equal(issues.length, 15)
+  assert.equal(issues.length, plan.issues.length)
   for (const [index, item] of plan.issues.entries()) {
     for (const dependency of item.dependsOn) {
       const number = plan.issues.findIndex(issue => issue.key === dependency) + 1
@@ -49,7 +49,7 @@ test('project plan publishes linked issues once and preserves user bodies/states
   issues[0].state = 'closed'
   milestones[0].description = 'An outdated milestone description'
   await publish(plan)
-  assert.equal(issues.length, 15)
+  assert.equal(issues.length, plan.issues.length)
   assert.equal(milestones.length, 4)
   assert.equal(issues[0].title, plan.issues[0].title)
   assert.equal(issues[0].body, 'Keep user notes\n\n<!-- netwatch-plan:dashboard-ui -->')
@@ -59,5 +59,5 @@ test('project plan publishes linked issues once and preserves user bodies/states
   const invalid = structuredClone(plan)
   invalid.issues[0].dependsOn = ['missing']
   await assert.rejects(publish(invalid), /Dependencies must precede/)
-  assert.equal(issues.length, 15)
+  assert.equal(issues.length, plan.issues.length)
 })

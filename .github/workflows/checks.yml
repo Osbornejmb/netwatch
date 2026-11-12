@@ -17,6 +17,9 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - name: Compile Windows tray launcher
+        if: runner.os == 'Windows'
+        run: npm run desktop:setup
       - name: Windows ICMP loopback smoke (no external targets)
         if: runner.os == 'Windows'
         run: node scripts/check-windows-icmp.mjs --loopback

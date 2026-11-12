@@ -6,7 +6,7 @@ The owner's priority is a clear dashboard showing genuine device up/down behavio
 
 M1 + M2 deliver the local monitoring MVP. SNMP/LLDP, BGP collection, and remote access are not prerequisites for seeing real up/down status. BGP session monitoring is not currently in scope; ping results cannot establish BGP health.
 
-**Critical path:** #13 → #1 → #4 → #5 → #6 → #11 → #16. Inventory editing (#2), recovery (#3), and map evidence (#15) must also be complete before the release gate #16. They do not block starting the backend after #1. Authentication #10 can be brought forward after #4/#6 if remote access becomes urgent, without waiting for SNMP.
+**Critical path:** #13 → #1 → #4 → #5 → #28 → #6 → #11 → #16. Local tray/desktop controls (#28) are brought forward before live dashboard integration. Inventory editing (#2), recovery (#3), and map evidence (#15) must also be complete before the release gate #16. Authentication #10 can be brought forward after #4/#6 if remote access becomes urgent, without waiting for SNMP.
 
 ## Recommended solo order
 
@@ -19,14 +19,15 @@ M1 + M2 deliver the local monitoring MVP. SNMP/LLDP, BGP collection, and remote 
 | 5 | [#15 Verify dashboard readability and larger-map behavior](https://github.com/Osbornejmb/netwatch/issues/15) | Larger-map evidence | #13 |
 | 6 | [#4 Add local host API and durable inventory/history storage](https://github.com/Osbornejmb/netwatch/issues/4) | Windows monitoring backend | #1 |
 | 7 | [#5 Implement bounded Windows ICMP checks and health transitions](https://github.com/Osbornejmb/netwatch/issues/5) | Windows monitoring backend | #4 |
-| 8 | [#6 Connect real observations, freshness, and history to the dashboard](https://github.com/Osbornejmb/netwatch/issues/6) | Windows monitoring backend | #13, #5 |
-| 9 | [#11 Add local incident lifecycle and optional approved notifications](https://github.com/Osbornejmb/netwatch/issues/11) | Windows monitoring backend | #6 |
-| 10 | [#16 Validate the live dashboard end to end on Windows](https://github.com/Osbornejmb/netwatch/issues/16) | Proven Windows monitoring MVP | #6, #2, #3, #15, #11 |
-| 11 | [#7 Add SNMPv3 interface collection](https://github.com/Osbornejmb/netwatch/issues/7) | Network intelligence | #16 |
-| 12 | [#8 Review LLDP neighbors before applying topology changes](https://github.com/Osbornejmb/netwatch/issues/8) | Network intelligence | #7 |
-| 13 | [#9 Model verified uplinks and router redundancy groups](https://github.com/Osbornejmb/netwatch/issues/9) | Network intelligence | #7 |
-| 14 | [#10 Add authentication, roles, and audit records before remote access](https://github.com/Osbornejmb/netwatch/issues/10) | Secure remote operations | #4, #6 |
-| 15 | [#12 Package and verify secure Windows deployment](https://github.com/Osbornejmb/netwatch/issues/12) | Secure remote operations | #16, #10 |
+| 8 | [#28 Add Windows tray controls and optional desktop launcher](https://github.com/Osbornejmb/netwatch/issues/28) | Local host usability | #4, #5 |
+| 9 | [#6 Connect real observations, freshness, and history to the dashboard](https://github.com/Osbornejmb/netwatch/issues/6) | Windows monitoring backend | #13, #5 |
+| 10 | [#11 Add local incident lifecycle and optional approved notifications](https://github.com/Osbornejmb/netwatch/issues/11) | Windows monitoring backend | #6 |
+| 11 | [#16 Validate the live dashboard end to end on Windows](https://github.com/Osbornejmb/netwatch/issues/16) | Proven Windows monitoring MVP | #6, #2, #3, #15, #11, #28 |
+| 12 | [#7 Add SNMPv3 interface collection](https://github.com/Osbornejmb/netwatch/issues/7) | Network intelligence | #16 |
+| 13 | [#8 Review LLDP neighbors before applying topology changes](https://github.com/Osbornejmb/netwatch/issues/8) | Network intelligence | #7 |
+| 14 | [#9 Model verified uplinks and router redundancy groups](https://github.com/Osbornejmb/netwatch/issues/9) | Network intelligence | #7 |
+| 15 | [#10 Add authentication, roles, and audit records before remote access](https://github.com/Osbornejmb/netwatch/issues/10) | Secure remote operations | #4, #6 |
+| 16 | [#12 Package and verify secure Windows deployment](https://github.com/Osbornejmb/netwatch/issues/12) | Secure remote operations | #16, #10 |
 
 The recommended order is not an artificial dependency chain. Follow the required dependencies if prioritizing the live-monitoring critical path.
 
@@ -42,7 +43,7 @@ Issues: [#13](https://github.com/Osbornejmb/netwatch/issues/13), [#1](https://gi
 
 A Windows-hosted local monitoring MVP: real reachable → down → recovered observations, truthful stale/disconnected behavior, persistent inventory/history, local incident lifecycle, backup/restore, and recorded end-to-end evidence.
 
-Issues: [#4](https://github.com/Osbornejmb/netwatch/issues/4), [#5](https://github.com/Osbornejmb/netwatch/issues/5), [#6](https://github.com/Osbornejmb/netwatch/issues/6), [#11](https://github.com/Osbornejmb/netwatch/issues/11), [#16](https://github.com/Osbornejmb/netwatch/issues/16).
+Issues: [#4](https://github.com/Osbornejmb/netwatch/issues/4), [#5](https://github.com/Osbornejmb/netwatch/issues/5), [#28](https://github.com/Osbornejmb/netwatch/issues/28), [#6](https://github.com/Osbornejmb/netwatch/issues/6), [#11](https://github.com/Osbornejmb/netwatch/issues/11), [#16](https://github.com/Osbornejmb/netwatch/issues/16).
 
 ### M3 — Network intelligence
 
@@ -63,12 +64,13 @@ Issues: [#10](https://github.com/Osbornejmb/netwatch/issues/10), [#12](https://g
 - Issue #18's map-first layout and popups are merged through #19; issue #15's provisional 100-device/180-link evidence is merged through #23. See SCALE-VALIDATION.md for timings and limits.
 - Issue #24's radial layout, direct-peer highlights and individual dashboard dragging are merged through #25. All 21 tests, build, browser regression suites and pre-merge CI checks passed. Real saved-layout moves autosave; radial/sample moves remain temporary and resettable.
 - Issue #4 (2.1) is merged through PR #26 and closed: loopback API/SQLite, explicit inventory transfer, monitoring opt-in and bounded history/backup/restore. All 30 tests/build and final Ubuntu/Windows checks passed.
-- Next critical-path work: [#5 bounded Windows ICMP](https://github.com/Osbornejmb/netwatch/issues/5), then #6 real dashboard observations. A completed UI or fixture is not proof of live monitoring.
-- Issue #5 implementation adds an opt-in bounded Windows ICMP collector, pending review and approved Windows-device evidence (see ICMP-COLLECTOR.md). See HOST-API.md for local host behavior/recovery. Dashboard observation integration, SNMP/LLDP, alerts, or remote access are not implemented yet. #16 requires actual approved Windows/device evidence; fixtures alone cannot close it.
+- Issue #5 is complete through merged PR #27 (a08c179), with 43 tests/build, Windows/Ubuntu CI and actual approved router/phone failure/recovery and console-shutdown evidence. See ICMP-COLLECTOR.md for timing and limits.
+- Current work: #28 local tray/desktop controls, then #6 real dashboard observations. WINDOWS-LAUNCHER.md explains the interactive launcher and future service handoff. SNMP/LLDP, alerts, unattended service and remote access remain planned. #16 requires actual Windows release evidence.
+- Deployment is one Windows host connected to the monitored network and multiple browser clients. The tray is host-local; remote browser closure never owns collection lifetime. #12's unattended service must survive sign-out/reboot and be the single collector/database owner, with optional tray controls attached to it. Remote shared URLs require #10/#12 security first.
 
 ## Plan maintenance
 
-`docs/github-plan.json` contains the same 15 issue definitions and dependency keys. Keys are stable identifiers, not execution order; original keys remain stable after reordering. GitHub issue numbers and this table identify the work.
+`docs/github-plan.json` contains the same 16 issue definitions and dependency keys. Keys are stable identifiers, not execution order; original keys remain stable after reordering. GitHub issue numbers and this table identify the work.
 
 The Publish project plan workflow matches stable markers or titles before creating missing work, updates canonical titles/milestones, and preserves existing issue bodies/states. Intentional acceptance-criteria revisions must be applied to both the plan and existing GitHub issues. It must not recreate issues solely because a title changes.
 
