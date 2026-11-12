@@ -10,7 +10,9 @@ Reference guidance: [UI/UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pr
 - System fonts and bundled SVG icons. No runtime font download, decorative charts, fake uptime percentages, or animated indicators implying a connection.
 - Use semantic CSS tokens for surfaces, text, boundaries, and status pairs. Target normal-text contrast of at least 4.5:1, visible focus, and controls at least 40 px tall on desktop / 44 px on narrow touch layouts.
 - Keep the editor's existing dark workspace separate. Preserve topology and storage compatibility when switching screens.
-- Clearly label sample mode. Default to actual configured inventory with unknown health and an honest disconnected explanation.
+- Clearly label sample mode. Default to Saved host network with real observations, explicit connection/checking state and last-update time; the separate Browser working copy has no live status. Preserve checks through connection loss and age them to stale with the host threshold.
+
+- Saved-device details provide Enable/Disable monitoring, a readable service state, last-check time and measured latency. Missing addresses disable authorization; never-checked and disabled devices remain unknown. Recent history is a collapsible section with bounded pages, local timestamps, adjacent status changes, and explicit loading/error/empty feedback. Needs attention stays inside View options. Keep UI messages readable without raw API errors or diagnostic codes.
 
 Validate at desktop and narrow widths. Check search, each status filter, selecting a device from map and list, sample mode isolation, and switching back to the editor. Record limitations in WORKLOG.md.
 

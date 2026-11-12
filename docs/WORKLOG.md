@@ -1,5 +1,22 @@
 # Working checkpoint
 
+## Current status (2026-11-13): issue 2.3 (#6)
+
+- Local branch feat/live-dashboard connects saved host inventory, snapshot health/freshness and device history to the dashboard; browser working copy and sample mode stay separate. Snapshot inventory is transactional with observations; history includes its inventory revision. Explicit saved-device monitoring uses conflict-checked writes, with no automatic retry or probes from the browser.
+- Serial five-second polling has a 10-second deadline and cleanup; failures preserve last-known data while a one-second clock ages it. Details show last check/latency/service state and collapsible 25-row history pages (200 displayed maximum), with adjacent transitions and no uptime claims. Host dragging is view-local; browser saved-layout autosave is preserved.
+- Added the user-requested Git Workflow & Branch Hygiene and UI & UX Copywriting Rules to AGENTS.md; commit, merge and safe post-merge branch cleanup are authorized.
+- Verification: all 50 node tests and production build pass; controlled Windows Chrome checks cover failure/recovery, independent switch health, disconnect/stale/reconnect, history pagination, keyboard details, opt-in/conflict/address limits, sample isolation, deletion/empty inventory and 390px overflow. See monitoring-results.json and screenshots/monitoring-*.png. Final copy/menu checks and existing dashboard-drag, radial and host-transfer browser suites also pass; host deletion assertion now waits for the asynchronous snapshot refresh.
+- Live phone dashboard acceptance now passes on the connected USB-authorized phone: genuine up -> third-failure down -> first-success up, visible history transitions, retained up on host disconnect, clock-driven stale after the real freshness window, and automatic reconnect to up. Default 30-second collection, zero collector/browser errors, desktop and 390px screenshots. Down followed Wi-Fi-disable completion by 84.287 s and recovery followed re-enable completion by 27.386 s; dashboard lag from the observations was 1.265/1.980 s. Evidence: phone-dashboard-results.json and screenshots/phone-dashboard-*.png, with the address masked.
+- Phone Wi-Fi restored/address unchanged; temporary host stopped, lock released, temporary database/cache removed, existing inventory untouched. Issue #6 implementation and acceptance are complete; GitHub records publication/CI/merge status. Next: #11 local incident lifecycle, then the remaining release #16 checks; this single-phone test does not establish capacity or internet health.
+
+### Unresolved work
+
+- #11: local incidents, deduplication/recovery and optional approved notifications remain unimplemented.
+- #16: full clean-install release/runbook, intended multi-device scale, incident acceptance, broader recovery/failure checks, launcher visual/DPI and tray-menu pointer validation remain open; one phone is not a full release gate.
+- #7/#8/#9: SNMP/LLDP/interface/redundancy work remains planned. Hotspot clients are not automatically discovered or added; LLDP proposals are a separate later workflow and do not guarantee phone discovery.
+- #10/#12: authentication, protected remote browser access and an unattended Windows service remain planned; the interactive host must stay awake and signed in.
+- Full screen-reader coverage and cross-device/browser/platform capacity are not established by the current evidence.
+
 ## Repo-local context skill (2026-11-13)
 
 - Added .agents/skills/netwatch-context/SKILL.md and an AGENTS.md entry point. It routes implementation/debug/review to connected code, contracts and checks, promotes targeted reads instead of repeated full-document discovery, and preserves existing verification/authorization rules. Token savings are not benchmarked. Skill format and all referenced file paths were validated.

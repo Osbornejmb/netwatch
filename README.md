@@ -1,6 +1,10 @@
 # NetWatch — Network health dashboard
 
-A local-first network operations dashboard with a supporting topology editor. The dashboard shows inventory, health filters, an interactive map, endpoint-colored connection paths, and click-to-open device details. A labelled sample preview illustrates up/down states. An optional Windows ICMP collector can persist reachability checks on the host; the dashboard does not display these live checks yet (#6). BGP monitoring and SNMP discovery remain planned.
+A local-first network operations dashboard with a supporting topology editor. The dashboard shows saved host devices, real reachability checks, health filters, endpoint-colored paths and device details with recent history. A labelled sample preview stays separate. BGP monitoring and SNMP discovery remain planned.
+
+For monitoring, build with `npm run build`, run `npm start`, then open **http://127.0.0.1:4317**, or use the [Windows tray app](docs/WINDOWS-LAUNCHER.md). The dashboard defaults to Saved host network; the editor and backups keep a separate browser working copy. Use Backup to review and save that copy to the host, then enable monitoring in a saved device's details. Collection requires both Windows collector opt-in and device authorization. No devices are probed automatically by the browser.
+
+The dashboard refreshes every five seconds, preserves last-known checks when disconnected, and ages them using the host freshness policy. Recent history opens in device details, 25 checks per page up to 200 displayed; timestamps use local time and no uptime percentage is inferred. Host-layout drags are temporary; browser saved-layout drags still autosave. Choose Browser working copy to view unsaved edits without live health.
 
 ## Requirements
 - Windows 10/11
