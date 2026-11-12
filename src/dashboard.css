@@ -39,3 +39,8 @@
 .health-map-focus-controls{position:absolute;right:12px;bottom:12px;z-index:6;max-width:min(340px,calc(100% - 76px));padding:10px;background:#fffffff5;border:1px solid var(--health-border);border-radius:7px;box-shadow:0 3px 12px #172b4314;display:flex;flex-wrap:wrap;gap:8px}
 .health-map-focus-controls .health-highlight-status{width:100%;margin:0;font-size:11px;color:var(--health-text)}
 .health-map-focus-controls .health-button{min-height:44px}
+
+.host-storage { border-top: 1px solid #cbd5e1; margin-top: 16px; padding-top: 12px; }
+.host-storage label { display: block; margin: 12px 0; }
+.host-storage select { display: block; width: 100%; max-width: 100%; min-height: 44px; padding: 8px; border: 1px solid #60758e; border-radius: 6px; background: #0a1421; color: #e3edf7; font: inherit; }
+.host-preview-list { max-height: 180px; overflow: auto; overflow-wrap: anywhere; padding: 8px 20px; }

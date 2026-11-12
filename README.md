@@ -4,7 +4,7 @@ A local-first network operations dashboard with a supporting topology editor. Th
 
 ## Requirements
 - Windows 10/11
-- Node.js 22 or newer
+- Node.js 22.13 or newer
 - npm
 
 ## Run on the Windows host
@@ -22,6 +22,12 @@ npm run dev
 The server binds to this computer only by default. Run `npm run dev:lan` to opt into LAN development.
 
 To open the development UI from another computer on the LAN, use the Windows host's LAN IP and port 5173, for example `http://192.168.1.50:5173`. This is development-only and is not secure remote access. Do not expose the Vite development server to the internet.
+
+## Local host database (2.1)
+
+Run `npm run build` then `npm start` and open **http://127.0.0.1:4317**. On PowerShell use `npm.cmd` if execution policy blocks npm.ps1. Stop with Ctrl+C. The host serves the build and a loopback-only SQLite API; no probes run.
+
+Use Backup → Local host storage → Check host, then explicitly preview/confirm Load host or Save to host. The host starts empty; browser autosave remains a separate working copy. Monitoring opt-in defaults off. See [host API, migration and backup/restore instructions](docs/HOST-API.md).
 
 ## Current capabilities
 - Dashboard is the default screen; use Topology editor in the top menu for inventory changes.
@@ -61,6 +67,7 @@ netwatch/
 │   ├── styles.css
 │   ├── dashboard.css
 │   └── nodes/
+├── host/                   # Loopback API, SQLite and offline maintenance
 ├── tests/
 ├── docs/
 ├── .github/workflows/

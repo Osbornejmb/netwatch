@@ -7,6 +7,7 @@ import { Activity, Cable, Check, Command, Database, Download, GitBranch, Plus, R
 import RouterNode from './nodes/RouterNode'
 import SwitchNode from './nodes/SwitchNode'
 import Dashboard from './Dashboard'
+import HostStorage from './HostStorage'
 import DeviceDialog from './DeviceDialog'
 import RecoveryDialog from './RecoveryDialog'
 import InventoryControls from './InventoryControls'
@@ -49,6 +50,7 @@ export default function App() {
   const [importBusy, setImportBusy] = useState(false)
   const [backupNotice, setBackupNotice] = useState('')
   const importInput = useRef(null)
+  const [importGeneration,setImportGeneration] = useState(0)
 
   useEffect(() => {
     if (autosavePaused) return
@@ -146,6 +148,7 @@ export default function App() {
   }
   const confirmRecovery = () => {
     if (pendingAction.kind === 'import') {
+      setImportGeneration(value=>value+1)
       setNodes(pendingAction.topology.nodes); setEdges(pendingAction.topology.edges); setSelectedNode(null); setQuery('')
       setBackupNotice(autosavePaused ? 'Map imported into this view. Autosave remains paused; replace the saved map explicitly to save it.' : 'Map imported. Autosave is active.')
     } else persistCurrent()
@@ -170,7 +173,7 @@ export default function App() {
             <p>Export current map downloads the visible inventory, never sample data. Import validates a JSON backup before asking to replace the visible map. Keep a backup before replacing any saved content.</p>
             {recovery && <p>{typeof recovery.raw === 'string' ? 'Download original saved content preserves the unreadable saved text exactly. It is separate from the current visible map.' : 'The original saved content is unavailable because storage access was denied. Export the visible map, allow browser storage, then reload to access the original before replacing it.'}</p>}
             <div className="backup-actions"><button className="button secondary" onClick={exportTopology}>Export current map</button><button className="button secondary" disabled={importBusy} onClick={() => importInput.current.click()}>{importBusy ? 'Reading backup…' : 'Import backup'}</button><button className="button secondary" disabled={importBusy} onClick={saveNow}>{autosavePaused ? 'Replace saved map…' : 'Save current map'}</button>{typeof recovery?.raw === 'string' && <button className="button secondary" onClick={downloadOriginal}>Download original saved content</button>}</div>
-          <p className="backup-status" role="status">{importBusy ? 'Validating backup…' : backupNotice}</p>
+          <HostStorage importGeneration={importGeneration} nodes={nodes} edges={edges} paused={autosavePaused} onLoad={topology => { setNodes(topology.nodes); setEdges(topology.edges); setSelectedNode(null) }}/><p className="backup-status" role="status">{importBusy ? 'Validating backup…' : backupNotice}</p>
           </details>
           <input ref={importInput} type="file" accept=".json,application/json" hidden onChange={importTopology}/>
         </section>

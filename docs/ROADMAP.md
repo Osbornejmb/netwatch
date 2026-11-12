@@ -63,7 +63,7 @@ Issues: [#10](https://github.com/Osbornejmb/netwatch/issues/10), [#12](https://g
 - Issue #18's map-first layout and popups are merged through #19; issue #15's provisional 100-device/180-link evidence is merged through #23. See SCALE-VALIDATION.md for timings and limits.
 - Issue #24's radial layout, direct-peer highlights and individual dashboard dragging are merged through #25. All 21 tests, build, browser regression suites and pre-merge CI checks passed. Real saved-layout moves autosave; radial/sample moves remain temporary and resettable.
 - Next critical-path work: [#4 local host API and durable inventory/history storage](https://github.com/Osbornejmb/netwatch/issues/4), then #5 bounded Windows ICMP and #6 real dashboard observations. A completed UI or fixture is not proof of live monitoring.
-- No live probes, host database, SNMP/LLDP, alerts, or remote access are implemented yet. #16 requires actual approved Windows/device evidence; fixtures alone cannot close it.
+- Issue #4 implementation adds a loopback host database/API and explicit browser transfer, pending PR review/merge; see HOST-API.md. No live probes, dashboard observation integration, SNMP/LLDP, alerts, or remote access are implemented yet. #16 requires actual approved Windows/device evidence; fixtures alone cannot close it.
 
 ## Plan maintenance
 
