@@ -60,7 +60,7 @@ test('desktop start reports an occupied port without stopping the existing host'
 test('desktop start preserves an existing lock; controller death leaves no running orphan and reports an unclean lock',async t=>{
  const directory=setup(t);const locked=join(directory,'locked');mkdirSync(locked+'.lock')
  const refused=launch(t,locked);assert.equal((await refused.closed)[0],1)
- assert.equal(existsSync(locked+'.lock'),true);assert.ok(refused.events.some(e=>e.state==='error'))
+ assert.equal(existsSync(locked+'.lock'),true);assert.ok(refused.events.some(e=>e.state==='error'&&e.message.includes('unclean shutdown')))
  const path=join(directory,'owned');const owner=launch(t,path);await running(owner)
  owner.child.kill('SIGKILL');await owner.closed
  const deadline=Date.now()+10000
@@ -69,9 +69,4 @@ test('desktop start preserves an existing lock; controller death leaves no runni
   try {await fetch('http://127.0.0.1:4317/api/v1/health',{signal:AbortSignal.timeout(500)});await delay(25)} catch {listening=false}
  }
  assert.equal(listening,false,'Controller death left a running orphan host')
- // Windows force-termination may kill the whole process tree; retain its lock for explicit recovery.
- if(existsSync(path+'.lock')) {
-  const restart=launch(t,path);assert.equal((await restart.closed)[0],1)
-  assert.ok(restart.events.some(e=>e.state==='error'&&e.message.includes('unclean shutdown')))
- }
 })
