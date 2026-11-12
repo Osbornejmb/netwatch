@@ -59,7 +59,7 @@ for (const viewport of [{width:1440,height:900},{width:390,height:844}]) {
   assert.equal(await page.locator('.health-node-down').count(),10)
   assert.equal(await page.locator('.health-node-stale').count(),10)
   await view.click()
-  const counts=async()=>page.locator('.health-filter option').allTextContents()
+  const counts=async()=>page.locator('[aria-label="Device status filter"] option').allTextContents()
   const baseline=await counts()
   assert.deepEqual(baseline.map(text=>Number(text.match(/\((\d+)\)/)[1])),[100,70,10,10,10])
   for(const [status,expected] of [['down',10],['stale',10],['unknown',10],['up',70],['all',100]]) {

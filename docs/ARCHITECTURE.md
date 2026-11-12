@@ -46,3 +46,9 @@ Dashboard health-card dimensions are maintained separately from inventory, using
 ## Scale evidence
 
 `tests/fixtures/scale-network.js` generates 100 documentation-address devices and 180 grid links. `scripts/check-scale-browser.mjs` seeds isolated inventory and intercepts only Vite's served sample generator for mixed-health QA; production App still has no observation source. The dashboard minimum zoom is 0.05 so the measured 390 px layout fits the complete fixture rather than clipping 20 nodes. Fit/zoom changes only the viewport, never manual node positions. See SCALE-VALIDATION.md and scale-results.json for timings, methods and limits.
+
+## Optional radial view and connected-device focus
+
+`src/radial.js` computes display-only positions from the complete graph before filtering. Links are treated as undirected only for BFS levels; stored direction and endpoint-health policy do not change. Each component chooses an explicit center if present, otherwise a most-connected router, then a most-connected device, with stable ID tie-breaking. Rings expand for card spacing; disconnected components are packed separately without invented links. Position generation is deterministic, cycle-safe and independent of health/input ordering. Straight radial links use facing side handles. Manual positions remain the default, and layout/center changes remount/refit the read-only graph without persisting layout output.
+
+The same module derives direct peers from incoming/outgoing configured links. Dashboard retains a separate highlight ID after the details popup closes. A solid blue focus outline, dashed peer outlines, thicker incident paths and subdued unrelated items are view state only; status colors, source inventory and filters are preserved. Canvas click, Clear highlight or sample switching clears the focus. Popup keyboard/focus handling is unchanged. View options scrolls on short screens so the additional controls remain reachable.

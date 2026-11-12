@@ -30,3 +30,9 @@
 @media(max-width:720px){.simple-shell .topbar{flex-wrap:wrap}.simple-shell .top-menu{order:3;width:100%;justify-content:space-between;margin-left:0}.simple-shell .backup-recovery{margin-left:auto}.simple-shell .backup-recovery details[open]{top:8px}.simple-shell .backup-recovery summary{min-height:44px}.health-button,.health-view-options summary{min-height:44px}}
 
 .dashboard-shell .backup-recovery{color:var(--health-text)}
+.health-view-options>div{max-height:max(100px,calc(100dvh - 240px));overflow-y:auto}
+.health-node-focus{outline:3px solid #2456c7;outline-offset:5px}
+.health-node-connected{outline:3px dashed #2456c7;outline-offset:5px}
+.health-node-muted{opacity:.38}
+.health-inventory tr.is-connected{background:#edf3ff}
+.health-highlight-status{max-width:440px;overflow-wrap:anywhere}
