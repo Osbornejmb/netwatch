@@ -3,15 +3,14 @@ import {
   ReactFlow, Background, Controls, MiniMap, addEdge, useEdgesState,
   useNodesState, MarkerType, Panel,
 } from '@xyflow/react'
-import {
-  Activity, AlertTriangle, Bell, Cable, Check, ChevronDown, CircleHelp,
-  Cloud, Command, Cpu, Database, Download, GitBranch, Globe2, LayoutDashboard,
-  Plus, Radio, Router, Search, Settings, ShieldCheck, SlidersHorizontal,
-  Trash2, X, Network, Zap,
-} from 'lucide-react'
+import { Activity, Cable, Check, Command, Database, Download, GitBranch, Plus, Radio, Router, Search, Trash2, X, Network, Zap } from 'lucide-react'
 import RouterNode from './nodes/RouterNode'
 import SwitchNode from './nodes/SwitchNode'
 import Dashboard from './Dashboard'
+import DeviceDialog from './DeviceDialog'
+import RecoveryDialog from './RecoveryDialog'
+import InventoryControls from './InventoryControls'
+import { createId } from './id'
 
 import { readTopology, writeTopology, validateTopology } from './topology'
 
@@ -30,50 +29,25 @@ const initialEdges = [
   { id: 'e-s1-s3', source: 's1', target: 's3', label: 'Downlink', style: { stroke: '#64748b', strokeWidth: 2 }, labelStyle: { fill: '#94a3b8', fontSize: 10 } },
 ]
 
-function AddDeviceModal({ onClose, onAdd }) {
-  const [kind, setKind] = useState('switch')
-  const [name, setName] = useState('')
-  const [ip, setIp] = useState('')
-  const [description, setDescription] = useState('')
-  const submit = (e) => {
-    e.preventDefault()
-    if (!name.trim()) return
-    onAdd({ kind, name: name.trim(), ip: ip.trim(), description: description.trim() })
-  }
-  return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <form role="dialog" aria-modal="true" aria-label="Add network device" className="modal" onKeyDown={e => { if (e.key === 'Escape') onClose() }} onSubmit={submit} onMouseDown={e => e.stopPropagation()}>
-        <div className="modal-head"><div><span className="eyebrow">DEVICE INVENTORY</span><h2>Add network device</h2></div><button type="button" className="icon-button" aria-label="Close add device" onClick={onClose}><X size={18}/></button></div>
-        <label className="field-label">Device type</label>
-        <div className="kind-picker">
-          <button type="button" className={kind === 'router' ? 'kind active' : 'kind'} onClick={() => setKind('router')}><Router size={19}/> Router <span className="shape-square"/></button>
-          <button type="button" className={kind === 'switch' ? 'kind active' : 'kind'} onClick={() => setKind('switch')}><Network size={19}/> Switch <span className="shape-circle"/></button>
-        </div>
-        <label className="field-label" htmlFor="device-name">Device name <b>*</b></label>
-        <input id="device-name" autoFocus required maxLength={100} value={name} onChange={e => setName(e.target.value)} placeholder={kind === 'router' ? 'EDGE-ROUTER-01' : 'ACCESS-SWITCH-01'} />
-        <label className="field-label" htmlFor="device-ip">Management IP address</label>
-        <input id="device-ip" maxLength={253} value={ip} onChange={e => setIp(e.target.value)} placeholder="192.168.1.10" />
-        <label className="field-label" htmlFor="device-desc">Description (optional)</label>
-        <input id="device-desc" maxLength={500} value={description} onChange={e => setDescription(e.target.value)} placeholder="Building, floor, rack, or purpose" />
-        <div className="notice"><Activity size={16}/><span>Phase 1 saves the device to the topology. Live ping and SNMP checks will be added in Phase 2.</span></div>
-        <div className="modal-actions"><button type="button" className="button secondary" onClick={onClose}>Cancel</button><button className="button primary" type="submit"><Plus size={16}/> Add device</button></div>
-      </form>
-    </div>
-  )
-}
-
 export default function App() {
   const saved = useMemo(() => readTopology({ getItem: key => localStorage.getItem(key) }, { nodes: initialNodes, edges: initialEdges }), [])
   const [nodes, setNodes, onNodesChange] = useNodesState(saved.topology.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(saved.topology.edges)
   const [view, setView] = useState('dashboard')
   const [showModal, setShowModal] = useState(false)
-  const [selectedNode, setSelectedNode] = useState(null)
+  const [selectedId, setSelectedId] = useState(null)
+  const selectedNode = nodes.find(node => node.id === selectedId)
+  const setSelectedNode = node => setSelectedId(node?.id || null)
   const [query, setQuery] = useState('')
   const [savedNotice, setSavedNotice] = useState(false)
 
   const [storageError, setStorageError] = useState(saved.error)
   const [autosavePaused, setAutosavePaused] = useState(Boolean(saved.error))
+  const [recovery, setRecovery] = useState(saved.recovery)
+  const [pendingAction, setPendingAction] = useState(null)
+  const [importError, setImportError] = useState('')
+  const [importBusy, setImportBusy] = useState(false)
+  const [backupNotice, setBackupNotice] = useState('')
   const importInput = useRef(null)
 
   useEffect(() => {
@@ -82,44 +56,49 @@ export default function App() {
       writeTopology(localStorage, { nodes, edges })
       setStorageError('')
     } catch {
-      setStorageError('Map could not be saved. Export JSON to keep a backup, then retry Save map.')
+      setBackupNotice('')
+      setStorageError('Map could not be saved. Autosave is paused. Export the current map to keep a backup, then retry saving.')
       setAutosavePaused(true)
     }
   }, [nodes, edges, autosavePaused])
 
-  useEffect(() => {
-    if (selectedNode && !nodes.some(node => node.id === selectedNode.id)) setSelectedNode(null)
-  }, [nodes, selectedNode])
 
   const importTopology = async (event) => {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
+    setImportBusy(true); setImportError(''); setBackupNotice('')
     try {
       if (file.size > 5 * 1024 * 1024) throw new Error('Choose a JSON file smaller than 5 MB.')
       const topology = validateTopology(JSON.parse(await file.text()))
-      if (!window.confirm('Replace this map with the imported map? Export your current map first if you need a backup.')) return
-      setNodes(topology.nodes); setEdges(topology.edges); setSelectedNode(null)
+      setPendingAction({ kind: 'import', topology })
     } catch (error) {
-      window.alert(`Import failed: ${error.message}`)
+      setImportError(`Import failed: ${error.message}`)
+    } finally {
+      setImportBusy(false)
     }
   }
 
   const onConnect = useCallback((params) => {
     setEdges(eds => addEdge({
-      ...params, id: `edge-${crypto.randomUUID()}`, label: 'Link',
+      ...params, id: `edge-${createId()}`, label: 'Link',
       style: { stroke: '#64748b', strokeWidth: 2 },
       labelStyle: { fill: '#94a3b8', fontSize: 10 },
       markerEnd: { type: MarkerType.ArrowClosed, color: '#64748b' },
     }, eds))
   }, [setEdges])
 
-  const addDevice = ({ kind, name, ip, description }) => {
+  const saveDevice = ({ kind, label, ip, description }) => {
+    if (showModal === 'edit' && selectedNode) {
+      setNodes(ns => ns.map(node => node.id === selectedNode.id ? { ...node, data: { ...node.data, label, ip, description } } : node))
+      setShowModal(false)
+      return
+    }
     if (nodes.length >= 2000) { window.alert('This map supports up to 2,000 devices.'); return }
-    const id = `${kind}-${crypto.randomUUID()}`
+    const id = `${kind}-${createId()}`
     setNodes(ns => [...ns, {
       id, type: kind, position: { x: 430 + Math.random() * 220, y: 180 + Math.random() * 180 },
-      data: { label: name, ip, description },
+      data: { label, ip, description },
     }])
     setShowModal(false)
   }
@@ -135,57 +114,72 @@ export default function App() {
   const routerCount = nodes.filter(n => n.type === 'router').length
   const switchCount = nodes.filter(n => n.type === 'switch').length
 
-  const exportTopology = () => {
-    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), ...validateTopology({ nodes, edges }) }, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = 'netwatch-topology.json'; a.click()
-    URL.revokeObjectURL(url)
+  const download = (content, filename, type) => {
+    const url = URL.createObjectURL(new Blob([content], { type }))
+    const link = document.createElement('a')
+    link.href = url; link.download = filename; link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
-  const saveNow = () => {
-    if (autosavePaused && !window.confirm('Replace the saved map with the current map and resume autosave?')) return
+  const exportTopology = () => {
+    download(JSON.stringify({ exportedAt: new Date().toISOString(), ...validateTopology({ nodes, edges }) }, null, 2), 'netwatch-topology.json', 'application/json')
+  }
+  const downloadOriginal = () => {
+    if (typeof recovery?.raw === 'string') download(recovery.raw, 'netwatch-original-saved-content.txt', 'text/plain;charset=utf-8')
+  }
+
+  const persistCurrent = () => {
     try {
       writeTopology(localStorage, { nodes, edges })
-      setStorageError(''); setAutosavePaused(false)
+      setStorageError(''); setAutosavePaused(false); setRecovery(null)
+      setBackupNotice('Map saved. Autosave is active.')
       setSavedNotice(true); setTimeout(() => setSavedNotice(false), 1800)
     } catch {
-      setStorageError('Map could not be saved. Export JSON to keep a backup.')
+      setStorageError('Map could not be saved. Autosave is paused. Export the current map to keep a backup.')
+      setAutosavePaused(true)
     }
+  }
+  const saveNow = () => {
+    setBackupNotice('')
+    if (autosavePaused) setPendingAction({ kind: 'save' })
+    else persistCurrent()
+  }
+  const confirmRecovery = () => {
+    if (pendingAction.kind === 'import') {
+      setNodes(pendingAction.topology.nodes); setEdges(pendingAction.topology.edges); setSelectedNode(null); setQuery('')
+      setBackupNotice(autosavePaused ? 'Map imported into this view. Autosave remains paused; replace the saved map explicitly to save it.' : 'Map imported. Autosave is active.')
+    } else persistCurrent()
+    setPendingAction(null)
   }
 
   return (
-    <div className={`app-shell${view === 'dashboard' ? ' dashboard-shell' : ''}`}>
-      <aside className="sidebar">
-        <div className="brand"><div className="brand-mark"><Activity size={21}/></div><div><strong>NETWATCH</strong><span>NETWORK OPERATIONS</span></div></div>
-        <div className="workspace"><div className="workspace-icon">NW</div><div><strong>Local workspace</strong><span>Windows host</span></div><ChevronDown size={15}/></div>
-        <div className="nav-label">WORKSPACE</div>
-        <nav>
-          <a className={view === 'dashboard' ? 'nav-item active' : 'nav-item'} href="#dashboard" aria-label="Network dashboard" aria-current={view === 'dashboard' ? 'page' : undefined} onClick={() => setView('dashboard')}><LayoutDashboard size={17}/> Dashboard</a>
-          <a className={view === 'editor' ? 'nav-item active' : 'nav-item'} href="#topology" aria-label="Topology builder" aria-current={view === 'editor' ? 'page' : undefined} onClick={() => setView('editor')}><GitBranch size={17}/> Topology builder</a>
-          <a className="nav-item" href="#inventory" aria-label="Device inventory" onClick={() => setView('dashboard')}><Cpu size={17}/> Devices <span className="nav-count">{nodes.length}</span></a>
-          <a className="nav-item disabled" title="Planned for Phase 2"><Activity size={17}/> Monitoring <span className="soon">PHASE 2</span></a>
-          <a className="nav-item disabled" title="Planned for Phase 3"><Bell size={17}/> Alerts <span className="soon">SOON</span></a>
-        </nav>
-        <div className="nav-label tools-label">CONFIGURATION</div>
-        <nav>
-          <a className="nav-item disabled" title="Planned for a later phase"><SlidersHorizontal size={17}/> Discovery settings</a>
-          <a className="nav-item disabled" title="Planned for a later phase"><Settings size={17}/> System settings</a>
-        </nav>
-        <div className="sidebar-bottom"><div className="secure-icon"><ShieldCheck size={17}/></div><div><strong>Local-first storage</strong><span>Topology saved in this browser</span></div></div>
-      </aside>
-
+    <div className={`app-shell simple-shell${view !== 'editor' ? ' dashboard-shell' : ''}`}>
       <main className="main-area">
         <header className="topbar">
-          <div className="breadcrumbs"><span>Workspace</span><b>/</b><strong>{view === 'dashboard' ? 'Network dashboard' : 'Topology builder'}</strong></div>
-          <div className="top-actions"><div className="host-status"><span className="pulse-dot"/> {view === 'dashboard' ? 'MONITORING OFFLINE' : 'HOST UI READY'}</div><button className="icon-button" aria-label="Topology help" onClick={() => window.alert('Add devices, drag them to arrange the map, and connect their handles. Select a device to inspect it. Export JSON for a backup; import JSON to restore a map. Monitoring is not active yet.')}><CircleHelp size={18}/></button><div className="avatar">AD</div></div>
+          <a className="top-brand" href="#dashboard" onClick={() => setView('dashboard')}><Activity size={19} aria-hidden="true"/> NETWATCH</a>
+          <nav className="top-menu" aria-label="Main navigation">
+            <a href="#dashboard" aria-label="Network dashboard" aria-current={view === 'dashboard' ? 'page' : undefined} onClick={() => setView('dashboard')}>Dashboard</a>
+            <a href="#topology" aria-label="Topology builder" aria-current={view === 'editor' ? 'page' : undefined} onClick={() => setView('editor')}>Topology editor</a>
+            <a href="#inventory" aria-label="Device inventory" aria-current={view === 'inventory' ? 'page' : undefined} onClick={() => setView('inventory')}>Devices</a>
+          </nav>
+        <section className="backup-recovery" aria-label="Map backup and recovery">
+          <details open={storageError || importError ? true : undefined}>
+            <summary aria-label="Map backup and recovery">Backup{storageError ? ' · Autosave paused' : importError ? ' · Import failed' : ''}</summary>
+            {storageError && <p className="notice storage-warning" role="alert">{storageError}</p>}
+            {importError && <p className="notice storage-warning" role="alert">{importError} Your current map and saved data have not been replaced.</p>}
+            <p>Export current map downloads the visible inventory, never sample data. Import validates a JSON backup before asking to replace the visible map. Keep a backup before replacing any saved content.</p>
+            {recovery && <p>{typeof recovery.raw === 'string' ? 'Download original saved content preserves the unreadable saved text exactly. It is separate from the current visible map.' : 'The original saved content is unavailable because storage access was denied. Export the visible map, allow browser storage, then reload to access the original before replacing it.'}</p>}
+            <div className="backup-actions"><button className="button secondary" onClick={exportTopology}>Export current map</button><button className="button secondary" disabled={importBusy} onClick={() => importInput.current.click()}>{importBusy ? 'Reading backup…' : 'Import backup'}</button><button className="button secondary" disabled={importBusy} onClick={saveNow}>{autosavePaused ? 'Replace saved map…' : 'Save current map'}</button>{typeof recovery?.raw === 'string' && <button className="button secondary" onClick={downloadOriginal}>Download original saved content</button>}</div>
+          <p className="backup-status" role="status">{importBusy ? 'Validating backup…' : backupNotice}</p>
+          </details>
+          <input ref={importInput} type="file" accept=".json,application/json" hidden onChange={importTopology}/>
+        </section>
         </header>
 
-        {storageError && <p className="notice storage-warning" role="alert">{storageError} Open the topology editor to save or export a backup.</p>}
-        {view === 'dashboard' ? <Dashboard nodes={nodes} edges={edges} onEdit={() => setView('editor')}/> : <section className="page-content" id="topology">
-          <input ref={importInput} type="file" accept=".json,application/json" hidden onChange={importTopology} />
+        {view !== 'editor' ? <Dashboard nodes={nodes} edges={edges} showInventory={view === 'inventory'} onMoveDevice={(id, position) => setNodes(current => current.map(node => node.id === id ? { ...node, position } : node))} onEdit={() => setView('editor')}/> : <section className="page-content" id="topology">
           <div className="page-heading">
             <div><div className="eyebrow">NETWORK MANAGEMENT / PHASE 01</div><h1>Topology builder</h1><p>Map your infrastructure first. Monitoring will be connected in the next phase.</p></div>
-            <div className="heading-actions"><button className="button secondary" onClick={() => importInput.current.click()}>Import JSON</button><button className="button secondary" onClick={exportTopology}><Download size={16}/> Export JSON</button><button className="button primary" onClick={() => setShowModal(true)}><Plus size={17}/> Add device</button></div>
+            <div className="heading-actions"><button className="button secondary" disabled={importBusy} onClick={() => importInput.current.click()}>Import JSON</button><button className="button secondary" onClick={exportTopology}><Download size={16}/> Export JSON</button><button className="button primary" onClick={() => setShowModal('add')}><Plus size={17}/> Add device</button></div>
           </div>
 
           <div className="stats-grid" id="overview">
@@ -209,7 +203,7 @@ export default function App() {
               onPaneClick={() => setSelectedNode(null)}
               fitView fitViewOptions={{ padding: 0.2 }}
               deleteKeyCode={['Backspace', 'Delete']}
-              defaultEdgeOptions={{ type: 'smoothstep', style: { stroke: '#64748b', strokeWidth: 2 }, labelStyle: { fill: '#94a3b8', fontSize: 10 } }}
+              defaultEdgeOptions={{ markerEnd: { type: MarkerType.ArrowClosed, color: '#64748b' }, type: 'smoothstep', style: { stroke: '#64748b', strokeWidth: 2 }, labelStyle: { fill: '#94a3b8', fontSize: 10 } }}
               proOptions={{ hideAttribution: true }}
             >
               <Background color="#263449" gap={22} size={1}/>
@@ -224,10 +218,12 @@ export default function App() {
               <div className="detail-row"><span>Management IP</span><strong>{selectedNode.data.ip || 'Not set'}</strong></div>
               <div className="detail-row"><span>Monitoring</span><strong className="pending">Not monitored</strong></div>
               <div className="detail-row"><span>Description</span><strong>{selectedNode.data.description || '—'}</strong></div>
+              <button className="button secondary full" onClick={() => setShowModal('edit')}>Edit device</button>
               <button className="button danger full" onClick={removeSelected}><Trash2 size={15}/> Remove device</button>
             </div>}
           </div>
 
+          <InventoryControls nodes={nodes} edges={edges} selectedId={selectedId} onSelect={setSelectedId} onEdit={() => setShowModal('edit')} onRemove={removeSelected} onMove={(id, position) => setNodes(ns => ns.map(node => node.id === id ? { ...node, position } : node))} onConnect={onConnect} onRemoveLink={id => setEdges(es => es.filter(edge => edge.id !== id))}/>
           <div className="bottom-grid">
             <div className="info-card"><div className="info-icon"><Zap size={17}/></div><div><strong>Automatic discovery comes next</strong><p>Phase 2 will add network scanning and ICMP checks. SNMP/LLDP will be used later to verify interface state and discover neighboring devices.</p></div></div>
             <div className="info-card"><div className="info-icon"><Database size={17}/></div><div><strong>Saved locally</strong><p>Your current map is stored in this browser. Export JSON to back it up or import it on another workstation.</p></div></div>
@@ -235,7 +231,8 @@ export default function App() {
           <footer>NETWATCH <span>•</span> PHASE 1 FOUNDATION <span>•</span> NO LIVE NETWORK PROBES YET</footer>
         </section>}
       </main>
-      {showModal && <AddDeviceModal onClose={() => setShowModal(false)} onAdd={addDevice}/>}
+      {pendingAction && <RecoveryDialog action={pendingAction} paused={autosavePaused} unavailable={recovery?.raw === null} hasOriginal={typeof recovery?.raw === 'string'} onDownloadOriginal={downloadOriginal} onClose={() => setPendingAction(null)} onConfirm={confirmRecovery}/>}
+      {showModal && <DeviceDialog device={showModal === 'edit' ? selectedNode : null} nodes={nodes} onClose={() => setShowModal(false)} onSave={saveDevice}/>}
     </div>
   )
 }

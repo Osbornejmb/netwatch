@@ -1,5 +1,23 @@
 # Working checkpoint
 
+## Current status (2026-11-12)
+
+- Completed/closed: #13, #1, #2, #3, #15, #18 and #24. Their implementations/evidence were merged through #14/#20/#21/#22/#23/#19/#25 respectively.
+- Latest application checkpoint: #25, commit `5aa9200a2ea3ff8d1c6bd83121457ecbeab1c7be`. All 21 tests, production build, six browser suites and pre-merge GitHub checks passed. The default full-map dashboard supports saved/radial layouts, direct-peer highlighting and individual dragging; saved-layout movement autosaves while radial/sample adjustments are temporary.
+- Next: #4 host API/SQLite persistence, followed by #5 bounded Windows ICMP and #6 real observations. No live probes, host database, SNMP/LLDP, alerts or remote access are implemented.
+- The dated and feature-specific entries below are historical checkpoints. Their then-current next steps and open/closed notes are superseded by this current status. The 100-device fixture is provisional, not a production capacity claim; confirm deployment size and target-machine behavior before release.
+
+## Current work: topology-first status and popup details (#18)
+
+- Branch feat/topology-status-paths makes the map fill the viewport below a small title/status strip and horizontal menu. Sidebar, avatar/breadcrumbs, summary cards, and default table are removed; View options contains search/status counts, and Devices opens the inventory separately.
+- Devices are directly tinted green/red/amber/gray. Connection lines summarize endpoint reachability: any down endpoint gives a red dashed path; both up gives green; stale/unknown remain conservative. Device state is never propagated from a failed neighbor.
+- Sample preview starts with the primary router down and supports explicit restore/fail. The other router and responding switches stay green. Colored lines do not establish physical interface state or traffic failover.
+- Device clicks and inventory Inspect open a native modal dialog with status, address, last check, and connected peers/path summaries. Close button, Escape, and backdrop dismiss it; trigger focus is restored.
+- Ten Node tests passed, including redundancy, both-router failure without overriding switch observations, recovery, and orientation-independent stale/unknown path rules. Production build passed.
+- Browser verified red primary-router paths/green alternate paths, restoration (four red paths to one; nine green paths to twelve), switch remaining up, popup data, Escape, close button, backdrop, keyboard Inspect/focus restoration, and return to the unchanged five-device inventory.
+- Desktop and narrow popup/layout inspected. The simplified opening screen has zero sidebars, summary cards, or tables, and the map takes 453 of 565 viewport pixels in the checked desktop view. Top navigation, separate Devices/Inspect, hidden filters/search, clear/reset, and editor round-trip were verified. Screenshots: docs/screenshots/topology-paths.jpg, device-popup.jpg, popup-mobile.jpg.
+- Pending: publish PR and verify its GitHub checks. Live monitoring, actual interface/failover proof, full screen-reader verification, and larger-map performance remain future checks.
+
 ## Product decisions
 
 - Network health is the default screen; topology editing supports it.
@@ -37,10 +55,92 @@
 - Critical path: #13 → #1 → #4 → #5 → #6 → #11 → #16. #2/#3/#15 are also release prerequisites. No issue is closed by this plan review.
 - docs/ROADMAP.md and docs/github-plan.json match the updated GitHub issues. Stable plan markers prevent renamed issues being recreated. The workflow self-check covers dependency links, reruns, renamed titles, and preservation of edited/closed issues.
 
-## PR acceptance checkpoint
+## Historical PR #14 acceptance checkpoint
 
 - Reviewed PR #14 against its connected code, tests, persisted-data boundaries, sample isolation, and issue 1.0 criteria. No merge-blocking findings; no external change requests or inline review comments were present.
 - All eight local tests passed again. Final-head push and PR checks were green before the owner-authorized squash merge.
 - Accepted implementation commit: 7b6b083580ccc6b15b59d5ede9d595447287ab76 on main. Local main was synchronized.
 - Issue 1.0 is GitHub #13, not GitHub #1. It was already implemented in the accepted PR; all seven acceptance criteria are now checked and the issue is closed. No duplicate feature implementation is needed.
 - Issue 1.1 (#1) remains the next development/verification checkpoint. No host probes or real-hardware claims were added during acceptance.
+
+## Foundation reliability follow-up (2026-11-12)
+
+- Reproduced the LAN issue in Chromium at a non-loopback plain HTTP address: `isSecureContext` was false and `crypto.randomUUID` was undefined. Add-device and pointer link creation now use a shared ID helper, preferring native UUID, then random bytes, with a time/sequence/random fallback for environments without crypto. IDs are not security tokens.
+- Editor arrows now come from trusted default edge options, surviving storage reload and JSON import without accepting arbitrary imported rendering properties. All editor links consistently use the same arrow treatment; v1 data is unchanged.
+- Real-mode freshness now advances once per second and refreshes on focus/visibility changes. Sample time remains frozen. Browser-only injected observations crossed from up to stale without a remount; this fixture is not a production monitoring source.
+- Corrected README checkout instructions/tree and the roadmap's outdated pending-merge checkpoint. Pinned checkout/setup-node/github-script Actions to the exact commits resolved from their existing v4/v4/v7 tags.
+- Clean Node 22.23.5/npm 11.9.0 install, ten Node tests, and production build passed. Initial installation using the default unwritable npm cache failed; using `/tmp/netwatch-npm` succeeded without lockfile changes.
+- Chromium browser checks passed: insecure HTTP add/connect, link arrow after reload, no-match search, sample isolation/frozen clock, 390 px layout without horizontal overflow, and real-mode freshness using injected observations. Screenshots: `docs/screenshots/foundation-lan.jpg` and `docs/screenshots/foundation-narrow.jpg`.
+- Additional browser checks passed: corrupt saved JSON preserves the raw content and pauses autosave; cancelling reset preserves it; explicit replacement resumes save; malformed/invalid/future imports and cancelled valid replacement preserve the prior saved map; JSON download, valid empty-map import, and empty dashboard work; denied reads and failed writes show warnings in dashboard/editor while retaining in-memory inventory.
+- Additional Chromium checks passed: pointer movement and persistence, selection/inspection, keyboard Delete with attached-edge cleanup, editor search, all sample status filters, and keyboard inventory inspection. #1 remains open pending merge/review of this evidence. No Windows hardware or live probes were tested.
+- User review follow-ups recorded: #2 owns UI IPv4/IPv6 canonicalization, duplicate checks, editable inventory and accessible controls; #4 must revalidate/normalize imported addresses at the host API, and #5 must use bounded shell-free probes. Existing address strings remain descriptive until then. #3 owns recoverable raw-data download and accessible import/recovery dialogs replacing native alert/confirm. No imported topology authorizes monitoring.
+- Next: review/merge the #1 foundation evidence, then implement host API/SQLite #4; finish #2/#3/#15 before the Windows MVP release gate.
+
+
+## Issue 1.2 — Accessible inventory editing (2026-11-12)
+
+- Implemented add/edit validation and canonical IPv4/IPv6 duplicate checks. Existing-device edits preserve ID/type/position/links; empty addresses are allowed. Imports/storage use the same validation, rejecting invalid and equivalent duplicate addresses before replacement. README describes older-backup repair and paused-autosave behavior.
+- Native modal dialog plus explicit forward/reverse Tab wrapping keeps focus inside, closes on Escape, and returns focus after closing. Field errors name the invalid field and focus it. Background content is inert while the modal is open.
+- Added keyboard-operable device selection/edit/delete, numerical X/Y positioning, and directed link add/remove controls below the editor. Self-links, existing default-handle links and link limits are rejected. Inspector selection now uses current node data by ID.
+- Thirteen Node tests and production build pass. Browser tests against the production build passed for edit preservation, invalid/duplicate input, IPv6 normalization, empty-address creation, modal focus/escape/return, save/cancel, numerical move, keyboard link add/remove, delete with attached-link cleanup, duplicate import rejection and import cancellation.
+- Desktop (1440×1000) and narrow (390×844) checked; screenshots: `docs/screenshots/inventory-desktop.jpg` and `docs/screenshots/inventory-narrow.jpg`. No live probes, host API, SNMP or real-device checks are included. Host API must revalidate before probing (#4/#5). Raw corrupt-data download and import/recovery dialog replacements remain #3 work.
+- Issue #2 stays open until the implementation is merged and acceptance evidence is reviewed. Next: saved-map recovery #3 or the live-monitoring critical path #4.
+
+
+## Issue 1.3 — Saved-map recovery and inventory navigation (2026-11-12)
+
+- #1 and #2 were completed and closed through merged PRs #20/#21. This change implements #3, keeping the existing dashboard/device list/navigation.
+- `readTopology` retains unreadable original text separately from the visible fallback, distinguishing read-access denial from invalid content. The original is downloadable unchanged, including empty text. Denied access offers accurate recovery guidance without pretending an original backup is available.
+- Backup/import/save controls and failure feedback are available in both views. Export always uses actual inventory, even in sample mode. Import validates before a native accessible confirmation; invalid input, Cancel and Escape preserve saved and visible maps. Imports during recovery change only the visible map, keeping autosave paused until separate explicit saved-map replacement succeeds.
+- Recovery dialogs share the tested modal focus logic with device dialogs, start on Cancel, trap forward/reverse Tab, close on Escape and restore focus. Import errors are inline; native import/replacement alert/confirm calls are removed.
+- Fourteen Node tests and production build pass. Optional `scripts/check-recovery-browser.mjs` verifies exact original downloads vs visible exports, malformed/future/invalid/oversize import rejection, cancellation, paused import, explicit replacement, backup/restore, empty/no-match states, sample-safe exports, editor/device-list navigation, denied reads, quota failures and successful retries. Failed replacement retains the raw recovery copy. Existing inventory regression checks also pass after the shared-dialog refactor.
+- Desktop 1440×1000 and narrow 390×844 checked with no document overflow. Review images: `docs/screenshots/recovery-desktop.jpg` and `docs/screenshots/recovery-narrow.jpg`. Browser tests use isolated contexts; they do not probe devices.
+- No dependency or persisted topology schema change. Multi-tab conflict resolution and host persistence remain future work; screen-reader/hardware verification is not claimed. #3 stays open until merge/review of the acceptance evidence.
+- Next: #15 for larger-map evidence in the solo sequence; #4 for the host API on the monitoring critical path.
+
+
+### PR #22 review follow-up
+
+A fresh Node 22 install, fourteen tests and build passed during review. The first recovery browser run timed out only at its final screenshot readiness wait after switching browser contexts; four subsequent diagnostic runs passed all checks. The screenshot setup now explicitly brings the main page forward and scrolls the map into view before checking initialized nodes. Recovery and inventory suites were rerun after this change. No application behavior changed in this follow-up.
+
+
+## PR #19 integration/review — Issue #18 (2026-11-12)
+
+- Merged current main into the PR branch and resolved App/Dashboard/architecture conflicts. Preserved LAN-safe IDs, editor arrows, advancing real-mode freshness, inventory validation/editing and keyboard map controls, and saved-map backup/recovery safeguards from #20–#22.
+- Recovery controls moved into a top-menu Backup popover. Paused/error indicators remain visible when closed; errors expand the controls. Default landing retains horizontal Dashboard/Topology editor/Devices navigation and a map filling the rest of the viewport, without summary cards, sidebar or default table.
+- Review found that regenerating controlled graph nodes discarded React Flow measurements during freshness updates, which could leave cards hidden. Dashboard now retains measured health-card dimensions and handles dimension events. Browser regression advances the clock and confirms the cards stay visible. An injected real-mode observation ages from up to stale without remounting (test fixture only; no live monitoring).
+- Review also found that Enter on a map node only selected it rather than opening details. Added Enter/Space activation and button/dialog semantics. DeviceDetails shares the existing tested modal hook for explicit Tab trapping and close/Escape/backdrop/focus restoration.
+- Sixteen Node tests cover existing foundations and endpoint failure/stale/unknown rules. Optional `scripts/check-topology-browser.mjs` verifies map viewport/layout, primary-router failure/restore colors, independent responding switches, optional filters, no-match/reset, node and inventory keyboard popups, focus/backdrop, sample isolation and desktop/narrow navigation. Inventory and recovery scripts were updated for the new menu/filter layout and both pass.
+- Screenshots refreshed: topology-paths.jpg, device-popup.jpg, topology-mobile.jpg, inventory and recovery layouts. Windows hardware, live monitoring, screen-reader behavior and larger-map performance remain unverified; #15 and the host monitoring issues remain separate work.
+- #18 is complete only after this reviewed integration merges. #1/#2/#3 remain completed, and their behavior is preserved.
+
+
+## Issue 1.4 — Representative larger-map checks (2026-11-12)
+
+- Kept the default dashboard as the full network map. Added a repeatable 100-device/180-link documentation-address fixture and meaningful fixture contract test.
+- Narrow initial-fit measurement found 20 clipped cards with minZoom 0.15. Dashboard now permits 0.05, fitting all 100 on both measured viewports. View options explains zoom/Devices for readable labels; no positions, grouping or layout data are changed.
+- Optional scale browser script covers initial all-unknown inventory, 70 up/10 down/10 stale/10 unknown sample states, empty inventory, stable full-inventory counts, exact filtered-edge/endpoints, search/no-match/reset, pan/zoom/fit, and map/list keyboard inspection on 1440×900 and 390×844. Fixture observations are browser-only sample overrides and never saved or probed.
+- Node 22 runner/server, browser/machine/cgroup metadata, render/filter/search timings and label sizes are recorded in docs/scale-results.json and explained in docs/SCALE-VALIDATION.md. Initial observed renders were 1311/1022 ms, status filters 62–143/36–128 ms; single measurements include Vite and automation overhead, not production capacity.
+- Saved overview, readable-card and inspection screenshots for both viewports. Full-view labels are too small to read (5.6/1.7 px); search plus Fit view reaches 20.8 px, and Devices/popups provide normal-size text. Actual deployment size/topology and target-machine performance must be confirmed before release.
+- #15 remains open until merge/review. Live monitoring and hardware verification remain separate work. Next critical-path issue is host API/storage #4.
+
+
+## Radial network map and direct-peer highlighting — #24 (2026-11-12)
+
+- Added View options → Map layout (Saved positions / Radial), automatic per-component router centers and an optional explicit center. Display-only BFS rings handle cycles, isolates and disconnected components deterministically; custom side handles/straight lines support the radial arrangement. Saved geometry, IDs, links and schema remain untouched. Layout/root changes refit the map, while filtering or health updates do not reorganize the rings.
+- Added persistent direct-peer highlighting for map click/Enter/Space and inventory Inspect. Solid blue focus and dashed peer outlines, thicker incident paths and subdued unrelated items preserve health colors. Popup close retains the highlight; Clear highlight/background click/sample switching clears it. Incoming/outgoing direct connections count; isolates show zero peers.
+- Twenty-one Node tests cover radial graph distance, centers, cycles/disconnected packing, deterministic input ordering, no mutation, 100-device mesh/star spacing, and direct-peer handling of duplicate/invalid/self edges. No new runtime dependency or persisted schema.
+- Optional scripts/check-radial-browser.mjs verifies both layouts, exact manual restoration/editor positions, custom center, stable filters/health colors, popup focus, highlight persistence/clear and filter behavior, source/sample isolation, desktop/narrow and 390×565 control reachability, plus a 101-device/180-link mesh with an isolated device. Existing topology, recovery and inventory production-preview suites pass.
+- Evidence images: radial-desktop.jpg, radial-narrow.jpg, radial-highlight-desktop.jpg, radial-highlight-narrow.jpg, radial-controls-narrow.jpg and radial-101-narrow.jpg. Large radial overviews can make labels tiny and links can cross; zoom/search/Devices remain necessary. No hardware, monitoring or full screen-reader claims.
+- #24 remains open until PR review/merge. Next monitoring milestone remains host API/storage #4.
+- Final checks: Node 22.23.5 tests/build and radial, topology, recovery, inventory and 100-device scale browser suites pass. Scale count assertions now target the status selector explicitly because View options also contains layout/center selectors.
+
+
+## Dashboard individual dragging follow-up — #24 / PR #25 (2026-11-12)
+
+- Enabled free individual node dragging in the dashboard. Position overrides render during movement; direct peers/incident paths highlight from drag start and links follow the moved device. Neighbor positions do not change, and drag release does not open a detail popup. Click/keyboard inspection remains available.
+- Real Saved positions persist at drag stop through App's existing autosave/recovery flow, with reload/editor/export compatibility. Radial and sample moves remain view-only, with explicit Reset/refit. Source/layout/center/sample changes invalidate or clear temporary geometry. No IDs, fields, edge endpoints/handles or health policy change.
+- Moved map focus/reset controls into an overlay, preserving canvas geometry during interaction. Added scripts/check-dashboard-drag-browser.mjs for mid-drag highlights/path geometry, individual movement, no drag popup, manual persistence/reload, radial/sample isolation/reset, narrow gestures and quota failure preserving the previous save and moved in-memory graph.
+- A narrow browser gesture after resize initially started before Fit view completed. The test now waits for resize observation and fully fitted node bounds before dragging; no timing logs remain in application code.
+- Screenshots: dashboard-drag-saved.jpg, dashboard-drag-radial.jpg and dashboard-drag-narrow.jpg. Highlighting refers to configured incident links, not verified hardware port state. Full hardware/touch-device/screen-reader testing is not claimed.
+- Final verification: Node 22.23.5 passes all 21 tests and production build; dashboard-drag, radial, topology, recovery, inventory and 100-device scale browser checks pass. The scale QA server was restarted after a connection-refused setup failure; the rerun passed. Commit/push requested on the existing feat/radial-map branch.

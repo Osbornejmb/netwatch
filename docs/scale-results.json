@@ -1,0 +1,109 @@
+{
+  "observedAt": "2026-11-12T08:02:17.502Z",
+  "mode": "Vite development-server QA (not production capacity)",
+  "fixture": {
+    "nodes": 100,
+    "edges": 180,
+    "mixedCounts": {
+      "all": 100,
+      "up": 70,
+      "down": 10,
+      "stale": 10,
+      "unknown": 10
+    }
+  },
+  "browser": "156.0.8078.79",
+  "machine": {
+    "platform": "linux",
+    "arch": "x64",
+    "cpuModel": "AMD EPYC 9V74 80-Core Processor",
+    "logicalCpus": 3,
+    "memoryGiB": 10,
+    "runnerNode": "v22.23.5",
+    "cpuMax": "200000 100000",
+    "memoryMaxBytes": "8589934592",
+    "scope": "Shared managed cloud executor; host resources are not dedicated allocations"
+  },
+  "runs": [
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "initialUnknownRenderMs": 1311,
+      "filters": [
+        {
+          "status": "down",
+          "ms": 76
+        },
+        {
+          "status": "stale",
+          "ms": 62
+        },
+        {
+          "status": "unknown",
+          "ms": 68
+        },
+        {
+          "status": "up",
+          "ms": 137
+        },
+        {
+          "status": "all",
+          "ms": 143
+        }
+      ],
+      "initialBounds": {
+        "outside": 0,
+        "map": {
+          "width": 1440,
+          "height": 788
+        },
+        "minLabelPx": 5.628528814206178
+      },
+      "mixedSampleRenderMs": 453,
+      "searchMs": 67,
+      "focusedLabelPx": 20.8
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "initialUnknownRenderMs": 1022,
+      "filters": [
+        {
+          "status": "down",
+          "ms": 128
+        },
+        {
+          "status": "stale",
+          "ms": 36
+        },
+        {
+          "status": "unknown",
+          "ms": 41
+        },
+        {
+          "status": "up",
+          "ms": 112
+        },
+        {
+          "status": "all",
+          "ms": 128
+        }
+      ],
+      "initialBounds": {
+        "outside": 0,
+        "map": {
+          "width": 390,
+          "height": 678
+        },
+        "minLabelPx": 1.6727932458636405
+      },
+      "mixedSampleRenderMs": 390,
+      "searchMs": 70,
+      "focusedLabelPx": 20.8
+    }
+  ]
+}
