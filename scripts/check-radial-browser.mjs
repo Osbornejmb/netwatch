@@ -1,3 +1,6 @@
+import { createHealthNetwork } from '../tests/fixtures/health-network.js'
+import { hostSnapshot } from '../tests/fixtures/host-snapshot.js'
+import { createEditorNetwork } from '../tests/fixtures/editor-network.js'
 import { createScaleNetwork } from '../tests/fixtures/scale-network.js'
 import { validateTopology } from '../src/topology.js'
 import { fileURLToPath } from 'node:url'
@@ -6,10 +9,13 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--no-sandbox'] })
 const url = process.env.NETWATCH_URL || 'http://127.0.0.1:4173'
 const context = await browser.newContext({viewport:{width:1440,height:900}})
+await context.addInitScript(network => { if (!localStorage.getItem('netwatch-topology-v1')) localStorage.setItem('netwatch-topology-v1', JSON.stringify(network)) }, createEditorNetwork())
 const page = await context.newPage()
 page.setDefaultTimeout(15000)
 const errors=[]
 page.on('pageerror',error=>errors.push(error.message))
+let network = createEditorNetwork()
+await page.route('**/api/v1/snapshot', route => route.fulfill({json:hostSnapshot(network,network.checks,network.nodes.length)}))
 await page.goto(url)
 await page.locator('.health-node').first().waitFor()
 const stored=()=>page.evaluate(()=>localStorage.getItem('netwatch-topology-v1'))
@@ -52,13 +58,16 @@ assert.equal(await page.locator('.health-node-connected,.health-node-muted,.heal
 await view.click()
 await page.getByLabel('Map layout',{exact:true}).selectOption('radial')
 await view.click()
-await page.getByRole('button',{name:'Preview sample statuses'}).click()
+network = createHealthNetwork(Date.now()); network.checks['core-a'].status = 'down'
+await page.getByRole('button',{name:'Refresh host',exact:true}).click()
 await page.locator('.health-node-down').first().waitFor()
 assert.equal(await page.locator('.health-path-down').count(),4)
-const sample=await positions()
-await page.getByRole('button',{name:'Restore primary router'}).click()
+const healthPositions=await positions()
+network.checks['core-a'].status='up'
+await page.getByRole('button',{name:'Refresh host',exact:true}).click()
+await page.locator('.react-flow__node[data-id="core-a"] .health-node-up').waitFor()
 assert.equal(await page.locator('.health-path-down').count(),1)
-assert.deepEqual(await positions(),sample,'Health changes must not move radial nodes')
+assert.deepEqual(await positions(),healthPositions,'Health changes must not move radial nodes')
 await page.screenshot({path:fileURLToPath(new URL('../docs/screenshots/radial-desktop.jpg',import.meta.url))})
 const node=page.locator('.react-flow__node[data-id="core-a"]')
 await node.focus();await page.keyboard.press('Enter')
@@ -92,7 +101,8 @@ await page.keyboard.press('Escape')
 await page.getByRole('link',{name:'Network dashboard',exact:true}).click()
 assert.equal(await page.locator('.health-node-connected').count(),3)
 await page.screenshot({path:fileURLToPath(new URL('../docs/screenshots/radial-highlight-narrow.jpg',import.meta.url))})
-await page.getByRole('button',{name:'Return to my network'}).click()
+await page.getByLabel('Network source').selectOption('browser')
+network = createEditorNetwork()
 assert.equal(await page.locator('.health-node-connected').count(),0)
 assert.equal(await stored(),original)
 await page.getByRole('link',{name:'Topology builder',exact:true}).click()

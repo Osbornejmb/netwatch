@@ -1,8 +1,10 @@
+import { createEditorNetwork } from '../tests/fixtures/editor-network.js'
 import assert from 'node:assert/strict'
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright')
 const base=process.env.NETWATCH_HOST_URL||'http://127.0.0.1:4317'
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']})
 const context=await browser.newContext({viewport:{width:1440,height:900}})
+await context.addInitScript(network => { if (!localStorage.getItem('netwatch-topology-v1')) localStorage.setItem('netwatch-topology-v1', JSON.stringify(network)) }, createEditorNetwork())
 const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message))
 const read=()=>context.request.get(base+'/api/v1/topology').then(r=>r.json())
 const host=page.getByRole('region',{name:'Host inventory storage'})
@@ -13,8 +15,6 @@ try {
  await page.goto(base);await open();const initial=await read()
  await host.getByRole('button',{name:'Save to host…',exact:true}).click();await page.keyboard.press('Shift+Tab');assert.equal(await preview.locator('summary').nth(1).evaluate(el=>el===document.activeElement),true);await page.keyboard.press('Shift+Tab');assert.equal(await preview.locator('summary').nth(0).evaluate(el=>el===document.activeElement),true);await page.keyboard.press('Enter');await preview.getByText('CORE-ROUTER-01 · r1',{exact:false}).waitFor();await preview.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal((await read()).revision,initial.revision)
  await save();const migrated=await read();assert.equal(migrated.topology.nodes.length,5);assert.equal(migrated.topology.edges.length,4);assert.ok(Object.values(migrated.monitoring).every(v=>v===false))
- await page.locator('summary[aria-label="Map backup and recovery"]').click();await page.getByRole('button',{name:'Preview sample statuses'}).click();await open();await save();assert.equal((await read()).topology.nodes.length,5)
- await page.locator('summary[aria-label="Map backup and recovery"]').click();await page.getByRole('button',{name:'Return to my network'}).click();await open()
  await host.getByLabel('Host device monitoring').selectOption('r1');await host.getByRole('checkbox').check();await save();assert.equal((await read()).monitoring.r1,true)
  // Reimporting the same v1 map must still revoke implicit authorization.
  await page.locator('input[type=file]').setInputFiles({name:'backup.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(migrated.topology))});await preview.getByRole('button',{name:'Import map',exact:true}).click();await save();assert.equal((await read()).monitoring.r1,false)

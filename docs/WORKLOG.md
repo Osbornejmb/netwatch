@@ -1,5 +1,13 @@
 # Working checkpoint
 
+## Current status (2026-11-13): remove built-in demo data
+
+- Removed the browser starter devices/links, generated preview statuses, preview/failure controls, demo watermark and sample-only rendering paths. Fresh browser and host inventories are empty; saved user inventory/history and import compatibility are preserved. Older saved devices are not silently erased; unwanted entries can be removed in the editor and explicitly saved to the host.
+- Regression inventories/observations now live only under tests/fixtures; browser checks seed isolated contexts or intercept snapshot HTTP responses instead of using a production demo feature. Runtime source no longer imports synthetic network generators. Updated shared modal focus handling to exclude controls hidden inside collapsed history, preserving keyboard trapping.
+- Rewrote README with Windows launcher installation, empty-network device setup, explicit host transfer/monitoring, status meanings, storage/backup, start/stop and current limits. Updated current architecture/design/product/host/launcher instructions. Historical acceptance records and screenshots remain as history.
+- Verification: 50 Node tests, production build and nine browser suites pass (empty startup, topology, inventory editing, recovery, monitoring, host transfer, dragging, radial and 100-device scale). Empty desktop/390px screenshots are saved; user-created devices survive reload. No demo generator, starter labels or preview controls remain in the production bundle. CI/merge status is recorded in the PR; no physical devices were probed for this removal.
+
+
 ## Current status (2026-11-13): issue 2.3 (#6)
 
 - Merged PR #30 (6190bb9) connects saved host inventory, snapshot health/freshness and device history to the dashboard; browser working copy and sample mode stay separate. Snapshot inventory is transactional with observations; history includes its inventory revision. Explicit saved-device monitoring uses conflict-checked writes, with no automatic retry or probes from the browser.

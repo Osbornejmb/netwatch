@@ -76,11 +76,7 @@ try {
   assert.equal(store.read().monitoring.r, true)
   await close(); await refresh()
   await inspect('empty'); assert.equal(await page.getByRole('button', { name: 'Enable monitoring', exact: true }).isDisabled(), true); await close()
-  const revision = store.read().revision
-  await page.getByRole('button', { name: 'Preview sample statuses' }).click()
-  assert.equal(await page.getByRole('button', { name: /monitoring$/ }).count(), 0)
-  assert.equal(store.read().revision, revision)
-  await page.getByRole('button', { name: 'Return to my network' }).click(); await status('r', 'up')
+  assert.equal(await page.getByRole('button', { name: /sample|preview/i }).count(), 0)
   await page.setViewportSize({ width: 390, height: 844 })
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true)
   await inspect('r'); await page.screenshot({ path: 'docs/screenshots/monitoring-narrow.png' }); await close()
@@ -89,7 +85,7 @@ try {
   store.write({ source: 'inventory', topology: { schemaVersion: 1, nodes: [], edges: [] } }, store.read().revision)
   await refresh(); await page.getByText('Your network map starts here').waitFor()
   assert.deepEqual(errors, [])
-  writeFileSync('docs/monitoring-results.json', JSON.stringify({ verifiedAt: new Date().toISOString(), platform: process.platform, controlledObservations: true, probes: 0, checks: ['host inventory source', 'filter counts', 'keyboard details and focus trap', 'history pagination and transitions', 'independent failure and recovery', 'disconnect, clock-driven stale, reconnect', 'explicit monitoring disable/enable', 'revision conflict', 'missing address', 'sample isolation', '390px overflow and details', 'deleted device and empty host'], screenshots: ['monitoring-desktop.png', 'monitoring-disconnected.png', 'monitoring-narrow.png'], pageErrors: errors }, null, 2) + '\n')
+  writeFileSync('docs/monitoring-results.json', JSON.stringify({ verifiedAt: new Date().toISOString(), platform: process.platform, controlledObservations: true, probes: 0, checks: ['host inventory source', 'filter counts', 'keyboard details and focus trap', 'history pagination and transitions', 'independent failure and recovery', 'disconnect, clock-driven stale, reconnect', 'explicit monitoring disable/enable', 'revision conflict', 'missing address', 'no demo controls', '390px overflow and details', 'deleted device and empty host'], screenshots: ['monitoring-desktop.png', 'monitoring-disconnected.png', 'monitoring-narrow.png'], pageErrors: errors }, null, 2) + '\n')
   console.log('Controlled monitoring browser checks passed; no probes or existing data used.')
 } finally {
   await browser.close(); await new Promise(resolve => server.close(resolve)); store.close(); rmSync(dir, { recursive: true, force: true })
