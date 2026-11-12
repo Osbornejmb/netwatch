@@ -12,7 +12,8 @@ export function validateProbeResult(value) {
 }
 export function createWindowsProbe({ platform = process.platform, execute = execFile, prepare = prepareWindowsHelper } = {}) {
   let preparation, retryAfter = 0
-  return async (target, { signal } = {}) => {
+  const children = new Set()
+  const probe = async (target, { signal } = {}) => {
     if (platform !== 'win32') return { outcome: 'error', code: 'unsupported_platform' }
     let address
     try { address = normalizeAddress(target); if (!address) throw new Error() } catch { return { outcome: 'error', code: 'invalid_target' } }
@@ -25,13 +26,21 @@ export function createWindowsProbe({ platform = process.platform, execute = exec
     try {executable = await preparation} catch {return {outcome:'error',code:'helper_unavailable'}}
     if (signal?.aborted) return { outcome:'error',code:'cancelled' }
     return new Promise(resolve => {
-      execute(executable, [address, String(ICMP_POLICY.timeoutMs)], {
+      const child = execute(executable, [address, String(ICMP_POLICY.timeoutMs)], {
         shell: false, windowsHide: true, timeout: ICMP_POLICY.processTimeoutMs,
         maxBuffer: 4096, signal,
       }, (error, stdout) => {
         if (error) return resolve({ outcome: 'error', code: signal?.aborted ? 'cancelled' : error.killed ? 'runner_timeout' : 'runner_process_error' })
         try { resolve(validateProbeResult(JSON.parse(stdout.trim()))) } catch { resolve({ outcome: 'error', code: 'invalid_runner_output' }) }
       })
+      if (child) {
+        const closed = new Promise(resolve => child.once('close', resolve))
+        children.add(closed)
+        void closed.then(() => children.delete(closed))
+      }
     })
   }
+  // Abort callbacks can precede process exit; drain before releasing the host lock.
+  probe.stop = async () => { await preparation?.catch(() => {}); await Promise.all(children) }
+  return probe
 }

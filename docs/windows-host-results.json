@@ -1,0 +1,88 @@
+{
+  "scope": "Windows loopback only; IPC invokes SIGINT handler, not a physical Ctrl+C",
+  "node": "v26.13.1",
+  "windows": "10.0.19045",
+  "health": {
+    "apiVersion": 1,
+    "ready": true,
+    "collector": {
+      "state": "running",
+      "ready": true,
+      "lastSeenAt": "2026-11-12T12:59:14.059Z",
+      "lastSuccessfulCycleAt": "2026-11-12T12:59:14.059Z",
+      "lastCycleCompletedAt": "2026-11-12T12:59:14.059Z",
+      "enabledDevices": 2,
+      "completedChecks": 2,
+      "errors": 0,
+      "diagnostics": [],
+      "policy": {
+        "intervalMs": 30000,
+        "timeoutMs": 1500,
+        "processTimeoutMs": 4000,
+        "concurrency": 8,
+        "failuresForDown": 3,
+        "successesForRecovery": 1,
+        "minimumStaleAfterMs": 90000
+      },
+      "cycleDurationMs": 529,
+      "freshness": {
+        "staleAfterMs": 90000
+      },
+      "expectedCycleBudgetMs": 30000
+    }
+  },
+  "snapshot": {
+    "generatedAt": "2026-11-12T12:59:14.081Z",
+    "collector": {
+      "state": "running",
+      "ready": true,
+      "lastSeenAt": "2026-11-12T12:59:14.059Z",
+      "lastSuccessfulCycleAt": "2026-11-12T12:59:14.059Z",
+      "lastCycleCompletedAt": "2026-11-12T12:59:14.059Z",
+      "enabledDevices": 2,
+      "completedChecks": 2,
+      "errors": 0,
+      "diagnostics": [],
+      "policy": {
+        "intervalMs": 30000,
+        "timeoutMs": 1500,
+        "processTimeoutMs": 4000,
+        "concurrency": 8,
+        "failuresForDown": 3,
+        "successesForRecovery": 1,
+        "minimumStaleAfterMs": 90000
+      },
+      "cycleDurationMs": 529,
+      "freshness": {
+        "staleAfterMs": 90000
+      },
+      "expectedCycleBudgetMs": 30000
+    },
+    "freshness": {
+      "staleAfterMs": 90000
+    },
+    "observations": [
+      {
+        "deviceId": "loopback-0",
+        "status": "up",
+        "checkedAt": "2026-11-12T12:59:14.033Z",
+        "outcome": "reachable",
+        "reason": "success",
+        "latencyMs": 0
+      },
+      {
+        "deviceId": "loopback-1",
+        "status": "up",
+        "checkedAt": "2026-11-12T12:59:14.055Z",
+        "outcome": "reachable",
+        "reason": "success",
+        "latencyMs": 0
+      }
+    ]
+  },
+  "shutdownMs": 20,
+  "restartShutdownMs": 63,
+  "restartHistoryAndOfflineBackup": "passed; lock reacquired after each stop",
+  "activeHelperCancellation": "child close observed before stop returned; no new observations",
+  "realProcessFailure": "three cycles with missing executable; diagnostics only, history/timestamps unchanged"
+}

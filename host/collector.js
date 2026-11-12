@@ -91,6 +91,6 @@ export function createCollector(store, { enabled = false, platform = process.pla
   return {
     snapshot, runOnce,
     start() { if (!enabled || platform !== 'win32' || stopped || timer || active) return; void poll() },
-    async stop() {stopped = true;clearTimeout(timer);info.state = 'stopping';controller?.abort();await active;info.state = 'stopped';info.ready = false},
+    async stop() {stopped = true;clearTimeout(timer);info.state = 'stopping';controller?.abort();await active;await runner.stop?.();info.state = 'stopped';info.ready = false},
   }
 }

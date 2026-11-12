@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { EventEmitter } from 'node:events'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -22,6 +23,25 @@ function setup(t, count=1) {
 }
 const collector=(store,runner,options={})=>createCollector(store,{enabled:true,platform:'win32',runner,...options})
 const tick=()=>new Promise(resolve=>setImmediate(resolve))
+
+test('shutdown waits for helper preparation and aborted child close before releasing workers',async t=>{
+ const {store}=setup(t);let prepared
+ const preparing=new Promise(resolve=>{prepared=resolve})
+ const child=new EventEmitter();let started
+ const launched=new Promise(resolve=>{started=resolve})
+ const runner=createWindowsProbe({platform:'win32',prepare:()=>preparing,execute:(_,args,{signal},callback)=>{
+  signal.addEventListener('abort',()=>callback(new Error('aborted')),{once:true});started();return child
+ }})
+ const c=collector(store,runner);c.runOnce();await tick()
+ let stopped=false;const stopping=c.stop().then(()=>{stopped=true});await tick()
+ assert.equal(stopped,false);prepared('test.exe');await stopping
+ assert.equal(store.history('d0').checks.length,0)
+
+ const next=collector(store,runner);next.runOnce();await launched
+ stopped=false;const closing=next.stop().then(()=>{stopped=true});await tick()
+ assert.equal(stopped,false);child.emit('close');await closing
+ assert.equal(stopped,true);assert.equal(store.history('d0').checks.length,0)
+})
 
 test('healthy, transient loss, sustained failure and recovery persist raw outcomes separately from policy status',async t=>{
  const {store}=setup(t);const results=[up,down,up,down,down,down,up];const c=collector(store,async()=>results.shift())
