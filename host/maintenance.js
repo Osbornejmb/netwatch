@@ -7,14 +7,15 @@ import { inventory } from './store.js'
 export function validateDatabase(path) {
   const db=new DatabaseSync(path,{readOnly:true})
   try {
-    if(db.prepare('PRAGMA integrity_check').get().integrity_check!=='ok' || db.prepare('PRAGMA user_version').get().user_version!==1) throw new Error('Invalid or unsupported backup database.')
+    if(db.prepare('PRAGMA integrity_check').get().integrity_check!=='ok' || ![1,2].includes(db.prepare('PRAGMA user_version').get().user_version)) throw new Error('Invalid or unsupported backup database.')
     const rows=db.prepare('SELECT * FROM inventory').all()
     if(rows.length!==1 || rows[0].singleton!==1 || !Number.isSafeInteger(rows[0].revision) || rows[0].revision<0 || !Number.isFinite(Date.parse(rows[0].updated_at))) throw new Error('Invalid inventory metadata.')
     const state=inventory({source:'inventory',...JSON.parse(rows[0].payload)})
     const ids=new Set(state.topology.nodes.map(n=>n.id))
     let count=0
     for(const row of db.prepare('SELECT * FROM checks').iterate()) {
-      if(++count>100000 || !ids.has(row.device_id) || !['up','down'].includes(row.status) || !Number.isSafeInteger(row.checked_at) || row.checked_at>Date.now() || !Number.isSafeInteger(row.seq) || row.seq<1) throw new Error('Invalid history in backup.')
+      if ('outcome' in row && (!['reachable','unreachable'].includes(row.outcome) || (row.latency_ms !== null && (!Number.isFinite(row.latency_ms) || row.latency_ms < 0 || row.latency_ms > 1500 || row.outcome !== 'reachable')) || typeof row.reason !== 'string' || !row.reason || row.reason.length > 80)) throw new Error('Invalid reachability data in backup.')
+      if(++count>100000 || !ids.has(row.device_id) || !['up','down','unknown'].includes(row.status) || !Number.isSafeInteger(row.checked_at) || row.checked_at>Date.now() || !Number.isSafeInteger(row.seq) || row.seq<1) throw new Error('Invalid history in backup.')
     }
     return rows[0].revision
   } finally {db.close()}

@@ -1,6 +1,6 @@
 # NetWatch — Network health dashboard
 
-A local-first network operations dashboard with a supporting topology editor. The dashboard shows inventory, health filters, an interactive map, endpoint-colored connection paths, and click-to-open device details. A labelled sample preview illustrates up/down states. It does **not** ping devices, monitor BGP, or perform SNMP discovery yet.
+A local-first network operations dashboard with a supporting topology editor. The dashboard shows inventory, health filters, an interactive map, endpoint-colored connection paths, and click-to-open device details. A labelled sample preview illustrates up/down states. An optional Windows ICMP collector can persist reachability checks on the host; the dashboard does not display these live checks yet (#6). BGP monitoring and SNMP discovery remain planned.
 
 ## Requirements
 - Windows 10/11
@@ -25,9 +25,13 @@ To open the development UI from another computer on the LAN, use the Windows hos
 
 ## Local host database (2.1)
 
-Run `npm run build` then `npm start` and open **http://127.0.0.1:4317**. On PowerShell use `npm.cmd` if execution policy blocks npm.ps1. Stop with Ctrl+C. The host serves the build and a loopback-only SQLite API; no probes run.
+Run `npm run build` then `npm start` and open **http://127.0.0.1:4317**. On PowerShell use `npm.cmd` if execution policy blocks npm.ps1. Stop with Ctrl+C. The host serves the build and a loopback-only SQLite API. Collection is disabled by default; enable it deliberately only for approved opted-in Windows inventory.
 
 Use Backup → Local host storage → Check host, then explicitly preview/confirm Load host or Save to host. The host starts empty; browser autosave remains a separate working copy. Monitoring opt-in defaults off. See [host API, migration and backup/restore instructions](docs/HOST-API.md).
+
+## Optional Windows ICMP collector (2.2)
+
+See [ICMP setup, detection policy and validation](docs/ICMP-COLLECTOR.md). Both `NETWATCH_ICMP=1` and explicit host per-device monitoring authorization are required. The collector uses bounded workers and distinguishes network failures from process errors; results/latency appear in host APIs. Real approved Windows-device validation remains outstanding; fake tests and CI loopback do not prove production network behavior.
 
 ## Current capabilities
 - Dashboard is the default screen; use Topology editor in the top menu for inventory changes.

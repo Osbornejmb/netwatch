@@ -1,0 +1,52 @@
+{
+  "runUrl": "https://github.com/Osbornejmb/netwatch/actions/runs/43220983634/job/131192131280",
+  "testedCommit": "d6078ec799a4944c7dde7f17416c220378e1d1e2",
+  "operatingSystem": "Microsoft Windows Server 2025 Datacenter 10.0.26100 (GitHub-hosted x64)",
+  "result": {
+    "scope": "Windows loopback only; not hardware/network validation",
+    "cycleMs": 1973,
+    "checks": [
+      {
+        "deviceId": "loopback-0",
+        "status": "up",
+        "checkedAt": "2026-11-12T12:47:22.809Z",
+        "outcome": "reachable",
+        "reason": "success",
+        "latencyMs": 0
+      },
+      {
+        "deviceId": "loopback-1",
+        "status": "up",
+        "checkedAt": "2026-11-12T12:47:22.816Z",
+        "outcome": "reachable",
+        "reason": "success",
+        "latencyMs": 0
+      }
+    ],
+    "collector": {
+      "state": "running",
+      "ready": true,
+      "lastSeenAt": "2026-11-12T12:47:22.821Z",
+      "lastSuccessfulCycleAt": "2026-11-12T12:47:22.821Z",
+      "lastCycleCompletedAt": "2026-11-12T12:47:22.821Z",
+      "enabledDevices": 2,
+      "completedChecks": 2,
+      "errors": 0,
+      "diagnostics": [],
+      "policy": {
+        "intervalMs": 30000,
+        "timeoutMs": 1500,
+        "processTimeoutMs": 4000,
+        "concurrency": 8,
+        "failuresForDown": 3,
+        "successesForRecovery": 1,
+        "minimumStaleAfterMs": 90000
+      },
+      "cycleDurationMs": 1973,
+      "freshness": {
+        "staleAfterMs": 90000
+      },
+      "expectedCycleBudgetMs": 30000
+    }
+  }
+}

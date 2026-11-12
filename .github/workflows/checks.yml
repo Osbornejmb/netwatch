@@ -17,3 +17,9 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - name: Windows ICMP loopback smoke (no external targets)
+        if: runner.os == 'Windows'
+        run: node scripts/check-windows-icmp.mjs --loopback
+      - name: Windows host lifecycle (temporary database, loopbacks only)
+        if: runner.os == 'Windows'
+        run: node scripts/check-windows-host.mjs --loopback

@@ -1,0 +1,47 @@
+{
+  "scope": "Windows loopback only; not hardware/network validation",
+  "cycleMs": 211,
+  "checks": [
+    {
+      "deviceId": "loopback-1",
+      "status": "up",
+      "checkedAt": "2026-11-12T12:59:14.819Z",
+      "outcome": "reachable",
+      "reason": "success",
+      "latencyMs": 0
+    },
+    {
+      "deviceId": "loopback-0",
+      "status": "up",
+      "checkedAt": "2026-11-12T12:59:14.834Z",
+      "outcome": "reachable",
+      "reason": "success",
+      "latencyMs": 0
+    }
+  ],
+  "collector": {
+    "state": "running",
+    "ready": true,
+    "lastSeenAt": "2026-11-12T12:59:14.840Z",
+    "lastSuccessfulCycleAt": "2026-11-12T12:59:14.840Z",
+    "lastCycleCompletedAt": "2026-11-12T12:59:14.840Z",
+    "enabledDevices": 2,
+    "completedChecks": 2,
+    "errors": 0,
+    "diagnostics": [],
+    "policy": {
+      "intervalMs": 30000,
+      "timeoutMs": 1500,
+      "processTimeoutMs": 4000,
+      "concurrency": 8,
+      "failuresForDown": 3,
+      "successesForRecovery": 1,
+      "minimumStaleAfterMs": 90000
+    },
+    "cycleDurationMs": 210,
+    "freshness": {
+      "staleAfterMs": 90000
+    },
+    "expectedCycleBudgetMs": 30000
+  }
+}

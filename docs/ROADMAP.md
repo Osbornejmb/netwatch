@@ -64,7 +64,7 @@ Issues: [#10](https://github.com/Osbornejmb/netwatch/issues/10), [#12](https://g
 - Issue #24's radial layout, direct-peer highlights and individual dashboard dragging are merged through #25. All 21 tests, build, browser regression suites and pre-merge CI checks passed. Real saved-layout moves autosave; radial/sample moves remain temporary and resettable.
 - Issue #4 (2.1) is merged through PR #26 and closed: loopback API/SQLite, explicit inventory transfer, monitoring opt-in and bounded history/backup/restore. All 30 tests/build and final Ubuntu/Windows checks passed.
 - Next critical-path work: [#5 bounded Windows ICMP](https://github.com/Osbornejmb/netwatch/issues/5), then #6 real dashboard observations. A completed UI or fixture is not proof of live monitoring.
-- See HOST-API.md for implemented local host behavior and recovery. No live probes, dashboard observation integration, SNMP/LLDP, alerts, or remote access are implemented yet. #16 requires actual approved Windows/device evidence; fixtures alone cannot close it.
+- Issue #5 implementation adds an opt-in bounded Windows ICMP collector, pending review and approved Windows-device evidence (see ICMP-COLLECTOR.md). See HOST-API.md for local host behavior/recovery. Dashboard observation integration, SNMP/LLDP, alerts, or remote access are not implemented yet. #16 requires actual approved Windows/device evidence; fixtures alone cannot close it.
 
 ## Plan maintenance
 

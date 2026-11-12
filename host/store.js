@@ -16,11 +16,11 @@ export function inventory(value) {
   for (const n of topology.nodes) if (monitoring[n.id] === true && !n.data.ip) throw invalid('Monitoring requires a management address.')
   return { topology, monitoring: Object.fromEntries(topology.nodes.map(n => [n.id, monitoring[n.id] === true])) }
 }
-export function openStore(path, { now = () => Date.now(), migrate } = {}) {
+export function openStore(path, { now = () => Date.now(), migrate, migrateV2 } = {}) {
   const db = new DatabaseSync(path)
   db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=3000;')
   const version = db.prepare('PRAGMA user_version').get().user_version
-  if (version > 1) { db.close(); throw new Error('Database schema is newer than this host. Use a compatible host; do not delete the database.') }
+  if (version > 2) { db.close(); throw new Error('Database schema is newer than this host. Use a compatible host; do not delete the database.') }
   try {
     if (!version) {
       db.exec('BEGIN IMMEDIATE')
@@ -33,6 +33,24 @@ export function openStore(path, { now = () => Date.now(), migrate } = {}) {
       db.exec('PRAGMA user_version=1; COMMIT')
     }
   } catch (e) { try { db.exec('ROLLBACK') } catch {} db.close(); throw e }
+  if (version < 2) {
+    try {
+      db.exec(`BEGIN IMMEDIATE;
+        ALTER TABLE checks RENAME TO checks_v1;
+        CREATE TABLE checks (seq INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT NOT NULL,
+          status TEXT NOT NULL CHECK(status IN ('up','down','unknown')), checked_at INTEGER NOT NULL,
+          outcome TEXT NOT NULL CHECK(outcome IN ('reachable','unreachable')), reason TEXT NOT NULL,
+          latency_ms REAL CHECK(latency_ms IS NULL OR (latency_ms >= 0 AND latency_ms <= 1500)));
+        INSERT INTO checks(seq,device_id,status,checked_at,outcome,reason,latency_ms)
+          SELECT seq,device_id,status,checked_at,CASE status WHEN 'up' THEN 'reachable' ELSE 'unreachable' END,'legacy',NULL FROM checks_v1;
+        UPDATE sqlite_sequence SET seq=MAX(seq,COALESCE((SELECT seq FROM sqlite_sequence WHERE name='checks_v1'),0)) WHERE name='checks';
+        DROP TABLE checks_v1;
+        CREATE INDEX checks_device_time ON checks(device_id, seq);
+        CREATE INDEX checks_time ON checks(checked_at);`)
+      migrateV2?.(db)
+      db.exec('PRAGMA user_version=2; COMMIT')
+    } catch (error) {try {db.exec('ROLLBACK')} catch {} db.close();throw error}
+  }
   const transaction = fn => {
     db.exec('BEGIN IMMEDIATE')
     try { const result = fn(); db.exec('COMMIT'); return result } catch (e) { db.exec('ROLLBACK'); throw e }
@@ -40,7 +58,8 @@ export function openStore(path, { now = () => Date.now(), migrate } = {}) {
   const read = () => { const row = db.prepare('SELECT * FROM inventory').get(); return {...JSON.parse(row.payload),revision:row.revision,updatedAt:row.updated_at} }
   const cleanup = () => {
     db.prepare('DELETE FROM checks WHERE checked_at < ?').run(now() - 30 * 86400000)
-    db.exec('DELETE FROM checks WHERE seq NOT IN (SELECT seq FROM checks ORDER BY seq DESC LIMIT 100000)')
+    const excess = db.prepare('SELECT COUNT(*) AS count FROM checks').get().count - 100000
+    if (excess > 0) db.prepare('DELETE FROM checks WHERE seq IN (SELECT seq FROM checks ORDER BY seq LIMIT ?)').run(excess)
   }
   const write = (input, revision, hook) => {
     const clean = inventory(input)
@@ -59,15 +78,21 @@ export function openStore(path, { now = () => Date.now(), migrate } = {}) {
   cleanup()
   return {
     read,
+    revision: () => db.prepare('SELECT revision FROM inventory').get().revision,
     write(input, revision, hook) { return write(input,revision,hook) },
-    append(observations) {
+    append(observations, { revision } = {}) {
       if (!Array.isArray(observations) || observations.length > 2000) throw invalid('At most 2000 observations per batch.')
       return transaction(() => {
         const state = read()
+        if (revision !== undefined && revision !== state.revision) throw invalid('Inventory changed during probe.',409)
         for (const o of observations) {
           const time = typeof o?.checkedAt === 'string' ? Date.parse(o.checkedAt) : NaN
-          if (state.monitoring[o?.deviceId] !== true || !['up','down'].includes(o.status) || !Number.isFinite(time) || new Date(time).toISOString() !== o.checkedAt || time > now() || time < now()-30*86400000) throw invalid('Invalid or unauthorized observation.')
-          db.prepare('INSERT INTO checks(device_id,status,checked_at) VALUES(?,?,?)').run(o.deviceId,o.status,time)
+          if (state.monitoring[o?.deviceId] !== true || !['up','down','unknown'].includes(o.status) || !Number.isFinite(time) || new Date(time).toISOString() !== o.checkedAt || time > now() || time < now()-30*86400000) throw invalid('Invalid or unauthorized observation.')
+          const outcome = o.outcome ?? (o.status === 'up' ? 'reachable' : o.status === 'down' ? 'unreachable' : null)
+          const latency = o.latencyMs ?? null
+          const reason = o.reason ?? 'legacy'
+          if (!['reachable','unreachable'].includes(outcome) || (latency !== null && (!Number.isFinite(latency) || latency < 0 || latency > 1500 || outcome !== 'reachable')) || typeof reason !== 'string' || !reason || reason.length > 80) throw invalid('Invalid reachability result or latency.')
+          db.prepare('INSERT INTO checks(device_id,status,checked_at,outcome,reason,latency_ms) VALUES(?,?,?,?,?,?)').run(o.deviceId,o.status,time,outcome,reason,latency)
         }
         cleanup()
       })
@@ -77,13 +102,13 @@ export function openStore(path, { now = () => Date.now(), migrate } = {}) {
       if (!Number.isSafeInteger(limit) || limit < 1 || limit > 200 || (before !== undefined && (!Number.isSafeInteger(before) || before < 1))) throw invalid('Invalid history pagination.')
       cleanup()
       const rows = db.prepare('SELECT * FROM checks WHERE device_id=? AND seq < ? ORDER BY seq DESC LIMIT ?').all(id,before ?? Number.MAX_SAFE_INTEGER,limit+1)
-      const checks = rows.slice(0,limit).map(r=>({id:r.seq,deviceId:r.device_id,status:r.status,checkedAt:new Date(r.checked_at).toISOString()}))
+      const checks = rows.slice(0,limit).map(r=>({id:r.seq,deviceId:r.device_id,status:r.status,checkedAt:new Date(r.checked_at).toISOString(),outcome:r.outcome,reason:r.reason,latencyMs:r.latency_ms}))
       return {checks,nextBefore:rows.length>limit?checks.at(-1).id:null}
     },
     snapshot() {
       cleanup()
       const observations = db.prepare('SELECT c.* FROM checks c JOIN (SELECT device_id,MAX(checked_at) time FROM checks GROUP BY device_id) latest ON c.device_id=latest.device_id AND c.checked_at=latest.time ORDER BY c.seq').all()
-      return {generatedAt:new Date(now()).toISOString(),collector:{state:'not-implemented',lastSeenAt:null},freshness:{staleAfterMs:90000},observations:Object.values(Object.fromEntries(observations.map(r=>[r.device_id,{deviceId:r.device_id,status:r.status,checkedAt:new Date(r.checked_at).toISOString()}])))}
+      return {generatedAt:new Date(now()).toISOString(),collector:{state:'not-implemented',lastSeenAt:null},freshness:{staleAfterMs:90000},observations:Object.values(Object.fromEntries(observations.map(r=>[r.device_id,{deviceId:r.device_id,status:r.status,checkedAt:new Date(r.checked_at).toISOString(),outcome:r.outcome,reason:r.reason,latencyMs:r.latency_ms}])))}
     },
     close:()=>db.close(), db,
   }

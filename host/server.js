@@ -16,18 +16,18 @@ function readBody(req) {
   })
 }
 
-export function createHost(store, { port = 4317, dist = resolve('dist') } = {}) {
+export function createHost(store, { port = 4317, dist = resolve('dist'), collector } = {}) {
   const server = http.createServer(async (req,res) => {
     const send = (status,body) => {res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(body))}
     try {
-      const authority = `127.0.0.1:${port}`
+      const authority = `127.0.0.1:${port === 0 ? server.address().port : port}`
       if (req.headers.host !== authority) throw invalid('Unexpected host.',403)
       if (req.headers.origin && req.headers.origin !== `http://${authority}`) throw invalid('Unexpected origin.',403)
       if (req.headers['sec-fetch-site'] && !['same-origin','none'].includes(req.headers['sec-fetch-site'])) throw invalid('Cross-site requests are disabled.',403)
       const url = new URL(req.url,`http://${authority}`)
-      if (req.method==='GET' && url.pathname==='/api/v1/health') {store.read();return send(200,{apiVersion:1,ready:true,collector:{state:'not-implemented'}})}
+      if (req.method==='GET' && url.pathname==='/api/v1/health') {store.read();return send(200,{apiVersion:1,ready:true,collector:collector?.snapshot() ?? {state:'not-implemented'}})}
       if (req.method==='GET' && url.pathname==='/api/v1/topology') return send(200,store.read())
-      if (req.method==='GET' && url.pathname==='/api/v1/snapshot') return send(200,store.snapshot())
+      if (req.method==='GET' && url.pathname==='/api/v1/snapshot') {const snapshot=store.snapshot();const status=collector?.snapshot();if(status){snapshot.collector=status;snapshot.freshness=status.freshness}return send(200,snapshot)}
       const history = url.pathname.match(/^\/api\/v1\/devices\/([^/]+)\/checks$/)
       if (req.method==='GET' && history) return send(200,store.history(decodeURIComponent(history[1]),{limit:url.searchParams.has('limit')?Number(url.searchParams.get('limit')):50,before:url.searchParams.has('before')?Number(url.searchParams.get('before')):undefined}))
       if (req.method==='PUT' && url.pathname==='/api/v1/topology') {
