@@ -1,3 +1,5 @@
+import { normalizeAddress } from './inventory.js'
+
 export const STORAGE_KEY = 'netwatch-topology-v1'
 
 export function validateTopology(value) {
@@ -9,6 +11,7 @@ export function validateTopology(value) {
     throw new Error('This editor supports up to 2,000 devices and 10,000 links.')
   }
   const ids = new Set()
+  const addresses = new Set()
   const nodes = value.nodes.map(node => {
     if (!node || typeof node.id !== 'string' || !node.id || ids.has(node.id) ||
       !['router', 'switch'].includes(node.type) ||
@@ -19,9 +22,12 @@ export function validateTopology(value) {
       (node.data.description !== undefined && (typeof node.data.description !== 'string' || node.data.description.length > 500))) {
       throw new Error('Invalid device: check unique IDs, type, position, and text fields.')
     }
+    const ip = normalizeAddress(node.data.ip || '')
+    if (ip && addresses.has(ip)) throw new Error('Duplicate management address in topology.')
+    if (ip) addresses.add(ip)
     ids.add(node.id)
     return { id: node.id, type: node.type, position: { x: node.position.x, y: node.position.y },
-      data: { label: node.data.label.trim(), ip: node.data.ip || '', description: node.data.description || '' } }
+      data: { label: node.data.label.trim(), ip, description: node.data.description || '' } }
   })
   const edgeIds = new Set()
   const edges = value.edges.map(edge => {

@@ -28,3 +28,30 @@ button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #69d7
 .storage-warning{margin:16px 25px}
 @media(max-width:720px){.sidebar .nav-count,.sidebar .soon{display:none}.sidebar .nav-item svg{flex-shrink:0}}
 @media(max-width:720px){.sidebar .workspace,.sidebar .nav-label{display:none}}
+
+.device-dialog{color:#e3edf7;max-height:calc(100dvh - 32px);overflow:auto}
+.device-dialog::backdrop{background:#020711c9}
+.device-dialog p{font-size:12px;line-height:1.5;color:#aebed0}
+.device-dialog select,.inventory-controls select,.inventory-controls input{font:inherit;min-height:44px;max-width:100%;border:1px solid #60758e;border-radius:7px;background:#0a1421;color:#e3edf7;padding:8px}
+.device-dialog select{width:100%}
+.device-dialog input{min-height:44px}
+.device-dialog .field-error,.field-error{color:#ffb4b4}
+.device-dialog [aria-invalid=true]{border-color:#ffb4b4}
+.inventory-controls{margin-top:18px;padding:18px;border:1px solid #34485d;border-radius:10px;background:#101c2a;color:#e3edf7}
+.inventory-controls h2{font-size:16px;margin:0 0 8px}
+.inventory-controls p{font-size:12px;color:#aebed0}
+.inventory-controls label{display:block;font-size:12px}
+.inventory-controls select{display:block;width:100%;margin:6px 0 12px}
+.inventory-device-actions,.position-form,.link-form{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin:12px 0}
+.position-form{width:100%}
+.position-form label,.link-form label{flex:1;min-width:120px}
+.position-form input{display:block;width:100%;margin-top:6px}
+.link-form{align-items:center}
+.editable-links{list-style:none;padding:0;max-height:320px;overflow:auto}
+.editable-links li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid #34485d;font-size:12px;overflow-wrap:anywhere}
+.editable-links .button{flex-shrink:0}
+.inventory-controls .button,.device-dialog .button,.device-dialog .icon-button{min-height:44px}
+select:focus-visible{outline:2px solid #69d7d0;outline-offset:3px}
+@media(max-width:720px){.position-form,.link-form{flex-direction:column;align-items:stretch}.position-form label,.link-form label{width:100%;min-width:0}.inventory-controls{padding:12px}.heading-actions{flex-wrap:wrap}.device-dialog{width:calc(100% - 24px);padding:16px}}
+.link-endpoint{flex:1;min-width:150px}
+@media(max-width:720px){.link-endpoint{min-width:0;width:100%}}
