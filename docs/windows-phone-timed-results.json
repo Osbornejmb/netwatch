@@ -1,0 +1,72 @@
+{
+  "scope": "USB-authorized phone only, temporary host/database; addresses, identifiers and absolute timestamps omitted",
+  "sourceCommit": "b034f0a345a37daa49e8b5951345ad75e4ac4fa7",
+  "policy": {
+    "intervalMs": 30000,
+    "failuresForDown": 3,
+    "successesForRecovery": 1
+  },
+  "events": [
+    {
+      "relativeToOffCommandMs": -436,
+      "status": "up",
+      "outcome": "reachable",
+      "reason": "success",
+      "latencyMs": 66
+    },
+    {
+      "relativeToOffCommandMs": 30000,
+      "status": "up",
+      "outcome": "unreachable",
+      "reason": "TimedOut",
+      "latencyMs": null
+    },
+    {
+      "relativeToOffCommandMs": 59992,
+      "status": "up",
+      "outcome": "unreachable",
+      "reason": "TimedOut",
+      "latencyMs": null
+    },
+    {
+      "relativeToOffCommandMs": 89991,
+      "status": "down",
+      "outcome": "unreachable",
+      "reason": "TimedOut",
+      "latencyMs": null
+    },
+    {
+      "relativeToOffCommandMs": 118938,
+      "status": "up",
+      "outcome": "reachable",
+      "reason": "success",
+      "latencyMs": 95
+    }
+  ],
+  "baselineLatencyMs": 66,
+  "offCommandDurationMs": 166,
+  "downDelayFromOffCommandMs": {
+    "fromCommandStart": 89991,
+    "fromCommandCompletion": 89825
+  },
+  "onCommandDurationMs": 252,
+  "recoveryDelayFromOnCommandMs": {
+    "fromCommandStart": 28574,
+    "fromCommandCompletion": 28322
+  },
+  "finalCollector": {
+    "errors": 0,
+    "diagnostics": [],
+    "cycleDurationMs": 197
+  },
+  "phoneWifiRestored": true,
+  "phoneAddressUnchanged": true,
+  "gracefulShutdownMs": 43,
+  "databaseLockReleased": true,
+  "limitations": [
+    "Timings start at USB ADB command invocation/completion, not the inaccessible exact radio transition instant",
+    "Recovery includes phone reassociation plus next regular collector cycle",
+    "SIGINT handler invoked via IPC; physical console Ctrl+C delivery remains unverified",
+    "Single phone/Wi-Fi path; no general hardware-capacity or internet-health claim"
+  ]
+}

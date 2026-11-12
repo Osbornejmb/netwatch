@@ -1,0 +1,13 @@
+{
+  "scope": "Temporary empty host only; monitoring disabled; private paths/identifiers omitted",
+  "method": "Real Windows CTRL_C_EVENT delivered to a dedicated hidden console, not process.emit or child.kill",
+  "sharedConsoleGuard": "Sender verified console contained exactly itself and the temporary host before signaling",
+  "hostExitCode": 0,
+  "shutdownMs": 553,
+  "databaseLockReleased": true,
+  "databaseIntegrity": "ok",
+  "limitations": [
+    "OS-generated console event, not a physical keyboard press",
+    "Active worker drain verified separately by real-helper cancellation and timed-phone lifecycle checks"
+  ]
+}
