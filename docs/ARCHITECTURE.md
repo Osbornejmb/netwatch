@@ -2,9 +2,9 @@
 
 ## Implemented foundation
 
-React + Vite opens the network health dashboard by default. `src/Dashboard.jsx` renders a read-only React Flow map, status counts/filters, attention and detail panels, and a device table. The existing topology canvas remains available through Edit topology. Router and switch components share the topology data contract. `src/topology.js` validates imported and saved maps and strips untrusted rendering properties. The browser stores a versioned topology; export/import is the portability boundary. Existing v1 exports remain readable.
+React + Vite opens the network health dashboard by default. `src/Dashboard.jsx` renders a read-only React Flow map, status counts/filters, attention and detail panels, and a device table. The existing topology canvas remains available through Edit topology. Router and switch components share the topology data contract. `src/topology.js` validates imported and saved maps and strips untrusted rendering properties. The browser stores a versioned topology; export/import is the portability boundary. Valid v1 exports remain readable; invalid or duplicate management addresses are rejected without replacement (see README recovery guidance).
 
-The system has no active probes, backend, authentication, or live status. Example addresses are inventory placeholders. Management address text is descriptive in this phase; backend address validation is mandatory before any probes exist.
+The system has no active probes, backend, authentication, or live status. Example addresses are inventory placeholders. Management addresses are validated as IPv4/IPv6 literals (or empty), with canonical IPv6 comparison and duplicate rejection. Backend address validation remains mandatory before any probes exist.
 
 ## Planned system
 
@@ -30,3 +30,9 @@ A failed storage read pauses autosave until the user explicitly replaces the sav
 `src/health.js` defines the UI health policy separately from inventory: up/down only from valid timestamped observations, stale after 90 seconds, unknown for absent/invalid/future data. The freshness threshold is a prototype limit to replace with the collector polling policy. Actual inventory currently has no observations and is always unmonitored. Sample mode uses a separate documentation-address fixture, frozen timestamps, and an explicit banner. It never writes sample nodes/checks to storage. Link lines are configured topology only, not measured interface health or BGP session state. A monitoring service connection failure must not be translated into device failures when the backend is added.
 
 System fonts replace the starter's Google Fonts import so the dashboard does not need a font CDN at runtime. `src/dashboard.css` contains the light dashboard tokens; the editor retains its original dark workspace. No dependencies or storage schema changes were added.
+
+## Inventory editing
+
+`src/inventory.js` defines literal-address normalization and duplicate comparison, shared by add/edit forms and topology import/storage validation. It rejects hostnames, CIDR/zone/bracket syntax and ambiguous IPv4 notation. IPv6 uses the WHATWG URL parser for validation and canonical compression, without network requests; IPv4-mapped IPv6 remains canonical IPv6. Empty addresses are unmonitored inventory entries. Invalid legacy saved maps pause autosave without changing the raw data; no persisted schema change is required.
+
+`DeviceDialog.jsx` uses a modal native dialog, explicit Tab wrapping, Escape handling, associated field errors and focus restoration after close. Edits replace only device data, preserving type, ID, position and connections. Selection is derived from current nodes by ID, so edited/dragged details stay current. `InventoryControls.jsx` provides device selection, X/Y position updates and directed link creation/removal without canvas gestures. The existing pointer workflows remain available.

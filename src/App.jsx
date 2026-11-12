@@ -12,6 +12,8 @@ import {
 import RouterNode from './nodes/RouterNode'
 import SwitchNode from './nodes/SwitchNode'
 import Dashboard from './Dashboard'
+import DeviceDialog from './DeviceDialog'
+import InventoryControls from './InventoryControls'
 import { createId } from './id'
 
 import { readTopology, writeTopology, validateTopology } from './topology'
@@ -31,45 +33,15 @@ const initialEdges = [
   { id: 'e-s1-s3', source: 's1', target: 's3', label: 'Downlink', style: { stroke: '#64748b', strokeWidth: 2 }, labelStyle: { fill: '#94a3b8', fontSize: 10 } },
 ]
 
-function AddDeviceModal({ onClose, onAdd }) {
-  const [kind, setKind] = useState('switch')
-  const [name, setName] = useState('')
-  const [ip, setIp] = useState('')
-  const [description, setDescription] = useState('')
-  const submit = (e) => {
-    e.preventDefault()
-    if (!name.trim()) return
-    onAdd({ kind, name: name.trim(), ip: ip.trim(), description: description.trim() })
-  }
-  return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <form role="dialog" aria-modal="true" aria-label="Add network device" className="modal" onKeyDown={e => { if (e.key === 'Escape') onClose() }} onSubmit={submit} onMouseDown={e => e.stopPropagation()}>
-        <div className="modal-head"><div><span className="eyebrow">DEVICE INVENTORY</span><h2>Add network device</h2></div><button type="button" className="icon-button" aria-label="Close add device" onClick={onClose}><X size={18}/></button></div>
-        <label className="field-label">Device type</label>
-        <div className="kind-picker">
-          <button type="button" className={kind === 'router' ? 'kind active' : 'kind'} onClick={() => setKind('router')}><Router size={19}/> Router <span className="shape-square"/></button>
-          <button type="button" className={kind === 'switch' ? 'kind active' : 'kind'} onClick={() => setKind('switch')}><Network size={19}/> Switch <span className="shape-circle"/></button>
-        </div>
-        <label className="field-label" htmlFor="device-name">Device name <b>*</b></label>
-        <input id="device-name" autoFocus required maxLength={100} value={name} onChange={e => setName(e.target.value)} placeholder={kind === 'router' ? 'EDGE-ROUTER-01' : 'ACCESS-SWITCH-01'} />
-        <label className="field-label" htmlFor="device-ip">Management IP address</label>
-        <input id="device-ip" maxLength={253} value={ip} onChange={e => setIp(e.target.value)} placeholder="192.168.1.10" />
-        <label className="field-label" htmlFor="device-desc">Description (optional)</label>
-        <input id="device-desc" maxLength={500} value={description} onChange={e => setDescription(e.target.value)} placeholder="Building, floor, rack, or purpose" />
-        <div className="notice"><Activity size={16}/><span>Phase 1 saves the device to the topology. Live ping and SNMP checks will be added in Phase 2.</span></div>
-        <div className="modal-actions"><button type="button" className="button secondary" onClick={onClose}>Cancel</button><button className="button primary" type="submit"><Plus size={16}/> Add device</button></div>
-      </form>
-    </div>
-  )
-}
-
 export default function App() {
   const saved = useMemo(() => readTopology({ getItem: key => localStorage.getItem(key) }, { nodes: initialNodes, edges: initialEdges }), [])
   const [nodes, setNodes, onNodesChange] = useNodesState(saved.topology.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(saved.topology.edges)
   const [view, setView] = useState('dashboard')
   const [showModal, setShowModal] = useState(false)
-  const [selectedNode, setSelectedNode] = useState(null)
+  const [selectedId, setSelectedId] = useState(null)
+  const selectedNode = nodes.find(node => node.id === selectedId)
+  const setSelectedNode = node => setSelectedId(node?.id || null)
   const [query, setQuery] = useState('')
   const [savedNotice, setSavedNotice] = useState(false)
 
@@ -88,9 +60,6 @@ export default function App() {
     }
   }, [nodes, edges, autosavePaused])
 
-  useEffect(() => {
-    if (selectedNode && !nodes.some(node => node.id === selectedNode.id)) setSelectedNode(null)
-  }, [nodes, selectedNode])
 
   const importTopology = async (event) => {
     const file = event.target.files?.[0]
@@ -115,12 +84,17 @@ export default function App() {
     }, eds))
   }, [setEdges])
 
-  const addDevice = ({ kind, name, ip, description }) => {
+  const saveDevice = ({ kind, label, ip, description }) => {
+    if (showModal === 'edit' && selectedNode) {
+      setNodes(ns => ns.map(node => node.id === selectedNode.id ? { ...node, data: { ...node.data, label, ip, description } } : node))
+      setShowModal(false)
+      return
+    }
     if (nodes.length >= 2000) { window.alert('This map supports up to 2,000 devices.'); return }
     const id = `${kind}-${createId()}`
     setNodes(ns => [...ns, {
       id, type: kind, position: { x: 430 + Math.random() * 220, y: 180 + Math.random() * 180 },
-      data: { label: name, ip, description },
+      data: { label, ip, description },
     }])
     setShowModal(false)
   }
@@ -186,7 +160,7 @@ export default function App() {
           <input ref={importInput} type="file" accept=".json,application/json" hidden onChange={importTopology} />
           <div className="page-heading">
             <div><div className="eyebrow">NETWORK MANAGEMENT / PHASE 01</div><h1>Topology builder</h1><p>Map your infrastructure first. Monitoring will be connected in the next phase.</p></div>
-            <div className="heading-actions"><button className="button secondary" onClick={() => importInput.current.click()}>Import JSON</button><button className="button secondary" onClick={exportTopology}><Download size={16}/> Export JSON</button><button className="button primary" onClick={() => setShowModal(true)}><Plus size={17}/> Add device</button></div>
+            <div className="heading-actions"><button className="button secondary" onClick={() => importInput.current.click()}>Import JSON</button><button className="button secondary" onClick={exportTopology}><Download size={16}/> Export JSON</button><button className="button primary" onClick={() => setShowModal('add')}><Plus size={17}/> Add device</button></div>
           </div>
 
           <div className="stats-grid" id="overview">
@@ -225,10 +199,12 @@ export default function App() {
               <div className="detail-row"><span>Management IP</span><strong>{selectedNode.data.ip || 'Not set'}</strong></div>
               <div className="detail-row"><span>Monitoring</span><strong className="pending">Not monitored</strong></div>
               <div className="detail-row"><span>Description</span><strong>{selectedNode.data.description || '—'}</strong></div>
+              <button className="button secondary full" onClick={() => setShowModal('edit')}>Edit device</button>
               <button className="button danger full" onClick={removeSelected}><Trash2 size={15}/> Remove device</button>
             </div>}
           </div>
 
+          <InventoryControls nodes={nodes} edges={edges} selectedId={selectedId} onSelect={setSelectedId} onEdit={() => setShowModal('edit')} onRemove={removeSelected} onMove={(id, position) => setNodes(ns => ns.map(node => node.id === id ? { ...node, position } : node))} onConnect={onConnect} onRemoveLink={id => setEdges(es => es.filter(edge => edge.id !== id))}/>
           <div className="bottom-grid">
             <div className="info-card"><div className="info-icon"><Zap size={17}/></div><div><strong>Automatic discovery comes next</strong><p>Phase 2 will add network scanning and ICMP checks. SNMP/LLDP will be used later to verify interface state and discover neighboring devices.</p></div></div>
             <div className="info-card"><div className="info-icon"><Database size={17}/></div><div><strong>Saved locally</strong><p>Your current map is stored in this browser. Export JSON to back it up or import it on another workstation.</p></div></div>
@@ -236,7 +212,7 @@ export default function App() {
           <footer>NETWATCH <span>•</span> PHASE 1 FOUNDATION <span>•</span> NO LIVE NETWORK PROBES YET</footer>
         </section>}
       </main>
-      {showModal && <AddDeviceModal onClose={() => setShowModal(false)} onAdd={addDevice}/>}
+      {showModal && <DeviceDialog device={showModal === 'edit' ? selectedNode : null} nodes={nodes} onClose={() => setShowModal(false)} onSave={saveDevice}/>}
     </div>
   )
 }

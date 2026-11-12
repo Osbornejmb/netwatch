@@ -49,3 +49,13 @@
 - Additional Chromium checks passed: pointer movement and persistence, selection/inspection, keyboard Delete with attached-edge cleanup, editor search, all sample status filters, and keyboard inventory inspection. #1 remains open pending merge/review of this evidence. No Windows hardware or live probes were tested.
 - User review follow-ups recorded: #2 owns UI IPv4/IPv6 canonicalization, duplicate checks, editable inventory and accessible controls; #4 must revalidate/normalize imported addresses at the host API, and #5 must use bounded shell-free probes. Existing address strings remain descriptive until then. #3 owns recoverable raw-data download and accessible import/recovery dialogs replacing native alert/confirm. No imported topology authorizes monitoring.
 - Next: review/merge the #1 foundation evidence, then implement host API/SQLite #4; finish #2/#3/#15 before the Windows MVP release gate.
+
+
+## Issue 1.2 — Accessible inventory editing (2026-11-12)
+
+- Implemented add/edit validation and canonical IPv4/IPv6 duplicate checks. Existing-device edits preserve ID/type/position/links; empty addresses are allowed. Imports/storage use the same validation, rejecting invalid and equivalent duplicate addresses before replacement. README describes older-backup repair and paused-autosave behavior.
+- Native modal dialog plus explicit forward/reverse Tab wrapping keeps focus inside, closes on Escape, and returns focus after closing. Field errors name the invalid field and focus it. Background content is inert while the modal is open.
+- Added keyboard-operable device selection/edit/delete, numerical X/Y positioning, and directed link add/remove controls below the editor. Self-links, existing default-handle links and link limits are rejected. Inspector selection now uses current node data by ID.
+- Thirteen Node tests and production build pass. Browser tests against the production build passed for edit preservation, invalid/duplicate input, IPv6 normalization, empty-address creation, modal focus/escape/return, save/cancel, numerical move, keyboard link add/remove, delete with attached-link cleanup, duplicate import rejection and import cancellation.
+- Desktop (1440×1000) and narrow (390×844) checked; screenshots: `docs/screenshots/inventory-desktop.jpg` and `docs/screenshots/inventory-narrow.jpg`. No live probes, host API, SNMP or real-device checks are included. Host API must revalidate before probing (#4/#5). Raw corrupt-data download and import/recovery dialog replacements remain #3 work.
+- Issue #2 stays open until the implementation is merged and acceptance evidence is reviewed. Next: saved-map recovery #3 or the live-monitoring critical path #4.
