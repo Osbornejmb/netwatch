@@ -98,3 +98,13 @@ A fresh Node 22 install, fourteen tests and build passed during review. The firs
 - Sixteen Node tests cover existing foundations and endpoint failure/stale/unknown rules. Optional `scripts/check-topology-browser.mjs` verifies map viewport/layout, primary-router failure/restore colors, independent responding switches, optional filters, no-match/reset, node and inventory keyboard popups, focus/backdrop, sample isolation and desktop/narrow navigation. Inventory and recovery scripts were updated for the new menu/filter layout and both pass.
 - Screenshots refreshed: topology-paths.jpg, device-popup.jpg, topology-mobile.jpg, inventory and recovery layouts. Windows hardware, live monitoring, screen-reader behavior and larger-map performance remain unverified; #15 and the host monitoring issues remain separate work.
 - #18 is complete only after this reviewed integration merges. #1/#2/#3 remain completed, and their behavior is preserved.
+
+
+## Issue 1.4 — Representative larger-map checks (2026-11-12)
+
+- Kept the default dashboard as the full network map. Added a repeatable 100-device/180-link documentation-address fixture and meaningful fixture contract test.
+- Narrow initial-fit measurement found 20 clipped cards with minZoom 0.15. Dashboard now permits 0.05, fitting all 100 on both measured viewports. View options explains zoom/Devices for readable labels; no positions, grouping or layout data are changed.
+- Optional scale browser script covers initial all-unknown inventory, 70 up/10 down/10 stale/10 unknown sample states, empty inventory, stable full-inventory counts, exact filtered-edge/endpoints, search/no-match/reset, pan/zoom/fit, and map/list keyboard inspection on 1440×900 and 390×844. Fixture observations are browser-only sample overrides and never saved or probed.
+- Node 22 runner/server, browser/machine/cgroup metadata, render/filter/search timings and label sizes are recorded in docs/scale-results.json and explained in docs/SCALE-VALIDATION.md. Initial observed renders were 1311/1022 ms, status filters 62–143/36–128 ms; single measurements include Vite and automation overhead, not production capacity.
+- Saved overview, readable-card and inspection screenshots for both viewports. Full-view labels are too small to read (5.6/1.7 px); search plus Fit view reaches 20.8 px, and Devices/popups provide normal-size text. Actual deployment size/topology and target-machine performance must be confirmed before release.
+- #15 remains open until merge/review. Live monitoring and hardware verification remain separate work. Next critical-path issue is host API/storage #4.

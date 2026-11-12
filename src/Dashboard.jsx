@@ -106,7 +106,7 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
         <details className="health-view-options"><summary>View options{statusFilter !== 'all' || query ? ' · Filtered' : ''}</summary><div>
           <label className="health-search"><Search size={15} aria-hidden="true"/><input aria-label="Search dashboard devices" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search name or IP"/></label>
           <label className="health-filter">Status <select aria-label="Device status filter" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="all">All devices ({counts.all})</option>{Object.entries(HEALTH).map(([key, value]) => <option key={key} value={key}>{value.label} ({counts[key]})</option>)}</select></label>
-          <p className="health-map-count">{visible.length} of {nodes.length} devices</p><p className="health-map-count">Path colors summarize device reachability, not verified interface state.</p>
+          <p className="health-map-count">{visible.length} of {nodes.length} devices</p><p className="health-map-count">Fit view shows the whole map. Zoom in or open Devices to read labels.</p><p className="health-map-count">Path colors summarize device reachability, not verified interface state.</p>
         </div></details>
       </div>
     </header>
@@ -121,7 +121,7 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
             edges={mapEdges}
             nodeTypes={nodeTypes} onNodeClick={(_, node) => setSelectedId(node.id)} onPaneClick={() => setSelectedId(null)}
             nodesDraggable={false} nodesConnectable={false} edgesFocusable={false} deleteKeyCode={null}
-            fitView fitViewOptions={{ padding: 0.12 }} minZoom={0.15} maxZoom={1.6} proOptions={{ hideAttribution: true }}>
+            fitView fitViewOptions={{ padding: 0.12 }} minZoom={0.05} maxZoom={1.6} proOptions={{ hideAttribution: true }}>
             <Controls showInteractive={false}/>
           </ReactFlow>
           {!visible.length && <div className="health-empty-map"><Search size={25} aria-hidden="true"/><strong>{nodes.length ? 'No matching devices' : 'Your network map starts here'}</strong><p>{nodes.length ? 'Try another name or status filter.' : 'Add your first router or switch in the topology editor.'}</p><button className="health-button" onClick={nodes.length ? () => { setQuery(''); setStatusFilter('all') } : onEdit}>{nodes.length ? 'Clear filters' : 'Open topology editor'}</button></div>}
