@@ -17,13 +17,21 @@ import { gridPosition, nextFreePosition } from './nodes/placement'
 
 import { readTopology, writeTopology, validateTopology } from './topology'
 
+const viewFromHash = () => ({ '#dashboard': 'dashboard', '#topology': 'editor', '#editor': 'editor', '#inventory': 'inventory', '#devices': 'inventory' }[location.hash] || 'dashboard')
+
 const nodeTypes = { router: RouterNode, switch: SwitchNode }
 
 export default function App() {
   const saved = useMemo(() => readTopology({ getItem: key => localStorage.getItem(key) }, { nodes: [], edges: [] }), [])
   const [nodes, setNodes, onNodesChange] = useNodesState(saved.topology.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(saved.topology.edges)
-  const [view, setView] = useState('dashboard')
+  const [view, setView] = useState(viewFromHash)
+  useEffect(() => {
+    const navigate = () => setView(viewFromHash())
+    window.addEventListener('hashchange', navigate)
+    return () => window.removeEventListener('hashchange', navigate)
+  }, [])
+  const [deviceNotice, setDeviceNotice] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [selectedId, setSelectedId] = useState(null)
   const selectedNode = nodes.find(node => node.id === selectedId)
@@ -85,7 +93,7 @@ export default function App() {
       setShowModal(false)
       return
     }
-    if (nodes.length >= 2000) { window.alert('This map supports up to 2,000 devices.'); return }
+    if (nodes.length >= 2000) { setDeviceNotice('This map supports up to 2,000 devices. Remove a device before adding another.'); return }
     const id = `${kind}-${createId()}`
     setNodes(ns => [...ns, {
       id, type: kind, position: nextFreePosition(ns),
@@ -95,7 +103,7 @@ export default function App() {
   }
 
   const removeSelected = () => {
-    if (!selectedNode) return
+    if (!selectedNode || !window.confirm(`Remove ${selectedNode.data.label} and its links?`)) return
     setNodes(ns => ns.filter(n => n.id !== selectedNode.id))
     setEdges(es => es.filter(e => e.source !== selectedNode.id && e.target !== selectedNode.id))
     setSelectedNode(null)
@@ -151,7 +159,7 @@ export default function App() {
           <a className="top-brand" href="#dashboard" onClick={() => setView('dashboard')}><Activity size={19} aria-hidden="true"/> NETWATCH</a>
           <nav className="top-menu" aria-label="Main navigation">
             <a href="#dashboard" aria-label="Network dashboard" aria-current={view === 'dashboard' ? 'page' : undefined} onClick={() => setView('dashboard')}>Dashboard</a>
-            <a href="#topology" aria-label="Topology builder" aria-current={view === 'editor' ? 'page' : undefined} onClick={() => setView('editor')}>Topology editor</a>
+            <a href="#topology" aria-label="Edit map" aria-current={view === 'editor' ? 'page' : undefined} onClick={() => setView('editor')}>Edit map</a>
             <a href="#inventory" aria-label="Device inventory" aria-current={view === 'inventory' ? 'page' : undefined} onClick={() => setView('inventory')}>Devices</a>
           </nav>
         <section className="backup-recovery" aria-label="Map backup and recovery">
@@ -168,12 +176,13 @@ export default function App() {
         </section>
         </header>
 
-        {view !== 'editor' ? <Dashboard nodes={nodes} edges={edges} showInventory={view === 'inventory'} onMoveDevice={(id, position) => setNodes(current => current.map(node => node.id === id ? { ...node, position } : node))} onEdit={() => setView('editor')}/> : <section className="page-content" id="topology">
+        {view !== 'editor' ? <Dashboard nodes={nodes} edges={edges} showInventory={view === 'inventory'} onMoveDevice={(id, position) => setNodes(current => current.map(node => node.id === id ? { ...node, position } : node))} onEdit={() => { location.hash = 'topology' }}/> : <section className="page-content" id="topology">
           <div className="page-heading">
             <div><div className="eyebrow">NETWORK MANAGEMENT</div><h1>Topology builder</h1><p>Edit the browser working copy, then use Backup to save it to the host for monitoring.</p></div>
             <div className="heading-actions"><button className="button secondary" disabled={importBusy} onClick={() => importInput.current.click()}>Import JSON</button><button className="button secondary" onClick={exportTopology}><Download size={16}/> Export JSON</button><button className="button primary" onClick={() => setShowModal('add')}><Plus size={17}/> Add device</button></div>
           </div>
 
+          {deviceNotice && <p role="alert" className="notice">{deviceNotice}</p>}
           <div className="stats-grid" id="overview">
             <div className="stat-card"><div className="stat-icon blue"><Router size={18}/></div><div><span>ROUTERS</span><strong>{routerCount}</strong><small>Configured devices</small></div></div>
             <div className="stat-card"><div className="stat-icon green"><Network size={18}/></div><div><span>SWITCHES</span><strong>{switchCount}</strong><small>Configured devices</small></div></div>
@@ -197,6 +206,7 @@ export default function App() {
               onNodeClick={(_, node) => setSelectedNode(node)}
               onPaneClick={() => setSelectedNode(null)}
               fitView fitViewOptions={{ padding: 0.2 }}
+              onBeforeDelete={async ({ nodes: removed }) => !removed.length || window.confirm(`Remove ${removed.length} device(s) and their links?`)}
               deleteKeyCode={['Backspace', 'Delete']}
               defaultEdgeOptions={{ markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--map-link)' }, type: 'straight', style: { stroke: 'var(--map-link)', strokeWidth: 2 }, labelStyle: { fill: 'var(--map-label)', fontSize: 10 } }}
               proOptions={{ hideAttribution: true }}
@@ -211,7 +221,6 @@ export default function App() {
               <div className="inspector-head"><div><span className="eyebrow">SELECTED DEVICE</span><h3>{selectedNode.data.label}</h3></div><button className="icon-button" aria-label="Close device details" onClick={() => setSelectedNode(null)}><X size={17}/></button></div>
               <div className="inspector-type"><span className={selectedNode.type === 'router' ? 'type-square' : 'type-circle'}/>{selectedNode.type.toUpperCase()}</div>
               <div className="detail-row"><span>Management IP</span><strong>{selectedNode.data.ip || 'Not set'}</strong></div>
-              <div className="detail-row"><span>Monitoring</span><strong className="pending">Not monitored</strong></div>
               <div className="detail-row"><span>Description</span><strong>{selectedNode.data.description || '—'}</strong></div>
               <button className="button secondary full" onClick={() => setShowModal('edit')}>Edit device</button>
               <button className="button danger full" onClick={removeSelected}><Trash2 size={15}/> Remove device</button>

@@ -880,3 +880,7 @@
 .health-map-tools > .health-filter {
   margin: 0;
 }
+
+.health-page-titlebar p.connection-lost {
+  color: var(--health-stale);
+}
