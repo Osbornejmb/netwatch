@@ -1,5 +1,4 @@
-const CARD_WIDTH = 200
-const CARD_HEIGHT = 180
+import { NODE_MAX_WIDTH as CARD_WIDTH, NODE_HEIGHT as CARD_HEIGHT } from './nodes/dimensions.js'
 const SPACING = 320
 const compareIds = (a, b) => a < b ? -1 : a > b ? 1 : 0
 
@@ -68,7 +67,7 @@ export function radialLayout(nodes, edges, centerId = '') {
 
 export function radialHandles(source, target) {
   const dx = target.x - source.x, dy = target.y - source.y
-  const side = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'bottom' : 'top')
+  const side = Math.abs(dx) / CARD_WIDTH > Math.abs(dy) / CARD_HEIGHT ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'bottom' : 'top')
   const opposite = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' }
   return { sourceHandle: `radial-source-${side}`, targetHandle: `radial-target-${opposite[side]}` }
 }

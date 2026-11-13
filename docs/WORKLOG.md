@@ -1,5 +1,24 @@
 # Working checkpoint
 
+## Current status (2026-11-13): integrate desktop-map commits with current main
+
+- Reviewed all six desktop-map commits and merged current main into the branch, resolving overlapping App/Dashboard/CSS/docs/browser checks. Preserved the off-white redesign, direct map replacement reviews, persistent Outages, Ports and all host changes already on main; no new host/schema changes. Compact content-sized oblong routers, filters/attention, side handles, grid/tidy, hash navigation, connection copy, removal confirmation and responsive panels remain.
+- Fixed backup anchoring for the newer full-height header, preserved open-outage attention even when current device evidence is up/paused, and used one node lookup for editor links. Browser checks cover desktop/narrow rendering, no pure-white UI, transfer-review/cancellation, editing and removal. 70 Node tests pass; production build passes. All 12 matching browser suites pass: desktop, redesign, inventory, Outages, Ports, dragging, recovery, radial, 100-device scale, empty startup, monitoring and topology. Fixed narrow View options positioning and updated reload checks for hash routes. Publication and CI status are recorded at handoff.
+
+
+## Current status (2026-11-13): content-sized router oblongs
+
+- Routers now use oblong borders in dashboard and editor, with intrinsic content width/height and compact padding. A shared 280px cap retains ellipsis/tooltips for unusually long names; switches remain 160×56 rectangles. Placement and radial spacing reserve the maximum router width. Stored topology is unchanged.
+- Verification: 52 tests, production build and focused desktop/narrow Playwright check pass. Browser assertions verify both router renderers have no unused horizontal space; refreshed 1440px dashboard/editor screenshots.
+
+
+## Current status (2026-11-13): desktop map refinements
+
+- Five requested steps: compact shared cards/formatted CSS; visible counts/status/attention; nearest-side links and deterministic grid/tidy; connection copy/hash routes/removal confirmation/inline limit; anchored Backups and responsive Devices cards. Host code and v1 storage format unchanged.
+- Focused Playwright check covers 1280–1920px and 320/390px, summary filters, accessible cards, solid stale paths, keyboard details, connection lifecycle, hash/reload/back, placement/removal and panel placement. Before/after 1440px screenshots and narrow/editor evidence are under docs/screenshots. Verification: 52 Node tests pass and the production build passes. The first full run exposed an incorrect new clearance-test expectation; corrected the test and reran successfully. Build ran once; no production edits followed it.
+- Existing checkout had no forced 136px/ellipse override, Draft device caption or duplicate backup heading to remove. Real hardware and collector behavior are outside this UI change.
+
+
 ## Current status (2026-11-13): remove built-in demo data
 
 - Removed the browser starter devices/links, generated preview statuses, preview/failure controls, demo watermark and sample-only rendering paths. Fresh browser and host inventories are empty; saved user inventory/history and import compatibility are preserved. Older saved devices are not silently erased; unwanted entries can be removed in the editor and explicitly saved to the host.

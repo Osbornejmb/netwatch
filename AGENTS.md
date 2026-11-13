@@ -83,7 +83,7 @@ The latest explicit user decision defines scope. Code and passing checks establi
 
 ## UI rules
 
-- Distinguish device types by shape in both dashboard and editor: horizontal oval routers and rounded-square switches, retaining type icons and independent health colors/labels.
+- Distinguish device types by shape in both dashboard and editor: content-sized horizontal oblong routers and compact rectangular switches, retaining type icons and independent health colors/labels.
 - The map fills the opening dashboard below a small horizontal top menu and title/status strip. No sidebar, summary-card row or inventory table on the landing screen (use Devices and View options). Show failures and staleness on devices and paths. Device details open in a popup; search, compact filters and a keyboard-operable device list support the map.
 - Pair status colors with text and icons. Keep readable labels, visible focus, named icon buttons, 40 px (desktop) / 44 px (narrow) targets, responsive layouts and reduced-motion support. No decorative animation implying live activity.
 - Every data-driven screen needs meaningful empty, disconnected, stale and error states. Show loading feedback only when something actually loads.

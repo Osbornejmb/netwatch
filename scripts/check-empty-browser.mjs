@@ -26,6 +26,8 @@ try {
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('netwatch-topology-v1')).nodes.length === 1)
   const saved = await stored()
   await page.reload()
+  await page.getByRole('heading', { name: 'Edit your map', exact: true }).waitFor()
+  await page.getByRole('link', { name: 'Network dashboard', exact: true }).click()
   await setSource(page,'browser')
   await page.locator('.health-node').waitFor()
   assert.deepEqual(await stored(), saved)

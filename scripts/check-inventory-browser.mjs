@@ -6,14 +6,15 @@ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH ||
 const context=await browser.newContext({viewport:{width:1440,height:1000}})
 await context.addInitScript(network => { if (!localStorage.getItem('netwatch-topology-v1')) localStorage.setItem('netwatch-topology-v1', JSON.stringify(network)) }, createEditorNetwork())
 const page=await context.newPage()
+page.on('dialog', dialog => dialog.accept())
 page.setDefaultTimeout(10000)
 const errors=[]
 page.on('pageerror',e=>errors.push(e.message))
 await page.goto(process.env.NETWATCH_URL || 'http://127.0.0.1:4173')
-await page.getByRole('link',{name:'Edit network map',exact:true}).click()
+await page.getByRole('link',{name:'Edit map',exact:true}).click()
 const snapshot=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('netwatch-topology-v1')))
 const original=await snapshot()
-for(const [selector,radius]of [['.router-node','50%'],['.switch-node','16px']]){const shapes=await page.locator(selector).evaluateAll(nodes=>nodes.map(node=>{const s=getComputedStyle(node);return {radius:s.borderRadius,width:s.width,height:s.height}}));assert.ok(shapes.length);for(const shape of shapes){assert.equal(shape.radius,radius);assert.equal(parseFloat(shape.width),selector==='.router-node'?200:136);assert.ok(selector==='.router-node'?parseFloat(shape.width)>parseFloat(shape.height):parseFloat(shape.height)>=136)}}
+for(const selector of ['.router-node','.switch-node']){const shapes=await page.locator(selector).evaluateAll(nodes=>nodes.map(node=>{const s=getComputedStyle(node);return {radius:s.borderRadius,width:node.offsetWidth,height:node.offsetHeight}}));assert.ok(shapes.length);for(const shape of shapes){assert.equal(shape.radius,selector==='.router-node'?'999px':'12px');assert.ok(shape.width<=280);assert.ok(shape.height<=56)}}
 await page.locator('.editor-tools > summary').click()
 await page.getByLabel('Selected device',{exact:true}).selectOption('r1')
 const edit=page.locator('.inventory-controls').getByRole('button',{name:'Edit device',exact:true})

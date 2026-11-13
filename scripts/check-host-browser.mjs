@@ -9,7 +9,7 @@ const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors
 const read=()=>context.request.get(base+'/api/v1/topology').then(r=>r.json())
 const host=page.getByRole('region',{name:'Saved network settings'})
 const preview=page.getByRole('dialog')
-const open=async()=>{await page.getByRole('link',{name:'Edit network map'}).click();await host.getByText('Monitoring settings',{exact:true}).click();await host.getByRole('button',{name:'Connect',exact:true}).click();await host.getByText(/Connected ·/).waitFor()}
+const open=async()=>{await page.getByRole('link',{name:'Edit map'}).click();await host.getByText('Monitoring settings',{exact:true}).click();await host.getByRole('button',{name:'Connect',exact:true}).click();await host.getByText(/Connected ·/).waitFor()}
 const save=async()=>{await host.getByRole('button',{name:'Use this map',exact:true}).click();await preview.getByRole('button',{name:'Confirm replacement'}).click();await host.getByText(/Network saved/).waitFor()}
 try {
  await page.goto(base);await open();const initial=await read()

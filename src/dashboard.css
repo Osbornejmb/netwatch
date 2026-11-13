@@ -1,7 +1,758 @@
-.dashboard-shell .main-area{height:100dvh;display:flex;flex-direction:column;overflow:hidden}.dashboard-shell .topbar{flex-shrink:0}.health-dashboard{flex:1;min-height:0;display:flex;flex-direction:column;font-size:14px;line-height:1.5;color:var(--text);background:var(--canvas)}.health-dashboard.is-inventory{overflow:auto}.health-page-titlebar{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 28px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface)}.health-page-titlebar h1{font-size:24px;font-weight:600;letter-spacing:-.7px;margin:0}.health-page-titlebar>div>p{font-size:12px;color:var(--muted);margin:5px 0 0;max-width:650px}.health-map-tools{display:flex;align-items:center;gap:10px}.health-view-options{position:relative}.health-view-options>summary{display:flex;align-items:center;gap:6px;min-height:42px;padding:10px 14px;list-style:none;border:1px solid var(--border);border-radius:8px;background:var(--surface);font-size:13px;font-weight:550}.health-view-options summary::-webkit-details-marker{display:none}.health-view-options[open]>summary{background:var(--accent-soft);color:var(--accent)}.health-view-options>div{position:absolute;right:0;top:calc(100% + 9px);z-index:12;width:300px;max-height:calc(100dvh - 230px);overflow:auto;padding:18px;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 14px 40px #253a3624}.health-search{display:flex;align-items:center;gap:9px;position:relative}.health-search>svg{position:absolute;left:12px;color:var(--muted);pointer-events:none}.health-search input{width:230px;padding-left:36px}.health-filter{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px;margin:0 0 14px}.health-filter select{width:174px}.health-map-count{font-size:12px;color:var(--muted);margin:14px 0 0}.health-attention{border-top:1px solid var(--border);margin-top:18px;padding-top:4px}.health-attention p{font-size:13px;font-weight:600}.health-attention button{display:block;text-align:left;width:100%;margin-top:8px}.health-map{flex:1;min-height:0;position:relative;background:var(--canvas)}.health-map .react-flow__handle{opacity:0;pointer-events:none}.health-map .react-flow__node:focus-visible{outline:3px solid var(--accent);outline-offset:5px;border-radius:12px}.health-node{width:215px;padding:14px 16px;border:1px solid #aab7ac;border-left-width:4px;border-radius:11px;background:var(--surface);color:var(--text);box-shadow:0 3px 9px #253a360a}.health-node-up{border-color:#8eb79c;border-left-color:var(--health-up)}.health-node-down{border-color:#d9a49b;border-left-color:var(--health-down);background:#f9eee7}.health-node-stale{border-color:#cfba8c;border-left-color:var(--health-stale);background:#f8f1df}.health-node-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}.health-device-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:var(--subtle);color:var(--muted)}.health-node>strong{display:block;font-size:14px;font-weight:600;overflow-wrap:anywhere}.health-address{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px}.health-node>.health-address{display:block;margin-top:4px}.health-status{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap}.health-up{color:var(--health-up);background:#e5eee3}.health-down{color:var(--health-down);background:#f3dfd7}.health-stale{color:var(--health-stale);background:#eee4cb}.health-unknown{color:var(--muted);background:var(--subtle)}.health-node.is-selected,.health-node-focus{outline:3px solid var(--accent);outline-offset:5px}.health-node-connected{outline:2px dashed var(--accent);outline-offset:5px}.health-node-muted{opacity:.42}
-.health-empty-map{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;gap:10px;color:var(--muted);background:var(--canvas)}.health-empty-map>svg{width:48px;height:48px;padding:12px;color:var(--accent);background:var(--accent-soft);border-radius:14px;margin-bottom:6px}.health-empty-map strong{font-size:23px;letter-spacing:-.5px;font-weight:600;color:var(--text)}.health-empty-map p{font-size:14px;max-width:350px;margin:0 0 12px}.health-empty-map .health-button{background:var(--accent);color:var(--surface);border-color:var(--accent);padding:11px 20px}.health-connection-note{margin:0;padding:10px 28px;color:#74531f;background:#f3ead6;font-size:13px;flex-shrink:0}.health-map-focus-controls{position:absolute;bottom:20px;right:20px;z-index:6;display:flex;flex-wrap:wrap;gap:8px;max-width:min(350px,calc(100% - 90px));padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 5px 20px #253a3614}.health-highlight-status{width:100%;margin:0;color:var(--muted);font-size:12px;overflow-wrap:anywhere}
-.health-inventory{margin:24px 28px;background:var(--surface);border:1px solid var(--border);border-radius:12px;flex-shrink:0;overflow:hidden}.health-panel-title{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:18px 20px;border-bottom:1px solid var(--border)}.health-panel-title h2{display:flex;align-items:center;gap:9px;font-size:15px;margin:0;font-weight:600}.health-panel-title>span{font-size:12px;color:var(--muted)}.health-inventory-count{font-size:12px;padding:2px 8px;border-radius:6px;background:var(--subtle);color:var(--muted)}.health-table-wrap{overflow-x:auto}.health-inventory table{width:100%;border-collapse:collapse;text-align:left;white-space:nowrap;font-size:13px}.health-inventory th,.health-inventory td{padding:16px 20px;border-bottom:1px solid var(--border)}.health-inventory thead{background:var(--subtle);color:var(--muted);font-size:12px}.health-inventory thead th{font-weight:550}.health-inventory tbody th{font-weight:550}.health-inventory tbody tr:hover,.health-inventory tr.is-connected,.health-inventory tr.is-selected{background:var(--accent-soft)}.health-table-device{display:flex;align-items:center;gap:10px}.health-table-device svg{color:var(--muted)}.health-table-empty{padding:28px;text-align:center;color:var(--muted)}
-.health-device-dialog{padding:0;width:min(520px,calc(100vw - 32px))}.health-dialog-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:24px;border-bottom:1px solid var(--border)}.health-dialog-heading h2{font-size:23px;letter-spacing:-.5px;font-weight:600;margin:0}.health-eyebrow{display:none}.health-close{display:grid;place-items:center;width:42px;height:42px;flex-shrink:0;background:var(--subtle);color:var(--muted);border:0;border-radius:9px;cursor:pointer}.health-device-details{padding:22px 24px}.health-device-details>p{color:var(--muted);font-size:13px}.health-device-details dl{margin:18px 0}.health-device-details dl>div{display:flex;justify-content:space-between;gap:18px;padding:12px 0;border-top:1px solid var(--border);font-size:13px}.health-device-details dt{color:var(--muted);flex-shrink:0}.health-device-details dd{margin:0;text-align:right;overflow-wrap:anywhere}.health-device-details h3{font-size:14px;font-weight:600;margin:20px 0 10px}.health-history-options{border-top:1px solid var(--border);margin-top:16px}.health-history-options>summary{min-height:50px;align-content:center;font-size:14px;font-weight:550}.health-neighbors{list-style:none;padding:0;margin:0}.health-neighbors li{border-top:1px solid var(--border);padding:12px 0}.health-neighbors li>div{display:flex;align-items:center;justify-content:space-between;gap:12px}.health-neighbors strong{font-size:13px;overflow-wrap:anywhere}.health-neighbors small{display:block;margin-top:6px;color:var(--muted);font-size:12px}.health-dialog-note{font-size:12px!important;padding-top:16px;border-top:1px solid var(--border)}:is(.health-history,.health-incidents) p{font-size:13px;color:var(--muted)}:is(.health-history,.health-incidents) ol{padding:0;list-style:none;max-height:280px;overflow:auto}:is(.health-history,.health-incidents) li{padding:12px 0;border-bottom:1px solid var(--border);font-size:13px}:is(.health-history,.health-incidents) time,:is(.health-history,.health-incidents) strong,:is(.health-history,.health-incidents) span{display:block;overflow-wrap:anywhere}:is(.health-history,.health-incidents) time{font-size:12px;color:var(--muted)}:is(.health-history,.health-incidents) .health-button{margin:4px 8px 4px 0}.health-device-dialog button:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
-@media(max-width:720px){.health-page-titlebar{padding:18px 16px;align-items:stretch;flex-direction:column;gap:16px}.health-page-titlebar h1{font-size:22px}.health-map-tools{width:100%;gap:8px}.health-search{flex:1;min-width:0}.health-search input{width:100%;min-width:0}.health-view-options>summary{min-height:44px;padding:10px 12px}.health-view-options>div{width:min(300px,calc(100vw - 32px));max-height:calc(100dvh - 300px)}.health-inventory{margin:16px}.health-panel-title{padding:14px}.health-panel-title>span{display:none}.health-inventory th,.health-inventory td{padding:12px 14px}.health-connection-note{padding:10px 16px}.health-dialog-heading{padding:18px}.health-dialog-heading h2{font-size:21px}.health-device-details{padding:18px}.health-device-details dl>div{font-size:12px}.health-close{width:44px;height:44px}.health-map-focus-controls{bottom:12px;right:12px;padding:12px}.health-empty-map strong{font-size:21px}.health-empty-map p{font-size:13px}}
-.health-node{width:136px;min-height:136px;height:auto;padding:10px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}.health-node-router{width:200px;min-height:112px;height:auto;border-radius:50%;padding:12px 24px}.health-node-router>strong,.health-node-router>.health-address{max-width:180px}.health-node-switch{border-radius:16px}.health-node-top{width:100%;max-width:140px;gap:4px;margin-bottom:6px}.health-node .health-device-icon{width:20px;height:20px}.health-node .health-status{font-size:10px;padding:3px 6px}.health-node>strong{max-width:140px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.health-node>.health-address{max-width:140px;font-size:11px;overflow-wrap:anywhere}.health-map .react-flow__node:has(.health-node-router):focus-visible{border-radius:50%}
-.health-node-top{display:grid;grid-template-columns:20px minmax(0,1fr);align-items:center}.health-node .health-status{justify-self:end;max-width:100%;white-space:normal}.health-node .health-status svg{flex-shrink:0}.health-node>strong,.health-node>.health-address{max-width:100%}
+.dashboard-shell .main-area {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dashboard-shell .topbar {
+  flex-shrink: 0;
+}
+.health-dashboard {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--canvas);
+}
+.health-dashboard.is-inventory {
+  overflow: auto;
+}
+.health-page-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 28px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--surface);
+}
+.health-page-titlebar h1 {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.7px;
+  margin: 0;
+}
+.health-page-titlebar > div > p {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 5px 0 0;
+  max-width: 650px;
+}
+.health-map-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.health-view-options {
+  position: relative;
+}
+.health-view-options > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 10px 14px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 550;
+}
+.health-view-options summary::-webkit-details-marker {
+  display: none;
+}
+.health-view-options[open] > summary {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.health-view-options > div {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 9px);
+  z-index: 12;
+  width: 300px;
+  max-height: calc(100dvh - 230px);
+  overflow: auto;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 14px 40px #253a3624;
+}
+.health-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  position: relative;
+}
+.health-search > svg {
+  position: absolute;
+  left: 12px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.health-search input {
+  width: 230px;
+  padding-left: 36px;
+}
+.health-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  margin: 0 0 14px;
+}
+.health-filter select {
+  width: 174px;
+}
+.health-map-count {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 14px 0 0;
+}
+.health-attention {
+  border-top: 1px solid var(--border);
+  margin-top: 18px;
+  padding-top: 4px;
+}
+.health-attention p {
+  font-size: 13px;
+  font-weight: 600;
+}
+.health-attention button {
+  display: block;
+  text-align: left;
+  width: 100%;
+  margin-top: 8px;
+}
+.health-map {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  background: var(--canvas);
+}
+.health-map .react-flow__handle {
+  opacity: 0;
+  pointer-events: none;
+}
+.health-map .react-flow__node:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 5px;
+  border-radius: 12px;
+}
+.health-node {
+  width: 215px;
+  padding: 14px 16px;
+  border: 1px solid #aab7ac;
+  border-left-width: 4px;
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 3px 9px #253a360a;
+}
+.health-node-up {
+  border-color: #8eb79c;
+  border-left-color: var(--health-up);
+}
+.health-node-down {
+  border-color: #d9a49b;
+  border-left-color: var(--health-down);
+  background: #f9eee7;
+}
+.health-node-stale {
+  border-color: #cfba8c;
+  border-left-color: var(--health-stale);
+  background: #f8f1df;
+}
+.health-node-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.health-device-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--subtle);
+  color: var(--muted);
+}
+.health-node > strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.health-address {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 12px;
+}
+.health-node > .health-address {
+  display: block;
+  margin-top: 4px;
+}
+.health-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.health-up {
+  color: var(--health-up);
+  background: #e5eee3;
+}
+.health-down {
+  color: var(--health-down);
+  background: #f3dfd7;
+}
+.health-stale {
+  color: var(--health-stale);
+  background: #eee4cb;
+}
+.health-unknown {
+  color: var(--muted);
+  background: var(--subtle);
+}
+.health-node.is-selected,
+.health-node-focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 5px;
+}
+.health-node-connected {
+  outline: 2px dashed var(--accent);
+  outline-offset: 5px;
+}
+.health-node-muted {
+  opacity: 0.42;
+}
+.health-empty-map {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  gap: 10px;
+  color: var(--muted);
+  background: var(--canvas);
+}
+.health-empty-map > svg {
+  width: 48px;
+  height: 48px;
+  padding: 12px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 14px;
+  margin-bottom: 6px;
+}
+.health-empty-map strong {
+  font-size: 23px;
+  letter-spacing: -0.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.health-empty-map p {
+  font-size: 14px;
+  max-width: 350px;
+  margin: 0 0 12px;
+}
+.health-empty-map .health-button {
+  background: var(--accent);
+  color: var(--surface);
+  border-color: var(--accent);
+  padding: 11px 20px;
+}
+.health-connection-note {
+  margin: 0;
+  padding: 10px 28px;
+  color: #74531f;
+  background: #f3ead6;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.health-map-focus-controls {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: min(350px, calc(100% - 90px));
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 5px 20px #253a3614;
+}
+.health-highlight-status {
+  width: 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.health-inventory {
+  margin: 24px 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.health-panel-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.health-panel-title h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 15px;
+  margin: 0;
+  font-weight: 600;
+}
+.health-panel-title > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.health-inventory-count {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--subtle);
+  color: var(--muted);
+}
+.health-table-wrap {
+  overflow-x: auto;
+}
+.health-inventory table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.health-inventory th,
+.health-inventory td {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.health-inventory thead {
+  background: var(--subtle);
+  color: var(--muted);
+  font-size: 12px;
+}
+.health-inventory thead th {
+  font-weight: 550;
+}
+.health-inventory tbody th {
+  font-weight: 550;
+}
+.health-inventory tbody tr:hover,
+.health-inventory tr.is-connected,
+.health-inventory tr.is-selected {
+  background: var(--accent-soft);
+}
+.health-table-device {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.health-table-device svg {
+  color: var(--muted);
+}
+.health-table-empty {
+  padding: 28px;
+  text-align: center;
+  color: var(--muted);
+}
+.health-device-dialog {
+  padding: 0;
+  width: min(520px, calc(100vw - 32px));
+}
+.health-dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.health-dialog-heading h2 {
+  font-size: 23px;
+  letter-spacing: -0.5px;
+  font-weight: 600;
+  margin: 0;
+}
+.health-eyebrow {
+  display: none;
+}
+.health-close {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  background: var(--subtle);
+  color: var(--muted);
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.health-device-details {
+  padding: 22px 24px;
+}
+.health-device-details > p {
+  color: var(--muted);
+  font-size: 13px;
+}
+.health-device-details dl {
+  margin: 18px 0;
+}
+.health-device-details dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.health-device-details dt {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.health-device-details dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.health-device-details h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 20px 0 10px;
+}
+.health-history-options {
+  border-top: 1px solid var(--border);
+  margin-top: 16px;
+}
+.health-history-options > summary {
+  min-height: 50px;
+  align-content: center;
+  font-size: 14px;
+  font-weight: 550;
+}
+.health-neighbors {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.health-neighbors li {
+  border-top: 1px solid var(--border);
+  padding: 12px 0;
+}
+.health-neighbors li > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.health-neighbors strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.health-neighbors small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.health-dialog-note {
+  font-size: 12px !important;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+:is(.health-history, .health-incidents) p {
+  font-size: 13px;
+  color: var(--muted);
+}
+:is(.health-history, .health-incidents) ol {
+  padding: 0;
+  list-style: none;
+  max-height: 280px;
+  overflow: auto;
+}
+:is(.health-history, .health-incidents) li {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+:is(.health-history, .health-incidents) time,
+:is(.health-history, .health-incidents) strong,
+:is(.health-history, .health-incidents) span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+:is(.health-history, .health-incidents) time {
+  font-size: 12px;
+  color: var(--muted);
+}
+:is(.health-history, .health-incidents) .health-button {
+  margin: 4px 8px 4px 0;
+}
+.health-device-dialog button:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+@media (max-width: 720px) {
+  .health-page-titlebar {
+    padding: 18px 16px;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .health-page-titlebar h1 {
+    font-size: 22px;
+  }
+  .health-map-tools {
+    width: 100%;
+    gap: 8px;
+  }
+  .health-search {
+    flex: 1;
+    min-width: 0;
+  }
+  .health-search input {
+    width: 100%;
+    min-width: 0;
+  }
+  .health-view-options > summary {
+    min-height: 44px;
+    padding: 10px 12px;
+  }
+  .health-view-options > div {
+    width: min(300px, calc(100vw - 32px));
+    max-height: calc(100dvh - 300px);
+  }
+  .health-inventory {
+    margin: 16px;
+  }
+  .health-panel-title {
+    padding: 14px;
+  }
+  .health-panel-title > span {
+    display: none;
+  }
+  .health-inventory th,
+  .health-inventory td {
+    padding: 12px 14px;
+  }
+  .health-connection-note {
+    padding: 10px 16px;
+  }
+  .health-dialog-heading {
+    padding: 18px;
+  }
+  .health-dialog-heading h2 {
+    font-size: 21px;
+  }
+  .health-device-details {
+    padding: 18px;
+  }
+  .health-device-details dl > div {
+    font-size: 12px;
+  }
+  .health-close {
+    width: 44px;
+    height: 44px;
+  }
+  .health-map-focus-controls {
+    bottom: 12px;
+    right: 12px;
+    padding: 12px;
+  }
+  .health-empty-map strong {
+    font-size: 21px;
+  }
+  .health-empty-map p {
+    font-size: 13px;
+  }
+}
+.health-node {
+  width: var(--node-width);
+  height: var(--node-height);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+}
+.health-device-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.health-node .device-copy {
+  min-width: 0;
+  flex: 1;
+}
+.health-node .device-copy .health-address {
+  color: var(--muted);
+}
+.health-node-up .node-status {
+  color: var(--health-up);
+}
+.health-node-down .node-status {
+  color: var(--health-down);
+}
+.health-node-stale .node-status {
+  color: var(--health-stale);
+}
+.health-map .react-flow__node:has(.router-node):focus-visible {
+  border-radius: 999px;
+}
+.health-map-tools {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.health-map-tools > .health-filter {
+  margin: 0;
+}
+.health-filter select {
+  max-width: 174px;
+}
+.health-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 28px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.health-summary button {
+  min-height: 40px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.health-summary .summary-down {
+  color: var(--health-down);
+  font-weight: 700;
+}
+.health-summary button[aria-pressed="true"] {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.health-attention {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 28px;
+  margin: 0;
+  max-height: 120px;
+  overflow: auto;
+  border-top: 0;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.health-attention p {
+  margin: 0;
+  color: var(--health-down);
+}
+.health-attention button {
+  width: auto;
+  display: inline-flex;
+  margin: 0;
+}
+.health-page-titlebar p.connection-lost {
+  color: var(--health-stale);
+}
+.health-table-wrap {
+  overflow-x: visible;
+}
+.health-inventory table {
+  table-layout: fixed;
+  white-space: normal;
+}
+.health-inventory th,
+.health-inventory td {
+  overflow-wrap: anywhere;
+}
+.health-table-device {
+  min-width: 0;
+}
+.health-table-device svg {
+  flex-shrink: 0;
+}
+.health-device-cards {
+  display: none;
+}
+@media (max-width: 720px) {
+  .health-inventory table {
+    display: none;
+  }
+  .health-device-cards {
+    display: grid;
+    gap: 12px;
+    padding: 12px;
+  }
+  .health-device-card {
+    display: flex;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow-wrap: anywhere;
+    min-width: 0;
+  }
+  .health-device-card > strong,
+  .health-device-card > span {
+    max-width: 100%;
+  }
+  .health-summary {
+    padding: 0 16px;
+  }
+  .health-attention {
+    padding: 8px 16px;
+  }
+  .health-map-tools {
+    justify-content: flex-start;
+  }
+  .health-map-tools .health-search {
+    flex-basis: 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  .health-view-options {
+    margin-left: auto;
+  }
+  .health-view-options > div {
+    max-height: max(100px, calc(100dvh - 420px));
+  }
+}

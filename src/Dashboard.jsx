@@ -1,5 +1,5 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
-import { ReactFlow, Controls, Handle, Position } from '@xyflow/react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ReactFlow, Controls } from '@xyflow/react'
 import { ArrowDownCircle, ArrowUpRight, CheckCircle2, CircleHelp, Clock3, Network, Router, Search } from 'lucide-react'
 import { HEALTH, deviceHealth, summarizeHealth, connectionHealth } from './health'
 import DeviceDetails from './DeviceDetails'
@@ -7,6 +7,8 @@ import useMonitoring from './useMonitoring'
 import { formatCheckTime, collectorLabel } from './monitoring'
 import { radialLayout, radialHandles, connectedDevices } from './radial'
 
+import { nodeDimensions } from './nodes/dimensions'
+import { NodeHandles } from './nodes/DeviceNode'
 import './dashboard.css'
 
 const healthIcons = { up: CheckCircle2, down: ArrowDownCircle, stale: Clock3, unknown: CircleHelp }
@@ -18,13 +20,14 @@ function Status({ status }) {
 
 function HealthNode({ data, selected }) {
   const Icon = data.kind === 'router' ? Router : Network
-  return <div className={`health-node health-node-${data.kind} health-node-${data.status}${selected ? ' is-selected' : ''}${data.connectionRole ? ` health-node-${data.connectionRole}` : ''}`}>
-    {data.radial && Object.entries({ top: Position.Top, right: Position.Right, bottom: Position.Bottom, left: Position.Left }).map(([side, position]) => <Fragment key={side}><Handle type="source" position={position} id={`radial-source-${side}`}/><Handle type="target" position={position} id={`radial-target-${side}`}/></Fragment>)}
-    <Handle type="target" position={Position.Top}/>
-    <div className="health-node-top"><span className="health-device-icon"><Icon size={18} aria-hidden="true"/></span><Status status={data.status}/></div>
-    <strong title={data.label}>{data.label}</strong><span className="health-address" title={data.ip}>{data.ip || 'No IP address'}</span>
-    <Handle type="source" position={Position.Bottom}/>
+  const StatusIcon = healthIcons[data.status]
+  return <div style={nodeDimensions} className={`health-node ${data.kind}-node health-node-${data.status}${selected ? ' is-selected' : ''}${data.connectionRole ? ` health-node-${data.connectionRole}` : ''}`}>
+    <NodeHandles/>
+    <span className="health-device-icon"><Icon size={18} aria-hidden="true"/></span>
+    <div className="device-copy"><strong title={data.label}>{data.label}</strong><span className="health-address" title={data.ip}>{data.ip || 'No address'}</span></div>
+    <StatusIcon size={14} role="img" aria-label={HEALTH[data.status].label} className="node-status"/>
   </div>
+
 }
 
 const nodeTypes = { health: HealthNode }
@@ -100,12 +103,12 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
     const status = connectionHealth(source?.health, target?.health)
     const label = { up: 'Both endpoints up', down: 'Endpoint down', stale: 'Stale endpoint data', unknown: 'Endpoint reachability unknown' }[status]
     return { id: edge.id, source: edge.source, target: edge.target,
-      ...(mapLayout === 'radial' ? radialHandles(source.position, target.position) : { sourceHandle: null, targetHandle: null }),
+      ...radialHandles(source.position, target.position),
       hidden: !visibleIds.has(edge.source) || !visibleIds.has(edge.target),
-      type: mapLayout === 'radial' ? 'straight' : 'smoothstep',
+      type: 'straight',
       ariaLabel: `${source?.data.label} to ${target?.data.label}: ${label}`,
       className: `health-path-${status}${highlightedDevice && (edge.source === highlightedId || edge.target === highlightedId) ? ' health-path-highlighted' : ''}`,
-      style: { stroke: HEALTH[status].color, strokeWidth: highlightedDevice && (edge.source === highlightedId || edge.target === highlightedId) ? 5 : 3, opacity: highlightedDevice && edge.source !== highlightedId && edge.target !== highlightedId ? 0.18 : 1, strokeDasharray: status === 'down' ? '7 5' : status === 'up' ? undefined : '3 5' },
+      style: { stroke: HEALTH[status].color, strokeWidth: highlightedDevice && (edge.source === highlightedId || edge.target === highlightedId) ? 5 : 3, opacity: highlightedDevice && edge.source !== highlightedId && edge.target !== highlightedId ? 0.18 : 1, strokeDasharray: status === 'down' ? '7 5' : status === 'unknown' ? '3 5' : undefined },
     }
   })
   const connections = selected ? edges.filter(edge => edge.source === selected.id || edge.target === selected.id).map(edge => {
@@ -125,8 +128,9 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
 
   return <section className={`health-dashboard${showInventory ? ' is-inventory' : ''}`} id={showInventory ? 'inventory-page' : 'dashboard'} aria-label="Network health dashboard">
     <header className="health-page-titlebar">
-      <div><h1>{showInventory ? 'Devices' : 'Your network'}</h1><p role="status">{source === 'browser' ? 'Draft map · No live checks' : `${host.state === 'loading' ? 'Connecting to NetWatch…' : host.state === 'disconnected' ? 'Connection lost · Reconnecting' : 'Connected'}${live ? ` · ${collectorLabel(live.collector.state)} · Updated ${formatCheckTime(live.generatedAt)}` : ' · Draft shown without live checks'}`}</p>{showInventory && highlightedDevice && <p className="health-highlight-status" role="status">{highlightedDevice.data.label} · {connectedIds.size} connected {connectedIds.size === 1 ? 'device' : 'devices'}</p>}</div>
+      <div><h1>{showInventory ? 'Devices' : 'Your network'}</h1><p className={source === 'host' && host.state !== 'connected' && host.hasConnected ? 'connection-lost' : ''} role="status">{source === 'browser' ? 'Draft map · No live checks' : `${host.state === 'connected' ? 'Connected' : host.hasConnected ? 'Connection lost, reconnecting' : 'Waiting for host'}${live ? ` · ${collectorLabel(live.collector.state)} · Updated ${formatCheckTime(live.generatedAt)}` : ' · Draft shown without live checks'}`}</p>{showInventory && highlightedDevice && <p className="health-highlight-status" role="status">{highlightedDevice.data.label} · {connectedIds.size} connected {connectedIds.size === 1 ? 'device' : 'devices'}</p>}</div>
       <div className="health-map-tools">
+          <label className="health-filter">Status <select aria-label="Device status filter" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="all">All devices ({counts.all})</option>{Object.entries(HEALTH).map(([key, value]) => <option key={key} value={key}>{value.label} ({counts[key]})</option>)}</select></label>
         <label className="health-search"><Search size={16} aria-hidden="true"/><input aria-label="Search dashboard devices" value={query} onChange={event => setQuery(event.target.value)} placeholder="Find a device"/></label>
         {showInventory && highlightedDevice && <button className="health-button" aria-label="Clear connection highlight" onClick={() => { setHighlightedId(null); setSelectedId(null) }}>Clear highlight</button>}
         <details className="health-view-options"><summary>View options{statusFilter !== 'all' || query ? ' · Filtered' : ''}</summary><div>
@@ -134,16 +138,16 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
           {source === 'host' && <button className="health-button" onClick={host.refresh}>Refresh now</button>}
           <label className="health-filter">Map layout <select aria-label="Map layout" value={mapLayout} onChange={event => { setDragState({ source: null, key: '', positions: {} }); setMapLayout(event.target.value) }}><option value="manual">Saved positions</option><option value="radial">Circle</option></select></label>
           {mapLayout === 'radial' && <><label className="health-filter">Center <select aria-label="Radial center" value={effectiveCenterId} onChange={event => { setDragState({ source: null, key: '', positions: {} }); setCenterId(event.target.value) }}><option value="">Automatic</option>{nodes.map(node => <option key={node.id} value={node.id}>{node.data.label}</option>)}</select></label><p className="health-map-count">This arranges devices in rings without changing your saved map.</p></>}
-          <label className="health-filter">Status <select aria-label="Device status filter" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="all">All devices ({counts.all})</option>{Object.entries(HEALTH).map(([key, value]) => <option key={key} value={key}>{value.label} ({counts[key]})</option>)}</select></label>
-          <div className="health-attention"><p>Needs attention ({devices.filter(needsAttention).length})</p>{devices.filter(needsAttention).map(node => <button className="health-button" key={node.id} onClick={() => selectDevice(node)}>{node.data.label} · {HEALTH[node.health].label}{openIncidents.has(node.id) ? ' · Open outage' : ''}</button>)}</div>
           <p className="health-map-count">{visible.length} of {nodes.length} devices</p><details className="view-help"><summary>About this map</summary><p className="health-map-count">Click a device for details; drag it to rearrange the map.</p><p className="health-map-count">Only draft-map moves in Saved positions are saved.</p><p className="health-map-count">Line colors follow device checks; they do not confirm a cable or port is working.</p></details>
         </div></details>
       </div>
     </header>
-    {source === 'host' && host.error && <p className="health-connection-note" role="status">Open the NetWatch Windows app and choose Start to resume updates.</p>}
+    <div className="health-summary" aria-label="Device health summary">{Object.entries({ up: 'up', down: 'down', stale: 'overdue', unknown: 'not monitored' }).map(([key, label], index) => <span key={key}>{index > 0 && ' · '}<button className={`summary-${key}`} aria-pressed={statusFilter === key} onClick={() => setStatusFilter(statusFilter === key ? 'all' : key)}>{counts[key]} {label}</button></span>)}</div>
+    {devices.some(needsAttention) && <div className="health-attention"><p>Needs attention ({devices.filter(needsAttention).length})</p>{devices.filter(needsAttention).map(node => <button className="health-button" key={node.id} onClick={() => selectDevice(node)}>{node.data.label} · {HEALTH[node.health].label}{openIncidents.has(node.id) ? ' · Open outage' : ''}</button>)}</div>}
+    {source === 'host' && host.hasConnected && host.error && <p className="health-connection-note" role="status">Open the NetWatch Windows app and choose Start to resume updates.</p>}
     {showInventory ? (
     <section className="health-inventory health-panel" id="inventory"><div className="health-panel-title"><h2>All devices <span className="health-inventory-count">{visible.length}</span></h2><span>{live ? 'Monitored network' : 'Draft map'}</span></div>
-      <div className="health-table-wrap"><table><thead><tr><th scope="col">Device</th><th scope="col">IP address</th><th scope="col">Status</th><th scope="col">Last check</th><th scope="col">Details</th></tr></thead><tbody>{visible.map(node => <tr key={node.id} className={highlightedDevice && (node.id === highlightedId || connectedIds.has(node.id)) ? 'is-connected' : selectedId === node.id ? 'is-selected' : ''}><th scope="row"><span className="health-table-device">{node.type === 'router' ? <Router size={16} aria-hidden="true"/> : <Network size={16} aria-hidden="true"/>}{node.data.label}</span></th><td className="health-address">{node.data.ip || 'Not configured'}</td><td><Status status={node.health}/></td><td>{formatCheckTime(checks[node.id]?.checkedAt)}</td><td><button className="health-row-button" aria-haspopup="dialog" aria-label={`View details for ${node.data.label}`} onClick={() => selectDevice(node)}>Details <ArrowUpRight size={14} aria-hidden="true"/></button></td></tr>)}</tbody></table>{!visible.length && <p className="health-table-empty">No devices match this view.</p>}</div>
+      <div className="health-table-wrap"><table><thead><tr><th scope="col">Device</th><th scope="col">IP address</th><th scope="col">Status</th><th scope="col">Last check</th><th scope="col">Details</th></tr></thead><tbody>{visible.map(node => <tr key={node.id} className={highlightedDevice && (node.id === highlightedId || connectedIds.has(node.id)) ? 'is-connected' : selectedId === node.id ? 'is-selected' : ''}><th scope="row"><span className="health-table-device">{node.type === 'router' ? <Router size={16} aria-hidden="true"/> : <Network size={16} aria-hidden="true"/>}{node.data.label}</span></th><td className="health-address">{node.data.ip || 'Not configured'}</td><td><Status status={node.health}/></td><td>{formatCheckTime(checks[node.id]?.checkedAt)}</td><td><button className="health-row-button" aria-haspopup="dialog" aria-label={`View details for ${node.data.label}`} onClick={() => selectDevice(node)}>Details <ArrowUpRight size={14} aria-hidden="true"/></button></td></tr>)}</tbody></table><div className="health-device-cards">{visible.map(node => <article key={node.id} className="health-device-card"><strong>{node.data.label}</strong><span className="health-address">{node.data.ip || 'Not configured'}</span><Status status={node.health}/><span>Last check: {formatCheckTime(checks[node.id]?.checkedAt)}</span><button className="health-row-button" aria-haspopup="dialog" aria-label={`View details for ${node.data.label}`} onClick={() => selectDevice(node)}>Details <ArrowUpRight size={14} aria-hidden="true"/></button></article>)}</div>{!visible.length && <p className="health-table-empty">No devices match this view.</p>}</div>
     </section>
     ) : (
         <div className="health-map">

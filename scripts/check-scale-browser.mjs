@@ -34,7 +34,7 @@ for (const viewport of [{width:1440,height:900},{width:390,height:844}]) {
   const initialBounds = await page.evaluate(() => {
     const map = document.querySelector('.health-map').getBoundingClientRect()
     const nodes = [...document.querySelectorAll('.react-flow__node')].map(node=>node.getBoundingClientRect())
-    return { outside: nodes.filter(node=>node.left<map.left-1||node.right>map.right+1||node.top<map.top-1||node.bottom>map.bottom+1).length, map:{width:map.width,height:map.height}, minLabelPx: Math.min(...[...document.querySelectorAll('.health-node>strong')].map(node=>parseFloat(getComputedStyle(node).fontSize)*node.getBoundingClientRect().width/node.offsetWidth)) }
+    return { outside: nodes.filter(node=>node.left<map.left-1||node.right>map.right+1||node.top<map.top-1||node.bottom>map.bottom+1).length, map:{width:map.width,height:map.height}, minLabelPx: Math.min(...[...document.querySelectorAll('.health-node .device-copy strong')].map(node=>parseFloat(getComputedStyle(node).fontSize)*node.getBoundingClientRect().width/node.offsetWidth)) }
   })
   run.initialBounds=initialBounds
   console.log(JSON.stringify({viewport,initialBounds,initialUnknownRenderMs:run.initialUnknownRenderMs}))
@@ -84,10 +84,10 @@ for (const viewport of [{width:1440,height:900},{width:390,height:844}]) {
   await view.click()
   await page.locator('.react-flow__controls-fitview').click()
   await page.waitForFunction(()=>{
-    const node=document.querySelector('.health-node>strong')
+    const node=document.querySelector('.health-node .device-copy strong')
     return node && parseFloat(getComputedStyle(node).fontSize)*node.getBoundingClientRect().width/node.offsetWidth>=12
   })
-  const readablePx=await page.locator('.health-node>strong').evaluate(node=>parseFloat(getComputedStyle(node).fontSize)*node.getBoundingClientRect().width/node.offsetWidth)
+  const readablePx=await page.locator('.health-node .device-copy strong').evaluate(node=>parseFloat(getComputedStyle(node).fontSize)*node.getBoundingClientRect().width/node.offsetWidth)
   assert.ok(readablePx>=12,'Focused label must be readable at fit zoom')
   run.focusedLabelPx=Math.round(readablePx*10)/10
   await page.screenshot({path:fileURLToPath(new URL(`../docs/screenshots/scale-${viewport.width}-readable.jpg`,import.meta.url))})
