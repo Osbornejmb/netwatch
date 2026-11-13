@@ -2,8 +2,7 @@ import { NODE_MAX_WIDTH as CARD_WIDTH, NODE_HEIGHT as CARD_HEIGHT } from './node
 const SPACING = 320
 const compareIds = (a, b) => a < b ? -1 : a > b ? 1 : 0
 
-// Display-only positions. Link direction and health never affect graph distance.
-export function radialLayout(nodes, edges, centerId = '') {
+function layoutLevels(nodes, edges, centerId) {
   if (!nodes.length) return []
   const byId = new Map(nodes.map(node => [node.id, node]))
   const neighbors = new Map(nodes.map(node => [node.id, new Set()]))
@@ -35,24 +34,22 @@ export function radialLayout(nodes, edges, centerId = '') {
       }
       if (next.length) levels.push(next)
     }
-    const positions = new Map([[root, { x: -CARD_WIDTH / 2, y: -CARD_HEIGHT / 2 }]])
-    let radius = 0
-    for (let depth = 1; depth < levels.length; depth++) {
-      const ring = levels[depth]
-      radius = Math.max(radius + SPACING, ring.length > 1 ? SPACING / (2 * Math.sin(Math.PI / ring.length)) : SPACING)
-      ring.forEach((id, index) => {
-        const angle = -Math.PI / 2 + 2 * Math.PI * index / ring.length
-        positions.set(id, { x: radius * Math.cos(angle) - CARD_WIDTH / 2, y: radius * Math.sin(angle) - CARD_HEIGHT / 2 })
-      })
-    }
+    components.push(levels)
+  }
+  return components
+}
+
+function packLayout(nodes, layouts) {
+  const components = layouts.map(positions => {
     const values = [...positions.values()]
     const minX = Math.min(...values.map(p => p.x)), minY = Math.min(...values.map(p => p.y))
-    const width = Math.max(...values.map(p => p.x)) - minX + CARD_WIDTH
-    const height = Math.max(...values.map(p => p.y)) - minY + CARD_HEIGHT
-    components.push({ positions, minX, minY, width, height })
-  }
+    return { positions, minX, minY,
+      width: Math.max(...values.map(p => p.x)) - minX + CARD_WIDTH,
+      height: Math.max(...values.map(p => p.y)) - minY + CARD_HEIGHT }
+  })
+  if (!components.length) return []
   // Pack disconnected components without drawing invented connecting links.
-  const gap = 200
+  const gap = 64
   const rowWidth = Math.max(...components.map(c => c.width), Math.sqrt(components.reduce((sum, c) => sum + (c.width + gap) * (c.height + gap), 0)))
   const positions = new Map()
   let x = 0, y = 0, rowHeight = 0
@@ -63,6 +60,44 @@ export function radialLayout(nodes, edges, centerId = '') {
     rowHeight = Math.max(rowHeight, component.height)
   }
   return nodes.map(node => ({ ...node, position: positions.get(node.id) }))
+}
+
+// Display-only positions. Link direction, observations and saved coordinates do not affect layout.
+export function tidyLayout(nodes, edges) {
+  const layouts = layoutLevels(nodes, edges, '').map(levels => {
+    const count = levels.reduce((sum, level) => sum + level.length, 0)
+    const columns = Math.max(1, Math.ceil(Math.sqrt(count * (CARD_HEIGHT + 48) / (CARD_WIDTH + 32))))
+    const positions = new Map()
+    let row = 0
+    for (const level of levels) {
+      const width = Math.min(columns, level.length)
+      level.forEach((id, index) => positions.set(id, {
+        x: (index % columns - (width - 1) / 2) * (CARD_WIDTH + 32),
+        y: (row + Math.floor(index / columns)) * (CARD_HEIGHT + 48),
+      }))
+      row += Math.ceil(level.length / columns)
+    }
+    return positions
+  })
+  return packLayout(nodes, layouts)
+}
+
+export function radialLayout(nodes, edges, centerId = '') {
+  const layouts = layoutLevels(nodes, edges, centerId).map(levels => {
+    const root = levels[0][0]
+    const positions = new Map([[root, { x: -CARD_WIDTH / 2, y: -CARD_HEIGHT / 2 }]])
+    let radius = 0
+    for (let depth = 1; depth < levels.length; depth++) {
+      const ring = levels[depth]
+      radius = Math.max(radius + SPACING, ring.length > 1 ? SPACING / (2 * Math.sin(Math.PI / ring.length)) : SPACING)
+      ring.forEach((id, index) => {
+        const angle = -Math.PI / 2 + 2 * Math.PI * index / ring.length
+        positions.set(id, { x: radius * Math.cos(angle) - CARD_WIDTH / 2, y: radius * Math.sin(angle) - CARD_HEIGHT / 2 })
+      })
+    }
+    return positions
+  })
+  return packLayout(nodes, layouts)
 }
 
 export function radialHandles(source, target) {

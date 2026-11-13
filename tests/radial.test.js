@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { radialLayout, radialHandles, connectedDevices } from '../src/radial.js'
+import { NODE_MAX_WIDTH, NODE_HEIGHT } from '../src/nodes/dimensions.js'
 import { createScaleNetwork } from './fixtures/scale-network.js'
 const node = (id, type='switch') => ({id,type,position:{x:15,y:25},data:{label:id,ip:''}})
 const link = (source,target) => ({id:`${source}-${target}`,source,target})
@@ -26,7 +27,7 @@ test('cycles, shuffled inputs, explicit centers and disconnected devices remain 
  assert.deepEqual(positions(radialLayout(nodes,edges)),positions(radialLayout([...nodes].reverse(),[...edges].reverse())))
  assert.notDeepEqual(positions(radialLayout(nodes,edges)),positions(radialLayout(nodes,edges,'b')))
  const result=radialLayout(nodes,edges)
- for(const a of result) for(const b of result) if(a!==b) assert.ok(Math.abs(a.position.x-b.position.x)>=200||Math.abs(a.position.y-b.position.y)>=180)
+ for(const a of result) for(const b of result) if(a!==b) assert.ok(Math.abs(a.position.x-b.position.x)>=NODE_MAX_WIDTH||Math.abs(a.position.y-b.position.y)>=NODE_HEIGHT)
  assert.deepEqual(radialLayout([],[]),[])
  assert.deepEqual(radialLayout([node('one')],[])[0].position,{x:0,y:0})
  assert.deepEqual(positions(radialLayout(nodes,edges,'missing')),positions(radialLayout(nodes,edges)))
