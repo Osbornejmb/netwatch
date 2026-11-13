@@ -35,15 +35,16 @@ function HealthNode({ data, selected }) {
 const nodeTypes = { health: HealthNode }
 const NO_CHECKS = {}
 
-export default function Dashboard({ nodes: inventory, edges: inventoryEdges, showInventory = false, onEdit, layoutMoves, setLayoutMoves }) {
-  const [source, setSource] = useState('host')
+export default function Dashboard({ nodes: inventory, edges: inventoryEdges, showInventory = false, onEdit, layoutMoves, setLayoutMoves, viewOptions, setViewOptions }) {
+  const { source, layout: mapLayout, centerId } = viewOptions
+  const setSource = source => setViewOptions(previous => ({ ...previous, source }))
+  const setMapLayout = layout => setViewOptions(previous => ({ ...previous, layout }))
+  const setCenterId = centerId => setViewOptions(previous => ({ ...previous, centerId }))
   const host = useMonitoring(source === 'host')
   const live = source === 'host' && host.snapshot
   const staleAfterMs = live ? live.freshness.staleAfterMs : 90_000
   const [statusFilter, setStatusFilter] = useState('all')
   const [query, setQuery] = useState('')
-  const [mapLayout, setMapLayout] = useState('radial')
-  const [centerId, setCenterId] = useState('')
   const [selectedId, setSelectedId] = useState(null)
   const [highlightedId, setHighlightedId] = useState(null)
   const [nodeSizes, setNodeSizes] = useState({})

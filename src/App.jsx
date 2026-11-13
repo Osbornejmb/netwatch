@@ -29,6 +29,7 @@ export default function App() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(saved.topology.edges)
   const [view, setView] = useState(viewFromHash)
   const [layoutMoves, setLayoutMoves] = useState({})
+  const [dashboardView, setDashboardView] = useState({ source: 'host', layout: 'radial', centerId: '' })
   useEffect(() => {
     const navigate = () => setView(viewFromHash())
     window.addEventListener('hashchange', navigate)
@@ -199,7 +200,7 @@ export default function App() {
         </section>
         </header>
 
-        {view !== 'editor' ? <Dashboard nodes={nodes} edges={edges} layoutMoves={layoutMoves} setLayoutMoves={setLayoutMoves} showInventory={view === 'inventory'} onEdit={() => { location.hash = 'topology' }}/> : <section className="page-content" id="topology">
+        {view !== 'editor' ? <Dashboard nodes={nodes} edges={edges} layoutMoves={layoutMoves} setLayoutMoves={setLayoutMoves} viewOptions={dashboardView} setViewOptions={setDashboardView} showInventory={view === 'inventory'} onEdit={() => { location.hash = 'topology' }}/> : <section className="page-content" id="topology">
           <div className="page-heading">
             <div><h1>Edit your map</h1><p>Changes save as a draft until you choose Use this map.</p></div>
             <div className="heading-actions"><button className="button secondary" disabled={autosavePaused||importBusy} onClick={()=>void hostStorage.current.reviewLoad()}>Load saved map</button><button className="button primary" onClick={() => setShowModal('add')}><Plus size={17}/> Add device</button></div>
