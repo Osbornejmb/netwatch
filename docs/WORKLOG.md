@@ -1,5 +1,11 @@
 # Working checkpoint
 
+## Current status (2026-11-13): content-sized router oblongs
+
+- Routers now use oblong borders in dashboard and editor, with intrinsic content width/height and compact padding. A shared 280px cap retains ellipsis/tooltips for unusually long names; switches remain 160×56 rectangles. Placement and radial spacing reserve the maximum router width. Stored topology is unchanged.
+- Verification: 52 tests, production build and focused desktop/narrow Playwright check pass. Browser assertions verify both router renderers have no unused horizontal space; refreshed 1440px dashboard/editor screenshots.
+
+
 ## Current status (2026-11-13): desktop map refinements
 
 - Five requested steps: compact shared cards/formatted CSS; visible counts/status/attention; nearest-side links and deterministic grid/tidy; connection copy/hash routes/removal confirmation/inline limit; anchored Backups and responsive Devices cards. Host code and v1 storage format unchanged.

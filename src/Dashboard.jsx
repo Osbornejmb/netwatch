@@ -21,7 +21,7 @@ function Status({ status }) {
 function HealthNode({ data, selected }) {
   const Icon = data.kind === 'router' ? Router : Network
   const StatusIcon = healthIcons[data.status]
-  return <div style={nodeDimensions} className={`health-node health-node-${data.status}${selected ? ' is-selected' : ''}${data.connectionRole ? ` health-node-${data.connectionRole}` : ''}`}>
+  return <div style={nodeDimensions} className={`health-node ${data.kind}-node health-node-${data.status}${selected ? ' is-selected' : ''}${data.connectionRole ? ` health-node-${data.connectionRole}` : ''}`}>
     <NodeHandles/>
     <span className="health-device-icon"><Icon size={18} aria-hidden="true"/></span>
     <div className="device-copy"><strong title={data.label}>{data.label}</strong><span className="health-address" title={data.ip}>{data.ip || 'No address'}</span></div>

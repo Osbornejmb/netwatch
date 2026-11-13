@@ -22,8 +22,25 @@ try {
     assert.equal(await page.locator('.health-node:visible').count(), count)
     await page.locator(`.summary-${key}`).click()
   }
-  const sizes = await page.locator('.health-node').evaluateAll(nodes => nodes.map(node => [node.offsetWidth, node.offsetHeight]))
+  const sizes = await page.locator('.health-node.switch-node').evaluateAll(nodes => nodes.map(node => [node.offsetWidth, node.offsetHeight]))
   assert.ok(sizes.every(([width, height]) => width === 160 && height === 56))
+  const checkOblongs = async selector => {
+    const cards = await page.locator(selector).evaluateAll(nodes => nodes.map(node => {
+      const style = getComputedStyle(node)
+      const children = [...node.children].filter(child => !child.classList.contains('react-flow__handle'))
+      const content = children.reduce((sum, child) => sum + parseFloat(getComputedStyle(child).width), 0)
+      const used = content + (children.length - 1) * parseFloat(style.gap) + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth)
+      return { width: node.offsetWidth, used, radius: style.borderRadius, height: node.offsetHeight }
+    }))
+    assert.ok(cards.length > 0)
+    for (const card of cards) {
+      assert.equal(card.radius, '999px')
+      assert.ok(card.width <= 281)
+      assert.ok(Math.abs(card.width - card.used) < 2, 'router has unused horizontal space')
+      assert.ok(card.height <= 56)
+    }
+  }
+  await checkOblongs('.health-node.router-node')
   assert.ok(await page.locator('.health-node strong[title]').count() > 0)
   assert.equal(await page.locator('.health-node .node-status[aria-label]').count(), 14)
   assert.equal(await page.locator('.health-path-stale path').first().evaluate(node => node.style.strokeDasharray), '')
@@ -54,6 +71,8 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto(base + '/#topology')
+  await page.locator('.device-node.router-node').first().waitFor()
+  await checkOblongs('.device-node.router-node')
   await page.getByRole('button', { name: 'Tidy layout', exact: true }).click()
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('netwatch-topology-v1')).nodes[0].position.x === 0)
   const snapshot = () => page.evaluate(() => JSON.parse(localStorage.getItem('netwatch-topology-v1')))

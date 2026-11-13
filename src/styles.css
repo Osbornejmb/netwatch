@@ -1139,3 +1139,16 @@ summary:focus-visible {
   --map-grid: #d6d9d1;
   --map-label: #94a3b8;
 }
+
+/* Routers hug their contents; cap unusually long names without stretching the map. */
+.device-node.router-node,
+.health-node.router-node {
+  width: max-content;
+  max-width: var(--node-max-width);
+  height: auto;
+  padding: 8px 12px;
+  border-radius: 999px;
+}
+.router-node .device-copy {
+  flex: 0 1 auto;
+}

@@ -21,4 +21,4 @@ Validate at desktop and narrow widths. Check search, each status filter, selecti
 
 - Allow individual dashboard devices to be dragged, highlighting direct peers and attached links from drag start. Do not open a popup on drag release. Keep focus/reset controls over the map so they do not shift the canvas during a gesture. Saved-layout moves autosave; host/radial moves are temporary and explicitly resettable.
 
-- Map cards share 160×56 dimensions, a left health border, accessible status icon, type icon and single-line name/address. Desktop Devices uses a fitted table; below 720px it uses stacked cards. Backups opens below its header button, below the navigation on narrow screens.
+- Switch cards use 160×56 dimensions; router cards use content-sized oblongs capped at 280px with ellipsis/tooltips for long labels. Cards share a left health border, accessible status icon, type icon and single-line name/address. Desktop Devices uses a fitted table; below 720px it uses stacked cards. Backups opens below its header button, below the navigation on narrow screens.
