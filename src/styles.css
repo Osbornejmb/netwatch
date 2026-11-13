@@ -1133,3 +1133,9 @@ summary:focus-visible {
   outline: 2px solid #46c8bd;
   outline-offset: 3px;
 }
+
+:root {
+  --map-link: #64748b;
+  --map-grid: #d6d9d1;
+  --map-label: #94a3b8;
+}

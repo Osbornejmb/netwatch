@@ -101,12 +101,12 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
     const status = connectionHealth(source?.health, target?.health)
     const label = { up: 'Both endpoints up', down: 'Endpoint down', stale: 'Stale endpoint data', unknown: 'Endpoint reachability unknown' }[status]
     return { id: edge.id, source: edge.source, target: edge.target,
-      ...(mapLayout === 'radial' ? radialHandles(source.position, target.position) : { sourceHandle: null, targetHandle: null }),
+      ...radialHandles(source.position, target.position),
       hidden: !visibleIds.has(edge.source) || !visibleIds.has(edge.target),
-      type: mapLayout === 'radial' ? 'straight' : 'smoothstep',
+      type: 'straight',
       ariaLabel: `${source?.data.label} to ${target?.data.label}: ${label}`,
       className: `health-path-${status}${highlightedDevice && (edge.source === highlightedId || edge.target === highlightedId) ? ' health-path-highlighted' : ''}`,
-      style: { stroke: HEALTH[status].color, strokeWidth: highlightedDevice && (edge.source === highlightedId || edge.target === highlightedId) ? 5 : 3, opacity: highlightedDevice && edge.source !== highlightedId && edge.target !== highlightedId ? 0.18 : 1, strokeDasharray: status === 'down' ? '7 5' : status === 'up' ? undefined : '3 5' },
+      style: { stroke: HEALTH[status].color, strokeWidth: highlightedDevice && (edge.source === highlightedId || edge.target === highlightedId) ? 5 : 3, opacity: highlightedDevice && edge.source !== highlightedId && edge.target !== highlightedId ? 0.18 : 1, strokeDasharray: status === 'down' ? '7 5' : status === 'unknown' ? '3 5' : undefined },
     }
   })
   const connections = selected ? edges.filter(edge => edge.source === selected.id || edge.target === selected.id).map(edge => {

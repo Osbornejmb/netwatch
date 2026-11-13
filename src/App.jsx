@@ -12,6 +12,8 @@ import DeviceDialog from './DeviceDialog'
 import RecoveryDialog from './RecoveryDialog'
 import InventoryControls from './InventoryControls'
 import { createId } from './id'
+import { radialHandles } from './radial'
+import { gridPosition, nextFreePosition } from './nodes/placement'
 
 import { readTopology, writeTopology, validateTopology } from './topology'
 
@@ -71,9 +73,9 @@ export default function App() {
   const onConnect = useCallback((params) => {
     setEdges(eds => addEdge({
       ...params, id: `edge-${createId()}`, label: 'Link',
-      style: { stroke: '#64748b', strokeWidth: 2 },
-      labelStyle: { fill: '#94a3b8', fontSize: 10 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: '#64748b' },
+      style: { stroke: 'var(--map-link)', strokeWidth: 2 },
+      labelStyle: { fill: 'var(--map-label)', fontSize: 10 },
+      markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--map-link)' },
     }, eds))
   }, [setEdges])
 
@@ -86,7 +88,7 @@ export default function App() {
     if (nodes.length >= 2000) { window.alert('This map supports up to 2,000 devices.'); return }
     const id = `${kind}-${createId()}`
     setNodes(ns => [...ns, {
-      id, type: kind, position: { x: 430 + Math.random() * 220, y: 180 + Math.random() * 180 },
+      id, type: kind, position: nextFreePosition(ns),
       data: { label, ip, description },
     }])
     setShowModal(false)
@@ -181,19 +183,22 @@ export default function App() {
 
           <div className="canvas-toolbar">
             <div className="canvas-title"><GitBranch size={18}/><div><strong>Network map</strong><span>Drag nodes · Connect handles · Select to inspect</span></div></div>
-            <div className="canvas-actions"><div className="search-box"><Search size={15}/><input aria-label="Find a device" value={query} onChange={e => setQuery(e.target.value)} placeholder="Find a device..." /></div><button className="button secondary small" onClick={saveNow}><Check size={15}/>{savedNotice ? 'Saved' : 'Save map'}</button></div>
+            <div className="canvas-actions"><button className="button secondary small" onClick={() => setNodes(current => current.map((node, index) => ({ ...node, position: gridPosition(index) })))}>Tidy layout</button><div className="search-box"><Search size={15}/><input aria-label="Find a device" value={query} onChange={e => setQuery(e.target.value)} placeholder="Find a device..." /></div><button className="button secondary small" onClick={saveNow}><Check size={15}/>{savedNotice ? 'Saved' : 'Save map'}</button></div>
           </div>
 
           <div className="canvas-wrap">
             <ReactFlow
               nodes={nodes.map(n => ({ ...n, hidden: !filteredNodes.some(f => f.id === n.id) }))}
-              edges={edges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
+              edges={edges.map(edge => {
+                const source = nodes.find(node => node.id === edge.source), target = nodes.find(node => node.id === edge.target)
+                return { ...edge, ...radialHandles(source.position, target.position), type: 'straight', style: { stroke: 'var(--map-link)', strokeWidth: 2 }, markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--map-link)' } }
+              })} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
               onConnect={onConnect} isValidConnection={connection => connection.source !== connection.target && edges.length < 10000} nodeTypes={nodeTypes}
               onNodeClick={(_, node) => setSelectedNode(node)}
               onPaneClick={() => setSelectedNode(null)}
               fitView fitViewOptions={{ padding: 0.2 }}
               deleteKeyCode={['Backspace', 'Delete']}
-              defaultEdgeOptions={{ markerEnd: { type: MarkerType.ArrowClosed, color: '#64748b' }, type: 'smoothstep', style: { stroke: '#64748b', strokeWidth: 2 }, labelStyle: { fill: '#94a3b8', fontSize: 10 } }}
+              defaultEdgeOptions={{ markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--map-link)' }, type: 'straight', style: { stroke: 'var(--map-link)', strokeWidth: 2 }, labelStyle: { fill: 'var(--map-label)', fontSize: 10 } }}
               proOptions={{ hideAttribution: true }}
             >
               <Background color="#263449" gap={22} size={1}/>
