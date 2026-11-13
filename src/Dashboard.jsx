@@ -4,8 +4,9 @@ import { ArrowDownCircle, ArrowUpRight, CheckCircle2, CircleHelp, Clock3, Networ
 import { HEALTH, deviceHealth, summarizeHealth, connectionHealth } from './health'
 import DeviceDetails from './DeviceDetails'
 import useMonitoring from './useMonitoring'
+import useLayoutDrag from './useLayoutDrag'
 import { formatCheckTime, collectorLabel } from './monitoring'
-import { radialLayout, radialHandles, connectedDevices } from './radial'
+import { tidyLayout, radialLayout, radialHandles, connectedDevices } from './radial'
 
 import { nodeDimensions } from './nodes/dimensions'
 import { NodeHandles } from './nodes/DeviceNode'
@@ -33,20 +34,18 @@ function HealthNode({ data, selected }) {
 const nodeTypes = { health: HealthNode }
 const NO_CHECKS = {}
 
-export default function Dashboard({ nodes: inventory, edges: inventoryEdges, showInventory = false, onEdit, onMoveDevice }) {
+export default function Dashboard({ nodes: inventory, edges: inventoryEdges, showInventory = false, onEdit }) {
   const [source, setSource] = useState('host')
   const host = useMonitoring(source === 'host')
   const live = source === 'host' && host.snapshot
   const staleAfterMs = live ? live.freshness.staleAfterMs : 90_000
   const [statusFilter, setStatusFilter] = useState('all')
   const [query, setQuery] = useState('')
-  const [mapLayout, setMapLayout] = useState('manual')
+  const [mapLayout, setMapLayout] = useState('tidy')
   const [centerId, setCenterId] = useState('')
   const [selectedId, setSelectedId] = useState(null)
   const [highlightedId, setHighlightedId] = useState(null)
   const [nodeSizes, setNodeSizes] = useState({})
-  const [dragState, setDragState] = useState({ source: null, key: '', positions: {} })
-  const [resetKey, setResetKey] = useState(0)
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const update = () => setNow(Date.now())
@@ -62,19 +61,13 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
   }, [])
   const { nodes, edges, checks } = live ? { nodes: live.inventory.topology.nodes, edges: live.inventory.topology.edges, checks: live.checks } : { nodes: inventory, edges: inventoryEdges, checks: NO_CHECKS }
   const effectiveCenterId = nodes.some(node => node.id === centerId) ? centerId : ''
-  const layoutNodes = useMemo(() => mapLayout === 'radial' ? radialLayout(nodes, edges, effectiveCenterId) : nodes, [nodes, edges, mapLayout, effectiveCenterId])
-  const layoutKey = `${live ? 'host' : 'inventory'}-${mapLayout}-${effectiveCenterId}`
-  const positionOverrides = dragState.source === nodes && dragState.key === layoutKey ? dragState.positions : {}
-  const hasViewPositions = (live || mapLayout === 'radial') && Object.keys(positionOverrides).length > 0
+  const layoutNodes = useMemo(() => mapLayout === 'radial' ? radialLayout(nodes, edges, effectiveCenterId) : tidyLayout(nodes, edges), [nodes, edges, mapLayout, effectiveCenterId])
+  const layoutKey = `${live ? 'host' : 'draft'}-${mapLayout}-${effectiveCenterId}-${showInventory}`
+  const { positions: positionOverrides, onPositionChanges, reset: finishDrag } = useLayoutDrag(layoutNodes, layoutKey)
   // Preserve React Flow's measured health-card dimensions across clock/filter
   // renders. Replacing controlled nodes without them resets initialization.
-  const onNodesChange = useCallback(changes => {
+  const onDimensionsChange = useCallback(changes => {
     const measured = changes.filter(change => change.type === 'dimensions' && change.dimensions)
-    const moved = changes.filter(change => change.type === 'position' && change.position && Number.isFinite(change.position.x) && Number.isFinite(change.position.y))
-    if (moved.length) setDragState(previous => {
-      const positions = previous.source === nodes && previous.key === layoutKey ? previous.positions : {}
-      return { source: nodes, key: layoutKey, positions: { ...positions, ...Object.fromEntries(moved.map(change => [change.id, change.position])) } }
-    })
     if (!measured.length) return
     setNodeSizes(previous => {
       let next = previous
@@ -86,7 +79,7 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
       }
       return next
     })
-  }, [nodes, layoutKey])
+  }, [])
   const openIncidents = new Set((live?.activeIncidents || []).map(item => item.deviceId))
   const needsAttention = node => ['down', 'stale'].includes(node.health) || openIncidents.has(node.id)
   const counts = summarizeHealth(nodes, checks, now, staleAfterMs)
@@ -118,14 +111,6 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
 
   const selectDevice = node => { setHighlightedId(node.id); setSelectedId(node.id) }
 
-  const finishDrag = (_, node) => {
-    if (!live && mapLayout === 'manual' && onMoveDevice && Number.isFinite(node.position.x) && Number.isFinite(node.position.y)) onMoveDevice(node.id, node.position)
-  }
-  const resetViewPositions = () => {
-    setDragState({ source: null, key: '', positions: {} })
-    setResetKey(value => value + 1)
-  }
-
   return <section className={`health-dashboard${showInventory ? ' is-inventory' : ''}`} id={showInventory ? 'inventory-page' : 'dashboard'} aria-label="Network health dashboard">
     <header className="health-page-titlebar">
       <div><h1>{showInventory ? 'Devices' : 'Your network'}</h1><p className={source === 'host' && host.state !== 'connected' && host.hasConnected ? 'connection-lost' : ''} role="status">{source === 'browser' ? 'Draft map · No live checks' : `${host.state === 'connected' ? 'Connected' : host.hasConnected ? 'Connection lost, reconnecting' : 'Waiting for host'}${live ? ` · ${collectorLabel(live.collector.state)} · Updated ${formatCheckTime(live.generatedAt)}` : ' · Draft shown without live checks'}`}</p>{showInventory && highlightedDevice && <p className="health-highlight-status" role="status">{highlightedDevice.data.label} · {connectedIds.size} connected {connectedIds.size === 1 ? 'device' : 'devices'}</p>}</div>
@@ -134,11 +119,11 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
         <label className="health-search"><Search size={16} aria-hidden="true"/><input aria-label="Search dashboard devices" value={query} onChange={event => setQuery(event.target.value)} placeholder="Find a device"/></label>
         {showInventory && highlightedDevice && <button className="health-button" aria-label="Clear connection highlight" onClick={() => { setHighlightedId(null); setSelectedId(null) }}>Clear highlight</button>}
         <details className="health-view-options"><summary>View options{statusFilter !== 'all' || query ? ' · Filtered' : ''}</summary><div>
-          <label className="health-filter">Show <select aria-label="Network source" value={source} onChange={event => { setSource(event.target.value); setSelectedId(null); setHighlightedId(null); setDragState({ source: null, key: '', positions: {} }) }}><option value="host">Monitored network</option><option value="browser">Draft map</option></select></label>
+          <label className="health-filter">Show <select aria-label="Network source" value={source} onChange={event => { setSource(event.target.value); setSelectedId(null); setHighlightedId(null); finishDrag() }}><option value="host">Monitored network</option><option value="browser">Draft map</option></select></label>
           {source === 'host' && <button className="health-button" onClick={host.refresh}>Refresh now</button>}
-          <label className="health-filter">Map layout <select aria-label="Map layout" value={mapLayout} onChange={event => { setDragState({ source: null, key: '', positions: {} }); setMapLayout(event.target.value) }}><option value="manual">Saved positions</option><option value="radial">Circle</option></select></label>
-          {mapLayout === 'radial' && <><label className="health-filter">Center <select aria-label="Radial center" value={effectiveCenterId} onChange={event => { setDragState({ source: null, key: '', positions: {} }); setCenterId(event.target.value) }}><option value="">Automatic</option>{nodes.map(node => <option key={node.id} value={node.id}>{node.data.label}</option>)}</select></label><p className="health-map-count">This arranges devices in rings without changing your saved map.</p></>}
-          <p className="health-map-count">{visible.length} of {nodes.length} devices</p><details className="view-help"><summary>About this map</summary><p className="health-map-count">Click a device for details; drag it to rearrange the map.</p><p className="health-map-count">Only draft-map moves in Saved positions are saved.</p><p className="health-map-count">Line colors follow device checks; they do not confirm a cable or port is working.</p></details>
+          <label className="health-filter">Map layout <select aria-label="Map layout" value={mapLayout} onChange={event => { finishDrag(); setMapLayout(event.target.value) }}><option value="tidy">Tidy layout</option><option value="radial">Circle</option></select></label>
+          {mapLayout === 'radial' && <><label className="health-filter">Center <select aria-label="Radial center" value={effectiveCenterId} onChange={event => { finishDrag(); setCenterId(event.target.value) }}><option value="">Automatic</option>{nodes.map(node => <option key={node.id} value={node.id}>{node.data.label}</option>)}</select></label><p className="health-map-count">This arranges devices in rings without changing your saved map.</p></>}
+          <p className="health-map-count">{visible.length} of {nodes.length} devices</p><details className="view-help"><summary>About this map</summary><p className="health-map-count">Click a device for details; dragged devices snap back into place.</p><p className="health-map-count">The tidy layout keeps connected devices close and prevents overlap.</p><p className="health-map-count">Line colors follow device checks; they do not confirm a cable or port is working.</p></details>
         </div></details>
       </div>
     </header>
@@ -151,7 +136,7 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
     </section>
     ) : (
         <div className="health-map">
-          <ReactFlow key={`${layoutKey}-${resetKey}`} onNodesChange={onNodesChange}
+          <ReactFlow key={layoutKey} onNodesChange={changes => { onDimensionsChange(changes); onPositionChanges(changes) }}
             nodes={devices.map(node => ({ ...node, measured: nodeSizes[node.id], type: 'health', ariaRole: 'button', domAttributes: { 'aria-haspopup': 'dialog', onKeyDown: event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); selectDevice(node) } } }, hidden: !visibleIds.has(node.id), selected: selectedId === node.id, ariaLabel: `${node.data.label}, ${node.type === "router" ? "Router" : "Switch"}, ${HEALTH[node.health].label}.${highlightedDevice ? node.id === highlightedId ? ' Connection focus.' : connectedIds.has(node.id) ? ` Directly connected to ${highlightedDevice.data.label}.` : '' : ''} Open device details`, data: { ...node.data, kind: node.type, status: node.health, radial: mapLayout === 'radial', connectionRole: highlightedDevice ? node.id === highlightedId ? 'focus' : connectedIds.has(node.id) ? 'connected' : 'muted' : '' } }))}
             edges={mapEdges}
             nodeTypes={nodeTypes} onNodeClick={(_, node) => selectDevice(node)} onPaneClick={() => { setSelectedId(null); setHighlightedId(null) }}
@@ -161,10 +146,9 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
             <Controls showInteractive={false}/>
           </ReactFlow>
           {!visible.length && <div className="health-empty-map"><Network size={25} aria-hidden="true"/><strong>{nodes.length ? 'No matching devices' : 'Your network starts here'}</strong><p>{nodes.length ? 'Try another name or status filter.' : 'Create a map, then choose which devices to monitor.'}</p><button className="health-button" onClick={nodes.length ? () => { setQuery(''); setStatusFilter('all') } : onEdit}>{nodes.length ? 'Clear filters' : 'Create your map'}</button></div>}
-          {(highlightedDevice || hasViewPositions) && <div className="health-map-focus-controls nodrag nopan">
+          {highlightedDevice && <div className="health-map-focus-controls nodrag nopan">
             {highlightedDevice && <p className="health-highlight-status" role="status">{highlightedDevice.data.label} · {connectedIds.size} connected {connectedIds.size === 1 ? 'device' : 'devices'}</p>}
             {highlightedDevice && <button className="health-button" aria-label="Clear connection highlight" onClick={() => { setHighlightedId(null); setSelectedId(null) }}>Clear highlight</button>}
-            {hasViewPositions && <button className="health-button" aria-label="Reset positions" onClick={resetViewPositions}>{mapLayout === 'radial' ? 'Reset layout' : 'Reset positions'}</button>}
           </div>}
         </div>
     )}

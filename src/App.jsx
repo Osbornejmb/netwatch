@@ -12,8 +12,9 @@ import DeviceDialog from './DeviceDialog'
 import RecoveryDialog from './RecoveryDialog'
 import InventoryControls from './InventoryControls'
 import { createId } from './id'
-import { radialHandles } from './radial'
-import { gridPosition, nextFreePosition } from './nodes/placement'
+import useLayoutDrag from './useLayoutDrag'
+import { tidyLayout, radialHandles } from './radial'
+import { nextFreePosition } from './nodes/placement'
 
 import { readTopology, writeTopology, validateTopology } from './topology'
 
@@ -109,7 +110,15 @@ export default function App() {
     setSelectedNode(null)
   }
 
-  const nodesById = new Map(nodes.map(node => [node.id, node]))
+  const layoutNodes = useMemo(() => tidyLayout(nodes, edges), [nodes, edges])
+  const editorDrag = useLayoutDrag(layoutNodes, view)
+  const editorNodes = layoutNodes.map(node => ({ ...node, position: editorDrag.positions[node.id] || node.position }))
+  const nodesById = new Map(editorNodes.map(node => [node.id, node]))
+  const changeEditorNodes = changes => {
+    const persistent = changes.filter(change => change.type !== 'position')
+    if (persistent.length) onNodesChange(persistent)
+    editorDrag.onPositionChanges(changes)
+  }
   const filteredNodes = nodes.filter(n => `${n.data.label} ${n.data.ip}`.toLowerCase().includes(query.toLowerCase()))
 
   const download = (content, filename, type) => {
@@ -176,7 +185,7 @@ export default function App() {
         </section>
         </header>
 
-        {view !== 'editor' ? <Dashboard nodes={nodes} edges={edges} showInventory={view === 'inventory'} onMoveDevice={(id, position) => setNodes(current => current.map(node => node.id === id ? { ...node, position } : node))} onEdit={() => { location.hash = 'topology' }}/> : <section className="page-content" id="topology">
+        {view !== 'editor' ? <Dashboard nodes={nodes} edges={edges} showInventory={view === 'inventory'} onEdit={() => { location.hash = 'topology' }}/> : <section className="page-content" id="topology">
           <div className="page-heading">
             <div><h1>Edit your map</h1><p>Changes save as a draft until you choose Use this map.</p></div>
             <div className="heading-actions"><button className="button secondary" disabled={autosavePaused||importBusy} onClick={()=>void hostStorage.current.reviewLoad()}>Load saved map</button><button className="button primary" onClick={() => setShowModal('add')}><Plus size={17}/> Add device</button></div>
@@ -185,16 +194,16 @@ export default function App() {
           {deviceNotice && <p role="alert" className="notice">{deviceNotice}</p>}
           <div className="canvas-toolbar">
             <div className="canvas-title"><GitBranch size={18}/><div><strong>Draft map</strong><span>{nodes.length} {nodes.length===1?'device':'devices'} · {edges.length} {edges.length===1?'connection':'connections'}</span></div></div>
-            <div className="canvas-actions"><button className="button secondary" onClick={() => setNodes(current => current.map((node, index) => ({ ...node, position: gridPosition(index) })))}>Tidy layout</button><div className="search-box"><Search size={15}/><input aria-label="Find a device" value={query} onChange={e => setQuery(e.target.value)} placeholder="Find a device" /></div><button className="button primary" disabled={autosavePaused||importBusy} onClick={()=>void hostStorage.current.reviewSave()}><Check size={15}/>Use this map</button></div>
+            <div className="canvas-actions"><button className="button secondary" onClick={() => setNodes(current => tidyLayout(current, edges))}>Tidy layout</button><div className="search-box"><Search size={15}/><input aria-label="Find a device" value={query} onChange={e => setQuery(e.target.value)} placeholder="Find a device" /></div><button className="button primary" disabled={autosavePaused||importBusy} onClick={()=>void hostStorage.current.reviewSave()}><Check size={15}/>Use this map</button></div>
           </div>
 
           <div className="canvas-wrap">
             <ReactFlow
-              nodes={nodes.map(n => ({ ...n, hidden: !filteredNodes.some(f => f.id === n.id) }))}
+              nodes={editorNodes.map(n => ({ ...n, hidden: !filteredNodes.some(f => f.id === n.id) }))}
               edges={edges.map(edge => {
                 const source = nodesById.get(edge.source), target = nodesById.get(edge.target)
                 return { ...edge, ...radialHandles(source.position, target.position), type: 'straight', style: { stroke: 'var(--map-link)', strokeWidth: 2 }, markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--map-link)' } }
-              })} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
+              })} onNodesChange={changeEditorNodes} onNodeDragStop={editorDrag.reset} onEdgesChange={onEdgesChange}
               connectionMode="loose" onConnect={onConnect} isValidConnection={connection => connection.source !== connection.target && edges.length < 10000} nodeTypes={nodeTypes}
               onNodeClick={(_, node) => setSelectedNode(node)}
               onPaneClick={() => setSelectedNode(null)}
@@ -218,7 +227,7 @@ export default function App() {
             </div>}
           </div>
 
-          <details className="editor-tools"><summary>Devices & connections</summary><InventoryControls nodes={nodes} edges={edges} selectedId={selectedId} onSelect={setSelectedId} onEdit={() => setShowModal('edit')} onRemove={removeSelected} onMove={(id, position) => setNodes(ns => ns.map(node => node.id === id ? { ...node, position } : node))} onConnect={onConnect} onRemoveLink={id => setEdges(es => es.filter(edge => edge.id !== id))}/></details>
+          <details className="editor-tools"><summary>Devices & connections</summary><InventoryControls nodes={nodes} edges={edges} selectedId={selectedId} onSelect={setSelectedId} onEdit={() => setShowModal('edit')} onRemove={removeSelected} onConnect={onConnect} onRemoveLink={id => setEdges(es => es.filter(edge => edge.id !== id))}/></details>
         </section>}
         <div hidden={view!=='editor'} className="editor-network-settings"><HostStorage ref={hostStorage} importGeneration={importGeneration} nodes={nodes} edges={edges} paused={autosavePaused} onLoad={topology=>{setNodes(topology.nodes);setEdges(topology.edges);setSelectedNode(null)}}/></div>
       </main>

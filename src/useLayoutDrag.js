@@ -18,6 +18,7 @@ export default function useLayoutDrag(nodes, context) {
       return { nodes, context, positions }
     })
   }
+  useEffect(reset, [nodes, context, reset])
   useEffect(() => {
     const hide = () => { if (document.hidden) reset() }
     window.addEventListener('blur', reset)
