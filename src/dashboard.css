@@ -833,3 +833,50 @@
 .health-node-stale .node-status {
   color: var(--health-stale);
 }
+
+.health-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--health-border);
+}
+.health-summary button {
+  min-height: 40px;
+  border: 0;
+  background: transparent;
+  color: var(--health-muted);
+  padding: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.health-summary .summary-down {
+  color: var(--health-down);
+  font-weight: 700;
+}
+.health-summary button[aria-pressed="true"] {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.health-attention {
+  padding: 8px 20px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 120px;
+  overflow: auto;
+  border-bottom: 1px solid var(--health-border);
+}
+.health-attention p {
+  margin: 0;
+  font-weight: 600;
+  color: var(--health-down);
+}
+.health-attention .health-button {
+  display: inline-flex;
+  margin: 0;
+}
+.health-map-tools > .health-filter {
+  margin: 0;
+}
