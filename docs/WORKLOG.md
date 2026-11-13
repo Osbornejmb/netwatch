@@ -1,5 +1,26 @@
 # Working checkpoint
 
+## Current status (2026-11-14): retain valid moves, snap only for overstretched connections
+
+- Replaced the 64px anchor tether and unconditional release/tab reset with collision-only movement and connection-based validation on release. Each link allows max(320px, 1.5× arranged length), measured to the peer's current position; exceeding it restores the gesture's last valid positions. Unconnected devices are unconstrained except for collisions.
+- App owns separate bounded session adjustments for host/draft/editor and Circle/Tidy. Valid pointer/keyboard moves and the selected dashboard source/layout/center survive tab/view changes; layout/source switching and browser blur retain valid adjustments. Structural graph changes invalidate stale geometry. Save layout saves the visible moved positions; host/storage formats and probe settings are unchanged.
+- Tests cover connected-peer limits, long initial links, collision avoidance, retained moves, excessive-drag rollback, keyboard, navigation, both layouts and sources, saving and undirected links. Production build and six browser suites pass: focused movement/undirected, inventory, radial, desktop, 100-device scale and monitoring. Local npm test passes 74/77; three launcher lifecycle checks are blocked by the installed monitor on port 4317, which was preserved. GitHub Windows/Ubuntu CI and PR/merge status are recorded at handoff.
+
+
+## Current status (2026-11-14): Circle default with shared layout constraints
+
+- Circle is the default in Dashboard and Edit map. Both expose Circle/Tidy, sharing collision checks, the 64px tether, snap-back on release/view/tab changes and undirected-link handling. The editor Save layout action explicitly saves the selected layout.
+- Replaced fixed 320px ring spacing with card-aware radii that clear every same-ring and earlier-ring card. Small vertical chains/opposite peers stay about 104px apart instead of 320px; crowded rings expand only as needed. Node/edge storage and host behavior are unchanged.
+- Regression tests cover close circle spacing and non-overlap across small/high-degree/cyclic/disconnected graphs; browser checks exercise both layouts in both maps. Verification: production build and three desktop/narrow browser suites pass (drag/undirected across both layouts and maps, radial, desktop). npm test passes 73/76; three launcher lifecycle checks report EADDRINUSE because the installed monitor is running on port 4317. Monitoring was left running. The installed server references the new built assets; refresh the browser to load them.
+
+
+## Current status (2026-11-13): tidy layouts, snap-back and undirected connections
+
+- Both maps now default to compact, deterministic router-first layers with wrapped rows and separate component packing. Layouts ignore old scattered/stacked saved positions. Shared drag handling limits movement to 64 layout pixels, rejects card collisions and snaps back on release, view/layout/source changes and browser blur/hidden events. Only explicit Tidy layout persists positions.
+- One rendered line and details/list entry per unordered device pair; reverse/parallel additions are blocked and removing a displayed connection removes all its old reciprocal records. Imported duplicate records and original coordinates remain intact until an explicit editing action. No host or persisted-format changes.
+- Pure layout/drag/link regression checks and a focused desktop/narrow browser check cover compactness, overlap, snap-back, focus/tab resets, unchanged storage and undirected add/remove/render/details behavior. Production build and five browser suites pass (focused snap-back/undirected, inventory, radial, desktop, 100-device scale). Full npm test: 71/75 pass; the early-shutdown case passes on isolated rerun, leaving three launcher lifecycle checks blocked by the running installed host on port 4317. The installed monitor was preserved. No CI/publication is claimed.
+
+
 ## Current status (2026-11-13): integrate desktop-map commits with current main
 
 - Reviewed all six desktop-map commits and merged current main into the branch, resolving overlapping App/Dashboard/CSS/docs/browser checks. Preserved the off-white redesign, direct map replacement reviews, persistent Outages, Ports and all host changes already on main; no new host/schema changes. Compact content-sized oblong routers, filters/attention, side handles, grid/tidy, hash navigation, connection copy, removal confirmation and responsive panels remain.

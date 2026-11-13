@@ -450,7 +450,6 @@ label {
   margin: 7px 0 12px;
 }
 .inventory-device-actions,
-.position-form,
 .link-form {
   display: flex;
   flex-wrap: wrap;
@@ -458,18 +457,9 @@ label {
   gap: 12px;
   margin: 14px 0;
 }
-.position-form {
-  width: 100%;
-}
-.position-form label,
 .link-endpoint {
   flex: 1;
   min-width: 130px;
-}
-.position-form input {
-  display: block;
-  width: 100%;
-  margin-top: 6px;
 }
 .editable-links {
   list-style: none;
@@ -755,12 +745,10 @@ label {
     top: 12px;
     right: 12px;
   }
-  .position-form,
   .link-form {
     flex-direction: column;
     align-items: stretch;
   }
-  .position-form label,
   .link-endpoint {
     width: 100%;
     min-width: 0;
@@ -861,4 +849,8 @@ label {
 
 .topbar {
   position: relative;
+}
+
+.canvas-actions > .health-filter {
+  margin: 0;
 }
