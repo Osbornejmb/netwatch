@@ -24,7 +24,7 @@ npm.cmd start
 
 The host still binds only to `127.0.0.1:4317`. This is independent of `NETWATCH_ICMP` and the existing per-device ICMP opt-in. Enable ICMP separately only for approved targets if you also want reachability status. The tray app does not yet have a separate SNMP checkbox; terminal startup is the documented SNMP path. Stop that host before starting another launcher-owned host.
 
-7. Open saved-device details → **Interfaces**. The browser reads results every five seconds only while that section is open; those reads do not issue SNMP requests. It shows 50 interfaces per page, admin/oper state, sample time and conservative receive/send rates. A replying device can remain Up while an interface is Down; stale/paused/error views show last-known interface information and unavailable rates.
+7. Open saved-device details → **Ports**. The browser reads results every five seconds only while that section is open; those reads do not issue SNMP requests. It shows 50 interfaces per page, admin/oper state, sample time and conservative receive/send rates. A replying device can remain Up while an interface is Down; stale/paused/error views show last-known interface information and unavailable rates.
 8. To revoke interface monitoring, stop the host and run `npm.cmd run snmp -- remove <saved-device-id>`. This also removes that ID's protected profile, including after the device has been deleted. Removing a device or changing its address/type automatically revokes authorization and deletes its old interface observations; an orphan protected file cannot reauthorize it. Re-adding an identical ID/address cannot inherit the old credential authorization. Label/layout changes preserve authorization.
 
 ## Credentials and backup

@@ -1,0 +1,21 @@
+{
+  "scope": "Isolated UI fixtures only; no collectors or existing databases",
+  "results": [
+    {
+      "name": "inventory",
+      "code": 0
+    },
+    {
+      "name": "radial",
+      "code": 0
+    },
+    {
+      "name": "scale",
+      "code": 0
+    },
+    {
+      "name": "dashboard-drag",
+      "code": 0
+    }
+  ]
+}

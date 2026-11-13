@@ -75,12 +75,15 @@ The latest explicit user decision defines scope. Code and passing checks establi
 
 ## UI & UX Copywriting Rules
 
+- Use one warm off-white design across the dashboard, editor, dialogs and Windows controls. Pure white (`#fff`, `#ffffff`, `rgb(255,255,255)`) is not allowed for app surfaces, text, borders or icons; use the shared off-white tokens, including text on dark buttons.
+- Prefer everyday labels: Edit map, Draft map, Monitored network, Ports, Outages and Overdue. Keep technical protocol/storage details in setup documentation; preserve the distinction between draft edits and the monitored network.
 - Write all UI text for a non-technical everyday user. Never expose raw error codes, database terms, or developer jargon.
 - Prioritize clarity over completeness: show only essential controls by default and tuck secondary options into collapsible menus.
 - Use short, action-oriented labels (1–3 words for buttons, 1 sentence max for helper text).
 
 ## UI rules
 
+- Distinguish device types by shape in both dashboard and editor: horizontal oval routers and rounded-square switches, retaining type icons and independent health colors/labels.
 - The map fills the opening dashboard below a small horizontal top menu and title/status strip. No sidebar, summary-card row or inventory table on the landing screen (use Devices and View options). Show failures and staleness on devices and paths. Device details open in a popup; search, compact filters and a keyboard-operable device list support the map.
 - Pair status colors with text and icons. Keep readable labels, visible focus, named icon buttons, 40 px (desktop) / 44 px (narrow) targets, responsive layouts and reduced-motion support. No decorative animation implying live activity.
 - Every data-driven screen needs meaningful empty, disconnected, stale and error states. Show loading feedback only when something actually loads.

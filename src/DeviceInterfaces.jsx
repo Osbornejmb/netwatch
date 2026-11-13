@@ -20,24 +20,24 @@ export default function DeviceInterfaces({deviceId,revision}) {
       try {
         const value=validate(await hostRequest(`devices/${encodeURIComponent(deviceId)}/interfaces?limit=50&after=${after}`,{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(10000)])}),revision)
         if(!stopped){setPage(value);setError('')}
-      }catch {if(!stopped)setError('Interface checks are unavailable. Last recorded details may be out of date.')}
+      }catch {if(!stopped)setError('Port checks are unavailable; saved results may be out of date.')}
       finally{if(!stopped)timer=setTimeout(poll,5000)}
     }
     setPage(null);setError('');poll()
     return()=>{stopped=true;clearTimeout(timer);controller?.abort()}
   },[deviceId,revision,after,reload])
   const checked=Date.parse(page?.checkedAt),current=page?.configured&&['running','degraded'].includes(page.monitoring.collectorState)&&Number.isFinite(checked)&&checked<=now&&now-checked<=page.monitoring.staleAfterMs&&!error
-  return <section className="health-interfaces health-history" aria-label="Device interfaces">
-    <h3>Interface checks</h3><p>Ports are checked separately from device reachability. Missing results do not mean a port is down.</p>
+  return <section className="health-interfaces health-history" aria-label="Device ports">
+    <h3>Port checks</h3><p>Port checks are separate from device checks; missing results do not mean a port is down.</p>
     {error&&<p role="alert">{error}</p>}
-    {!page&&!error&&<p role="status">Loading interfaces…</p>}
-    {page&&<><p>{!page.configured?'Interface monitoring is not configured on this host.':page.monitoring.collectorState==='disabled'?'Interface checks are paused.':!current?'Waiting for current interface results.':page.monitoring.state==='checking'?'Checking interfaces; showing recent results.':page.monitoring.state&&page.monitoring.state!=='ok'?'Checks interrupted; showing recent results.':'Recent interface results.'}</p>
-    <p>Last interface check: {formatCheckTime(page.checkedAt)} · {page.total} interfaces</p>
-    {!page.interfaces.length&&<p>No recorded interfaces.</p>}
-    <ol>{page.interfaces.map(row=><li key={row.index}><strong>{row.name||row.description||`Interface ${row.index}`}</strong><span>{current?'':'Last known · '}{OPER[row.oper]||'Unknown'} · {ADMIN[row.admin]||'Configuration unknown'}</span><span>Receive: {current?rate(row.inBps):'Unavailable'} · Send: {current?rate(row.outBps):'Unavailable'}</span></li>)}</ol>
-    <p>Rates need consecutive valid counters. Restarts, counter resets, missing evidence and long gaps show Unavailable.</p>
-    {after>0&&<button className="health-button" onClick={()=>setAfter(0)}>First interfaces</button>}
-    {page.nextAfter&&<button className="health-button" onClick={()=>setAfter(page.nextAfter)}>Next interfaces</button>}</>}
-    <button className="health-button" onClick={()=>setReload(v=>v+1)}>Refresh interfaces</button>
+    {!page&&!error&&<p role="status">Loading ports…</p>}
+    {page&&<><p>{!page.configured?'Port checks are not set up on this PC.':page.monitoring.collectorState==='disabled'?'Port checks are paused.':!current?'Waiting for new port results.':page.monitoring.state==='checking'?'Checking ports; showing recent results.':page.monitoring.state&&page.monitoring.state!=='ok'?'Checks interrupted; showing recent results.':'Recent port results.'}</p>
+    <p>Last port check: {formatCheckTime(page.checkedAt)} · {page.total} ports</p>
+    {!page.interfaces.length&&<p>No recorded ports.</p>}
+    <ol>{page.interfaces.map(row=><li key={row.index}><strong>{row.name||row.description||`Interface ${row.index}`}</strong><span>{current?'':'Last known · '}{OPER[row.oper]||'Unknown'} · {ADMIN[row.admin]||'Setting unknown'}</span><span>Receive: {current?rate(row.inBps):'Unavailable'} · Send: {current?rate(row.outBps):'Unavailable'}</span></li>)}</ol>
+    <p>Traffic rates appear after two suitable checks; gaps or device restarts can leave them unavailable.</p>
+    {after>0&&<button className="health-button" onClick={()=>setAfter(0)}>First page</button>}
+    {page.nextAfter&&<button className="health-button" onClick={()=>setAfter(page.nextAfter)}>Next page</button>}</>}
+    <button className="health-button" onClick={()=>setReload(v=>v+1)}>Refresh ports</button>
   </section>
 }

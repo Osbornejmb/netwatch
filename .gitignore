@@ -11,3 +11,4 @@ data/
 *.sqlite*
 snmp-credentials/
 *.dpapi
+docs/screenshots/redesign-*.png
