@@ -42,7 +42,7 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
   const staleAfterMs = live ? live.freshness.staleAfterMs : 90_000
   const [statusFilter, setStatusFilter] = useState('all')
   const [query, setQuery] = useState('')
-  const [mapLayout, setMapLayout] = useState('tidy')
+  const [mapLayout, setMapLayout] = useState('radial')
   const [centerId, setCenterId] = useState('')
   const [selectedId, setSelectedId] = useState(null)
   const [highlightedId, setHighlightedId] = useState(null)
@@ -123,7 +123,7 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
         <details className="health-view-options"><summary>View options{statusFilter !== 'all' || query ? ' · Filtered' : ''}</summary><div>
           <label className="health-filter">Show <select aria-label="Network source" value={source} onChange={event => { setSource(event.target.value); setSelectedId(null); setHighlightedId(null); finishDrag() }}><option value="host">Monitored network</option><option value="browser">Draft map</option></select></label>
           {source === 'host' && <button className="health-button" onClick={host.refresh}>Refresh now</button>}
-          <label className="health-filter">Map layout <select aria-label="Map layout" value={mapLayout} onChange={event => { finishDrag(); setMapLayout(event.target.value) }}><option value="tidy">Tidy layout</option><option value="radial">Circle</option></select></label>
+          <label className="health-filter">Map layout <select aria-label="Map layout" value={mapLayout} onChange={event => { finishDrag(); setMapLayout(event.target.value) }}><option value="radial">Circle</option><option value="tidy">Tidy layout</option></select></label>
           {mapLayout === 'radial' && <><label className="health-filter">Center <select aria-label="Radial center" value={effectiveCenterId} onChange={event => { finishDrag(); setCenterId(event.target.value) }}><option value="">Automatic</option>{nodes.map(node => <option key={node.id} value={node.id}>{node.data.label}</option>)}</select></label><p className="health-map-count">This arranges devices in rings without changing your saved map.</p></>}
           <p className="health-map-count">{visible.length} of {nodes.length} devices</p><details className="view-help"><summary>About this map</summary><p className="health-map-count">Click a device for details; dragged devices snap back into place.</p><p className="health-map-count">The tidy layout keeps connected devices close and prevents overlap.</p><p className="health-map-count">Line colors follow device checks; they do not confirm a cable or port is working.</p></details>
         </div></details>

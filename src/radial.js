@@ -1,5 +1,6 @@
 import { NODE_MAX_WIDTH as CARD_WIDTH, NODE_HEIGHT as CARD_HEIGHT } from './nodes/dimensions.js'
-const SPACING = 320
+const COLUMN_GAP = 32
+const ROW_GAP = 48
 const compareIds = (a, b) => a < b ? -1 : a > b ? 1 : 0
 
 function layoutLevels(nodes, edges, centerId) {
@@ -66,20 +67,44 @@ function packLayout(nodes, layouts) {
 export function tidyLayout(nodes, edges) {
   const layouts = layoutLevels(nodes, edges, '').map(levels => {
     const count = levels.reduce((sum, level) => sum + level.length, 0)
-    const columns = Math.max(1, Math.ceil(Math.sqrt(count * (CARD_HEIGHT + 48) / (CARD_WIDTH + 32))))
+    const columns = Math.max(1, Math.ceil(Math.sqrt(count * (CARD_HEIGHT + ROW_GAP) / (CARD_WIDTH + COLUMN_GAP))))
     const positions = new Map()
     let row = 0
     for (const level of levels) {
       const width = Math.min(columns, level.length)
       level.forEach((id, index) => positions.set(id, {
-        x: (index % columns - (width - 1) / 2) * (CARD_WIDTH + 32),
-        y: (row + Math.floor(index / columns)) * (CARD_HEIGHT + 48),
+        x: (index % columns - (width - 1) / 2) * (CARD_WIDTH + COLUMN_GAP),
+        y: (row + Math.floor(index / columns)) * (CARD_HEIGHT + ROW_GAP),
       }))
       row += Math.ceil(level.length / columns)
     }
     return positions
   })
   return packLayout(nodes, layouts)
+}
+
+// Find the closest ring radius that clears every card, including earlier rings.
+function clearRingRadius(directions, positions, minimum) {
+  const width = CARD_WIDTH + COLUMN_GAP, height = CARD_HEIGHT + ROW_GAP
+  let radius = minimum
+  for (let a = 0; a < directions.length; a++) for (let b = a + 1; b < directions.length; b++) {
+    radius = Math.max(radius, Math.min(width / Math.abs(directions[a].x - directions[b].x), height / Math.abs(directions[a].y - directions[b].y)))
+  }
+  const interval = (direction, center, extent) => {
+    if (Math.abs(direction) < 1e-10) return Math.abs(center) < extent ? [-Infinity, Infinity] : [Infinity, -Infinity]
+    const a = (center - extent) / direction, b = (center + extent) / direction
+    return [Math.min(a, b), Math.max(a, b)]
+  }
+  const blocked = []
+  for (const direction of directions) for (const position of positions.values()) {
+    const x = interval(direction.x, position.x + CARD_WIDTH / 2, width)
+    const y = interval(direction.y, position.y + CARD_HEIGHT / 2, height)
+    const enter = Math.max(0, x[0], y[0]), exit = Math.min(x[1], y[1])
+    if (exit > radius && enter < exit) blocked.push([enter, exit])
+  }
+  blocked.sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  for (const [enter, exit] of blocked) if (radius + 1e-6 >= enter && radius < exit) radius = exit
+  return radius + 1e-6
 }
 
 export function radialLayout(nodes, edges, centerId = '') {
@@ -89,11 +114,15 @@ export function radialLayout(nodes, edges, centerId = '') {
     let radius = 0
     for (let depth = 1; depth < levels.length; depth++) {
       const ring = levels[depth]
-      radius = Math.max(radius + SPACING, ring.length > 1 ? SPACING / (2 * Math.sin(Math.PI / ring.length)) : SPACING)
-      ring.forEach((id, index) => {
+      const directions = ring.map((_, index) => {
         const angle = -Math.PI / 2 + 2 * Math.PI * index / ring.length
-        positions.set(id, { x: radius * Math.cos(angle) - CARD_WIDTH / 2, y: radius * Math.sin(angle) - CARD_HEIGHT / 2 })
+        return { x: Math.cos(angle), y: Math.sin(angle) }
       })
+      radius = clearRingRadius(directions, positions, radius + CARD_HEIGHT + ROW_GAP)
+      ring.forEach((id, index) => positions.set(id, {
+        x: radius * directions[index].x - CARD_WIDTH / 2,
+        y: radius * directions[index].y - CARD_HEIGHT / 2,
+      }))
     }
     return positions
   })

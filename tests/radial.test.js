@@ -40,7 +40,7 @@ test('100-device mesh and 100-spoke star produce finite non-overlapping position
   const layout=radialLayout(fixture.nodes,edges)
   assert.equal(layout.length,100)
   assert.ok(layout.every(n=>Number.isFinite(n.position.x)&&Number.isFinite(n.position.y)))
-  for(let a=0;a<layout.length;a++) for(let b=a+1;b<layout.length;b++) assert.ok(distance(center(layout[a]),center(layout[b]))>=269-0.001)
+  for(let a=0;a<layout.length;a++) for(let b=a+1;b<layout.length;b++) assert.ok(Math.abs(layout[a].position.x-layout[b].position.x)>=NODE_MAX_WIDTH-0.001||Math.abs(layout[a].position.y-layout[b].position.y)>=NODE_HEIGHT-0.001)
  }
  assert.deepEqual(radialHandles({x:0,y:0},{x:100,y:0}),{sourceHandle:'radial-source-right',targetHandle:'radial-target-left'})
  assert.deepEqual(radialHandles({x:0,y:100},{x:0,y:0}),{sourceHandle:'radial-source-top',targetHandle:'radial-target-bottom'})
@@ -52,4 +52,20 @@ test('connection highlight finds direct incoming/outgoing peers only, including 
  assert.deepEqual([...connectedDevices('a',nodes,edges)].sort(),['b','c'])
  assert.equal(connectedDevices('isolated',nodes,edges).size,0)
  assert.equal(connectedDevices('missing',nodes,edges).size,0)
+})
+
+test('circle uses close card-aware spacing on small chains and opposite peers', () => {
+  const nodes = [node('hub','router'), node('a'), node('leaf')]
+  const edges = [link('hub','a'), link('a','leaf')]
+  const positions = Object.fromEntries(radialLayout(nodes,edges).map(n=>[n.id,n.position]))
+  assert.ok(distance(positions.hub,positions.a) < 110)
+  assert.ok(distance(positions.a,positions.leaf) < 110)
+  const opposite = Object.fromEntries(radialLayout(nodes,[link('hub','a'),link('hub','leaf')]).map(n=>[n.id,n.position]))
+  assert.ok(distance(opposite.hub,opposite.a)<110)
+  assert.ok(distance(opposite.hub,opposite.leaf)<110)
+  for (const count of [3,4,7,20]) {
+    const peers = Array.from({length:count},(_,i)=>node(String(i)))
+    const layout=radialLayout([node('hub','router'),...peers],peers.map(n=>link('hub',n.id)))
+    for(const a of layout) for(const b of layout) if(a!==b) assert.ok(Math.abs(a.position.x-b.position.x)>=NODE_MAX_WIDTH+31.999||Math.abs(a.position.y-b.position.y)>=NODE_HEIGHT+47.999)
+  }
 })

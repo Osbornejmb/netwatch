@@ -1,5 +1,12 @@
 # Working checkpoint
 
+## Current status (2026-11-14): Circle default with shared layout constraints
+
+- Circle is the default in Dashboard and Edit map. Both expose Circle/Tidy, sharing collision checks, the 64px tether, snap-back on release/view/tab changes and undirected-link handling. The editor Save layout action explicitly saves the selected layout.
+- Replaced fixed 320px ring spacing with card-aware radii that clear every same-ring and earlier-ring card. Small vertical chains/opposite peers stay about 104px apart instead of 320px; crowded rings expand only as needed. Node/edge storage and host behavior are unchanged.
+- Regression tests cover close circle spacing and non-overlap across small/high-degree/cyclic/disconnected graphs; browser checks exercise both layouts in both maps. Verification: production build and three desktop/narrow browser suites pass (drag/undirected across both layouts and maps, radial, desktop). npm test passes 73/76; three launcher lifecycle checks report EADDRINUSE because the installed monitor is running on port 4317. Monitoring was left running. The installed server references the new built assets; refresh the browser to load them.
+
+
 ## Current status (2026-11-13): tidy layouts, snap-back and undirected connections
 
 - Both maps now default to compact, deterministic router-first layers with wrapped rows and separate component packing. Layouts ignore old scattered/stacked saved positions. Shared drag handling limits movement to 64 layout pixels, rejects card collisions and snaps back on release, view/layout/source changes and browser blur/hidden events. Only explicit Tidy layout persists positions.

@@ -22,7 +22,7 @@ Reference guidance: [UI/UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pr
 
 Validate at desktop and narrow widths. Check search, each status filter, selecting a device from map and list, empty startup and saved-inventory preservation, and switching back to the editor. Record limitations in WORKLOG.md.
 
-- The default layout is tidy: deterministic router-first graph layers wrap into compact rows with card-sized spacing. Circle remains an optional view. Both are display-only until the explicit editor Tidy layout action saves coordinates.
+- Circle is the default in both maps and uses card-aware ring radii for close spacing without overlap. Tidy remains available: deterministic router-first graph layers wrap into compact rows with card-sized spacing. Both share collision checks, the same 64px tether, snap-back, tab/view resets and undirected link rules. Both are display-only until the explicit editor Save layout action saves coordinates.
 - Selecting a device highlights direct peers and incident paths in either layout. Use blue solid/dashed outlines to distinguish focus/peers without replacing green/red/amber/gray health colors. Keep an explicit Clear highlight control and a textual direct-peer count; do not imply transitive connectivity or live interface verification.
 
 - Allow individual dashboard devices to be dragged, highlighting direct peers and attached links from drag start. Do not open a popup on drag release. Keep focus controls over the map so gestures do not shift the canvas. Movement is tethered to 64 layout pixels, collisions are rejected, and pointer/key release, route changes or browser focus/tab changes restore designated positions in both maps.

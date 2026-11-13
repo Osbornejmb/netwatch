@@ -75,7 +75,7 @@ try {
   await page.locator('.device-node.router-node').first().waitFor()
   await checkOblongs('.device-node.router-node')
   const beforeTidy = await page.evaluate(() => localStorage.getItem('netwatch-topology-v1'))
-  await page.getByRole('button', { name: 'Tidy layout', exact: true }).click()
+  await page.getByRole('button', { name: 'Save layout', exact: true }).click()
   await page.waitForFunction(before => localStorage.getItem('netwatch-topology-v1') !== before, beforeTidy)
   const snapshot = () => page.evaluate(() => JSON.parse(localStorage.getItem('netwatch-topology-v1')))
   const tidy = await snapshot()

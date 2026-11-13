@@ -850,3 +850,7 @@ label {
 .topbar {
   position: relative;
 }
+
+.canvas-actions > .health-filter {
+  margin: 0;
+}

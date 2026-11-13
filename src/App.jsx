@@ -14,7 +14,7 @@ import InventoryControls from './InventoryControls'
 import { createId } from './id'
 import { connectionKey, uniqueConnections } from './connections'
 import useLayoutDrag from './useLayoutDrag'
-import { tidyLayout, radialHandles } from './radial'
+import { tidyLayout, radialLayout, radialHandles } from './radial'
 import { nextFreePosition } from './nodes/placement'
 
 import { readTopology, writeTopology, validateTopology } from './topology'
@@ -121,9 +121,10 @@ export default function App() {
     setSelectedNode(null)
   }
 
+  const [editorLayout, setEditorLayout] = useState('radial')
   const mapEdges = useMemo(() => uniqueConnections(edges), [edges])
-  const layoutNodes = useMemo(() => tidyLayout(nodes, edges), [nodes, edges])
-  const editorDrag = useLayoutDrag(layoutNodes, view)
+  const layoutNodes = useMemo(() => editorLayout === 'radial' ? radialLayout(nodes, edges) : tidyLayout(nodes, edges), [nodes, edges, editorLayout])
+  const editorDrag = useLayoutDrag(layoutNodes, `${view}-${editorLayout}`)
   const editorNodes = layoutNodes.map(node => ({ ...node, position: editorDrag.positions[node.id] || node.position }))
   const nodesById = new Map(editorNodes.map(node => [node.id, node]))
   const changeEditorNodes = changes => {
@@ -206,7 +207,7 @@ export default function App() {
           {deviceNotice && <p role="alert" className="notice">{deviceNotice}</p>}
           <div className="canvas-toolbar">
             <div className="canvas-title"><GitBranch size={18}/><div><strong>Draft map</strong><span>{nodes.length} {nodes.length===1?'device':'devices'} · {mapEdges.length} {mapEdges.length===1?'connection':'connections'}</span></div></div>
-            <div className="canvas-actions"><button className="button secondary" onClick={() => setNodes(current => tidyLayout(current, edges))}>Tidy layout</button><div className="search-box"><Search size={15}/><input aria-label="Find a device" value={query} onChange={e => setQuery(e.target.value)} placeholder="Find a device" /></div><button className="button primary" disabled={autosavePaused||importBusy} onClick={()=>void hostStorage.current.reviewSave()}><Check size={15}/>Use this map</button></div>
+            <div className="canvas-actions"><label className="health-filter">Map layout <select aria-label="Map layout" value={editorLayout} onChange={event => setEditorLayout(event.target.value)}><option value="radial">Circle</option><option value="tidy">Tidy layout</option></select></label><button className="button secondary" onClick={() => setNodes(current => editorLayout === 'radial' ? radialLayout(current, edges) : tidyLayout(current, edges))}>Save layout</button><div className="search-box"><Search size={15}/><input aria-label="Find a device" value={query} onChange={e => setQuery(e.target.value)} placeholder="Find a device" /></div><button className="button primary" disabled={autosavePaused||importBusy} onClick={()=>void hostStorage.current.reviewSave()}><Check size={15}/>Use this map</button></div>
           </div>
 
           <div className="canvas-wrap">
