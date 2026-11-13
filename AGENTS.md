@@ -7,7 +7,7 @@ NetWatch is a local-first Windows network monitoring dashboard. Its job is to sh
 Stack: React 18, Vite 6, plain JavaScript (ESM, no TypeScript), React Flow (`@xyflow/react`), Lucide, Tailwind. Host: Node >= 22.13 using built-in `node:sqlite` (no runtime packages). No linter or formatter is configured.
 
 **Implemented:** dashboard and topology editor, browser-local topology with JSON backup/restore and recovery, loopback Node API + SQLite store with explicit browser transfer (`docs/HOST-API.md`), opt-in bounded Windows ICMP collector (`docs/ICMP-COLLECTOR.md`).
-**Issue #6 implementation:** dashboard snapshot polling, host freshness, per-device authorization and bounded history; merged through PR #30; see WORKLOG.md for verification and remaining release work. **Not implemented:** incidents/alerts, SNMP/LLDP, BGP, authentication, remote access, Windows service packaging. Never describe a planned feature as implemented. Docs can lag the code: confirm status with `git log` and the code, and never hardcode test counts or PR/issue states from memory.
+**Issue #6 implementation:** dashboard snapshot polling, host freshness, per-device authorization and bounded history; merged through PR #30; see WORKLOG.md for verification and remaining release work. **Local incidents:** persistent outage/recovery history and dashboard attention; external delivery remains deferred. **Not implemented:** external alerts, SNMP/LLDP, BGP, authentication, remote access, Windows service packaging. Never describe a planned feature as implemented. Docs can lag the code: confirm status with `git log` and the code, and never hardcode test counts or PR/issue states from memory.
 
 ## Commands
 
@@ -33,7 +33,7 @@ Stack: React 18, Vite 6, plain JavaScript (ESM, no TypeScript), React Flow (`@xy
 ## Repo map
 
 - `src/` UI. `App.jsx` (navigation, editor, localStorage autosave, recovery), `Dashboard.jsx` (health map, layouts, dragging), `health.js` (device/connection health rules), `topology.js` (v1 validation, storage read/write), `inventory.js` (address normalization, duplicates), `radial.js` (display-only radial layout, direct peers), `id.js`, `useModal.js`, dialogs (`DeviceDetails`, `DeviceDialog`, `RecoveryDialog`), `HostStorage.jsx`, `InventoryControls.jsx`, `nodes/`.
-- `host/` Node service. `main.js` (entry, lock, graceful shutdown), `server.js` (HTTP, Host/Origin/write checks, serves `dist/`), `store.js` (SQLite schema v2, validation, retention), `collector.js` + `icmp-policy.js` (cycles, failure/recovery state machine, constants), `windows-probe.js`, `windows-helper.js`, `windows-ping.cs` (shell-free .NET ping helper), `maintenance.js` (backup/restore), `files.js` (lock).
+- `host/` Node service. `main.js` (entry, lock, graceful shutdown), `server.js` (HTTP, Host/Origin/write checks, serves `dist/`), `store.js` (SQLite schema v3, validation, retention), `collector.js` + `icmp-policy.js` (cycles, failure/recovery state machine, constants), `windows-probe.js`, `windows-helper.js`, `windows-ping.cs` (shell-free .NET ping helper), `maintenance.js` (backup/restore), `files.js` (lock).
 - `tests/` `node:test` + `node:assert/strict`; `tests/fixtures/` shared fixtures. `scripts/` optional browser/Windows checks. `docs/` product, architecture, API, roadmap, worklog, evidence JSON and screenshots.
 
 ## Reading order (read what the task needs, not everything)
@@ -105,7 +105,7 @@ The latest explicit user decision defines scope. Code and passing checks establi
 
 - `npm start` serves `./dist` relative to the working directory, so build first. The host is hard-coded to 127.0.0.1:4317 and rejects any other Host header (including `localhost`), unexpected Origin, and cross-site requests.
 - `PUT /api/v1/topology` needs `Content-Type: application/json`, `X-NetWatch-Write: 1`, `source: "inventory"` and the current `baseRevision`. There is no observation-write route and no probe-trigger route; keep it that way.
-- `node:sqlite` prints an experimental warning on Node 22; that is expected. The DB is `user_version=2`; a newer schema is rejected. Never delete a database to get past a migration error.
+- `node:sqlite` prints an experimental warning on Node 22; that is expected. The DB is `user_version=3`; a newer schema is rejected. Never delete a database to get past a migration error.
 - The collector reports `unsupported` off Windows. Live dashboard freshness uses the host's `freshness.staleAfterMs`; the 90-second default in `src/health.js` remains for test fixtures and callers without a host policy.
 - Dashboard drag moves are view-local overrides; only the Saved-positions layout persists, through App's existing autosave callback. Keep measured React Flow node dimensions across freshness-clock updates or cards disappear.
 - Never commit `.env*`, `data/`, `*.sqlite*`, `dist/`, `node_modules/`, `.tools/` (all gitignored), device credentials, or real topology exports (these are not gitignored, so check `git status` before committing).

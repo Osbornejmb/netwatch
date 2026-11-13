@@ -28,6 +28,8 @@ export function createHost(store, { port = 4317, dist = resolve('dist'), collect
       if (req.method==='GET' && url.pathname==='/api/v1/health') {store.read();return send(200,{apiVersion:1,ready:true,collector:collector?.snapshot() ?? {state:'not-implemented'}})}
       if (req.method==='GET' && url.pathname==='/api/v1/topology') return send(200,store.read())
       if (req.method==='GET' && url.pathname==='/api/v1/snapshot') {const snapshot=store.snapshot();const status=collector?.snapshot();if(status){snapshot.collector=status;snapshot.freshness=status.freshness}return send(200,snapshot)}
+      const incidents = url.pathname.match(/^\/api\/v1\/devices\/([^/]+)\/incidents$/)
+      if (req.method==='GET' && incidents) return send(200,store.incidents(decodeURIComponent(incidents[1]),{limit:url.searchParams.has('limit')?Number(url.searchParams.get('limit')):25,before:url.searchParams.has('before')?Number(url.searchParams.get('before')):undefined}))
       const history = url.pathname.match(/^\/api\/v1\/devices\/([^/]+)\/checks$/)
       if (req.method==='GET' && history) return send(200,store.history(decodeURIComponent(history[1]),{limit:url.searchParams.has('limit')?Number(url.searchParams.get('limit')):50,before:url.searchParams.has('before')?Number(url.searchParams.get('before')):undefined}))
       if (req.method==='PUT' && url.pathname==='/api/v1/topology') {

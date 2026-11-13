@@ -30,11 +30,21 @@ export function validateSnapshot(value) {
         (check.latencyMs != null && (!Number.isFinite(check.latencyMs) || check.latencyMs < 0 || check.latencyMs > 1500))) throw new Error('Invalid host observation.')
     if (inventory.monitoring[check.deviceId] === true) checks[check.deviceId] = check
   }
-  return { ...value, inventory: { ...inventory, topology }, checks }
+  const activeIncidents = value.activeIncidents ?? []
+  validateIncidents(activeIncidents, ids, 2000)
+  if (activeIncidents.some(item => item.resolvedAt !== null) || new Set(activeIncidents.map(item => item.deviceId)).size !== activeIncidents.length) throw new Error('Invalid active incidents.')
+  return { ...value, activeIncidents, inventory: { ...inventory, topology }, checks }
+}
+
+export function validateIncidents(items, ids, maximum = 25) {
+  if (!Array.isArray(items) || items.length > maximum || items.some((item, index) =>
+    !ids.has(item?.deviceId) || !Number.isSafeInteger(item.id) || item.id < 1 ||
+    (index > 0 && item.id >= items[index - 1].id) || typeof item.openedAt !== 'string' || !Number.isFinite(Date.parse(item.openedAt)) ||
+    (item.resolvedAt !== null && (typeof item.resolvedAt !== 'string' || !Number.isFinite(Date.parse(item.resolvedAt)) || Date.parse(item.resolvedAt) < Date.parse(item.openedAt))))) throw new Error('Invalid incidents.')
 }
 
 // Serial, deadline-bounded polling. Cleanup also rejects late responses from transports that ignore abort.
-export function pollSnapshot(onState, { request = hostRequest, intervalMs = 5000, timeoutMs = 10000 } = {}) {
+export function pollSnapshot(onState, { request = hostRequest, intervalMs = 1000, timeoutMs = 10000 } = {}) {
   let stopped = false, timer, controller
   const poll = async () => {
     controller = new AbortController()

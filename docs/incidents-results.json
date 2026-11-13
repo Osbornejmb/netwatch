@@ -1,0 +1,16 @@
+{
+  "observedAt": "2026-11-13T01:21:29.659Z",
+  "browser": "157.0.8103.51",
+  "mode": "Controlled isolated database; no real probes",
+  "checks": [
+    "empty",
+    "down deduplication",
+    "attention entry",
+    "device history navigation",
+    "recovery",
+    "390px overflow",
+    "keyboard dialog",
+    "request failure"
+  ],
+  "errors": []
+}

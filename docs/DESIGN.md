@@ -20,3 +20,7 @@ Validate at desktop and narrow widths. Check search, each status filter, selecti
 - Selecting a device highlights direct peers and incident paths in either layout. Use blue solid/dashed outlines to distinguish focus/peers without replacing green/red/amber/gray health colors. Keep an explicit Clear highlight control and a textual direct-peer count; do not imply transitive connectivity or live interface verification.
 
 - Allow individual dashboard devices to be dragged, highlighting direct peers and attached links from drag start. Do not open a popup on drag release. Keep focus/reset controls over the map so they do not shift the canvas during a gesture. Saved-layout moves autosave; host/radial moves are temporary and explicitly resettable.
+
+- Device details include collapsible Incidents with open/recovered labels, local timestamps, empty/loading/error feedback, bounded older pages and View checks to open Recent history. Needs attention includes open incidents even when monitoring is paused or evidence is stale. An open incident is historical outage evidence, not a claim that the latest check is fresh. External notifications remain deferred.
+
+- Live snapshots refresh every second. Default device checks target ten-second cycles with two failures before Down and one reply for recovery; the host freshness threshold is at least 30 seconds and scales with inventory.

@@ -7,7 +7,8 @@ import { inventory } from './store.js'
 export function validateDatabase(path) {
   const db=new DatabaseSync(path,{readOnly:true})
   try {
-    if(db.prepare('PRAGMA integrity_check').get().integrity_check!=='ok' || ![1,2].includes(db.prepare('PRAGMA user_version').get().user_version)) throw new Error('Invalid or unsupported backup database.')
+    const version=db.prepare('PRAGMA user_version').get().user_version
+    if(db.prepare('PRAGMA integrity_check').get().integrity_check!=='ok' || ![1,2,3].includes(version)) throw new Error('Invalid or unsupported backup database.')
     const rows=db.prepare('SELECT * FROM inventory').all()
     if(rows.length!==1 || rows[0].singleton!==1 || !Number.isSafeInteger(rows[0].revision) || rows[0].revision<0 || !Number.isFinite(Date.parse(rows[0].updated_at))) throw new Error('Invalid inventory metadata.')
     const state=inventory({source:'inventory',...JSON.parse(rows[0].payload)})
@@ -16,6 +17,14 @@ export function validateDatabase(path) {
     for(const row of db.prepare('SELECT * FROM checks').iterate()) {
       if ('outcome' in row && (!['reachable','unreachable'].includes(row.outcome) || (row.latency_ms !== null && (!Number.isFinite(row.latency_ms) || row.latency_ms < 0 || row.latency_ms > 1500 || row.outcome !== 'reachable')) || typeof row.reason !== 'string' || !row.reason || row.reason.length > 80)) throw new Error('Invalid reachability data in backup.')
       if(++count>100000 || !ids.has(row.device_id) || !['up','down','unknown'].includes(row.status) || !Number.isSafeInteger(row.checked_at) || row.checked_at>Date.now() || !Number.isSafeInteger(row.seq) || row.seq<1) throw new Error('Invalid history in backup.')
+    }
+    if(version===3) {
+      const active=new Set();let resolved=0
+      for(const row of db.prepare('SELECT * FROM incidents').iterate()) {
+        if(!ids.has(row.device_id) || !Number.isSafeInteger(row.id) || row.id<1 || !Number.isSafeInteger(row.opened_at) || row.opened_at>Date.now() || (row.resolved_at!==null && (!Number.isSafeInteger(row.resolved_at) || row.resolved_at<row.opened_at || row.resolved_at>Date.now()))) throw new Error('Invalid incidents in backup.')
+        if(row.resolved_at===null) {if(active.has(row.device_id)) throw new Error('Duplicate active incident.');active.add(row.device_id)}
+        else if(++resolved>10000) throw new Error('Incident retention exceeded.')
+      }
     }
     return rows[0].revision
   } finally {db.close()}

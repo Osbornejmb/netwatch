@@ -38,7 +38,7 @@ Only enable checks for devices you manage. Both the launcher's ICMP setting and 
 - **Stale:** the last check is too old to describe the device's current state.
 - **Not monitored:** monitoring is disabled, no address is configured, or no confirmed result is available.
 
-The collector normally checks every 30 seconds. The dashboard refreshes every five seconds and ages checks using the host's freshness policy (at least 90 seconds). Host disconnection preserves the last-known result and its timestamp; it does not turn devices Down. Device details show last check, measured response time, service state and collapsible recent history, 25 checks per page up to 200 displayed. No uptime percentage is inferred.
+The collector normally checks every 10 seconds. The dashboard refreshes every second and ages checks using the host's freshness policy (at least 30 seconds, increasing with device count). Host disconnection preserves the last-known result and its timestamp; it does not turn devices Down. Device details show last check, measured response time, service state and collapsible recent history, 25 checks per page up to 200 displayed. No uptime percentage is inferred.
 
 Line colors summarize endpoint reachability, not verified cable, interface or routing-session health. A responding switch remains Up when a connected router fails.
 
@@ -80,3 +80,9 @@ The Vite development UI is browser-only and does not run the monitoring host. Us
 Local incidents/notifications (#11), broader Windows release/capacity/accessibility validation (#16), SNMP/LLDP/interface/redundancy work (#7/#8/#9), authentication (#10), and secured remote access/unattended service packaging (#12) remain planned. The current host is local-only; other PCs cannot access its dashboard. Do not expose the development server or bypass the host's loopback protections.
 
 See [ROADMAP.md](docs/ROADMAP.md), [Windows launcher](docs/WINDOWS-LAUNCHER.md), [monitoring policy](docs/ICMP-COLLECTOR.md), and [WORKLOG.md](docs/WORKLOG.md) for details and evidence.
+
+### Outages and recovery
+
+In device details, expand **Incidents** to see outages and recovery times; **View checks** opens the recent check history. Two failed checks open an outage, and the next reply confirms recovery. Repeated failures keep one outage open. **View options → Needs attention** includes open outages. Paused or disconnected monitoring leaves incidents open until a reply confirms recovery; check freshness and monitoring state before acting.
+
+Incidents survive host restart. Resolved incidents are kept for up to 30 days, with a 10,000-record network-wide limit; check history can expire earlier. Removing a device or replacing its address/type removes its old incident evidence. Existing databases upgrade automatically; back up before upgrading. Only new confirmed results create incidents after upgrade. External email/chat notifications remain planned and send nothing.
