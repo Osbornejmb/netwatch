@@ -1,5 +1,5 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
-import { ReactFlow, Controls, Handle, Position } from '@xyflow/react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ReactFlow, Controls } from '@xyflow/react'
 import { ArrowDownCircle, ArrowUpRight, CheckCircle2, CircleHelp, Clock3, Network, Router, Search } from 'lucide-react'
 import { HEALTH, deviceHealth, summarizeHealth, connectionHealth } from './health'
 import DeviceDetails from './DeviceDetails'
@@ -7,6 +7,8 @@ import useMonitoring from './useMonitoring'
 import { formatCheckTime, collectorLabel } from './monitoring'
 import { radialLayout, radialHandles, connectedDevices } from './radial'
 
+import { nodeDimensions } from './nodes/dimensions'
+import { NodeHandles } from './nodes/DeviceNode'
 import './dashboard.css'
 
 const healthIcons = { up: CheckCircle2, down: ArrowDownCircle, stale: Clock3, unknown: CircleHelp }
@@ -18,13 +20,14 @@ function Status({ status }) {
 
 function HealthNode({ data, selected }) {
   const Icon = data.kind === 'router' ? Router : Network
-  return <div className={`health-node health-node-${data.status}${selected ? ' is-selected' : ''}${data.connectionRole ? ` health-node-${data.connectionRole}` : ''}`}>
-    {data.radial && Object.entries({ top: Position.Top, right: Position.Right, bottom: Position.Bottom, left: Position.Left }).map(([side, position]) => <Fragment key={side}><Handle type="source" position={position} id={`radial-source-${side}`}/><Handle type="target" position={position} id={`radial-target-${side}`}/></Fragment>)}
-    <Handle type="target" position={Position.Top}/>
-    <div className="health-node-top"><span className="health-device-icon"><Icon size={18} aria-hidden="true"/></span><Status status={data.status}/></div>
-    <strong>{data.label}</strong><span className="health-address">{data.ip || 'No management address'}</span>
-    <Handle type="source" position={Position.Bottom}/>
+  const StatusIcon = healthIcons[data.status]
+  return <div style={nodeDimensions} className={`health-node health-node-${data.status}${selected ? ' is-selected' : ''}${data.connectionRole ? ` health-node-${data.connectionRole}` : ''}`}>
+    <NodeHandles/>
+    <span className="health-device-icon"><Icon size={18} aria-hidden="true"/></span>
+    <div className="device-copy"><strong title={data.label}>{data.label}</strong><span className="health-address" title={data.ip}>{data.ip || 'No address'}</span></div>
+    <StatusIcon size={14} role="img" aria-label={HEALTH[data.status].label} className="node-status"/>
   </div>
+
 }
 
 const nodeTypes = { health: HealthNode }

@@ -1,5 +1,4 @@
-const CARD_WIDTH = 200
-const CARD_HEIGHT = 180
+import { NODE_WIDTH as CARD_WIDTH, NODE_HEIGHT as CARD_HEIGHT } from './nodes/dimensions.js'
 const SPACING = 320
 const compareIds = (a, b) => a < b ? -1 : a > b ? 1 : 0
 
