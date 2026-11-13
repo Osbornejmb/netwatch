@@ -28,15 +28,15 @@ export default function DeviceHistory({ deviceId, revision, checkedAt }) {
     load(null, controller.signal)
     return () => { controller.abort() }
   }, [deviceId, revision, checkedAt, reload])
-  return <section className="health-history" aria-label="Recent device history" aria-busy={page.loading}>
-    <h3>Recent checks and transitions</h3>
-    <p>Latest first in local time, up to 200 checks; changes compare consecutive saved checks and do not prove uninterrupted uptime.</p>
+  return <section className="health-history" aria-label="Check history" aria-busy={page.loading}>
+    <h3>Check history</h3>
+    <p>Newest checks appear first; a reply only confirms the device responded at that time.</p>
     {page.loading && <p role="status">Loading history…</p>}
     {page.error && <p role="alert">{page.error}</p>}
     {!page.loading && !page.error && !page.checks.length && <p>No recorded checks.</p>}
     <ol>{page.checks.map((check, index) => <li key={check.id}><time dateTime={check.checkedAt}>{formatCheckTime(check.checkedAt)}</time><strong>{check.status === 'unknown' ? 'Confirming result' : HEALTH[check.status].label}{page.checks[index + 1] && page.checks[index + 1].status !== check.status ? ` · ${page.checks[index + 1].status} → ${check.status}` : ''}</strong><span>{check.outcome === 'reachable' ? 'Replied' : 'No reply'}{Number.isFinite(check.latencyMs) ? ` · ${check.latencyMs} ms` : ''}</span></li>)}</ol>
     <button className="health-button" disabled={page.loading} onClick={() => setReload(value => value + 1)}>Refresh history</button>
-    {page.nextBefore && page.checks.length < 200 && <button className="health-button" disabled={page.loading} onClick={() => load(page.nextBefore, active.current.signal)}>Load older checks</button>}
-    {page.checks.length >= 200 && <p>Display limit reached. Refresh history to return to the newest checks.</p>}
+    {page.nextBefore && page.checks.length < 200 && <button className="health-button" disabled={page.loading} onClick={() => load(page.nextBefore, active.current.signal)}>Older checks</button>}
+    {page.checks.length >= 200 && <p>Showing 200 checks; refresh to return to the latest.</p>}
   </section>
 }

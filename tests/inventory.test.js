@@ -11,7 +11,7 @@ test('normalizes literal IPv4/IPv6, including equivalent and embedded IPv4 IPv6 
 test('duplicate checks use canonical addresses, exclude current device, and permit empty entries', () => {
   const nodes=[{id:'a',data:{ip:'2001:0db8:0:0:0:0:0:1'}},{id:'b',data:{ip:''}}]
   const fields={label:' Router ',ip:'2001:db8::1',description:' Rack '}
-  assert.throws(()=>deviceFields(fields,nodes),/already assigned/)
+  assert.throws(()=>deviceFields(fields,nodes),/already uses/)
   assert.deepEqual(deviceFields(fields,nodes,'a'),{label:'Router',ip:'2001:db8::1',description:'Rack'})
   assert.equal(deviceFields({...fields,ip:''},nodes).ip,'')
   assert.throws(()=>deviceFields({...fields,label:' '},nodes),/name/)

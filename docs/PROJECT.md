@@ -1,5 +1,7 @@
 # NetWatch product brief
 
+Current UI direction: a shared warm off-white design, everyday wording, a map-first dashboard, directly available search and progressively disclosed setup/details. Draft edits apply to monitoring only through an explicit replacement review.
+
 ## Primary outcome
 
 A network operator opens the dashboard and immediately sees device reachability, where attention is needed, and how affected devices connect. The user's reference is a large up/down network map; NetWatch should make it cleaner through a viewport-filling topology, directly colored devices and paths, a small horizontal top menu, optional view controls, and click-to-open device details. The opening screen has no sidebar, summary-card row, or device table. A red router/path must not turn an independently responding redundant switch red.
@@ -14,5 +16,7 @@ A network operator opens the dashboard and immediately sees device reachability,
 Topology creation/import remains a supporting workflow. Keep the existing editor available rather than rebuilding it. A BGP-looking topology does not establish a requirement for a BGP collector: ICMP reachability, interface state, and routing-session state are different signals. Confirm routing protocol requirements before adding a collector.
 
 ## Delivery boundary
+
+Read-only SNMPv3 interface collection is implemented locally for #7, behind separate Windows-host enrollment and global opt-in. It adds interface evidence without changing device reachability semantics. Cisco Catalyst 3750/Cisco 2811 hardware validation is still pending; no model support is claimed solely from protocol fixtures.
 
 The dashboard displays genuine host observations; fresh browser and host inventories start empty. Built-in demo devices/statuses and preview controls are removed. Synthetic observations exist only in tests. See ARCHITECTURE.md for implemented components and ROADMAP.md for remaining work.

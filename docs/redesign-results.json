@@ -1,0 +1,35 @@
+{
+  "scope": "Isolated redesign fixtures; no real probes",
+  "checks": [
+    "desktop and 390px layouts",
+    "no pure-white visible text/surfaces/borders/SVG",
+    "up/down/overdue/unknown evidence",
+    "search and status filter",
+    "keyboard details and focus trap",
+    "device list",
+    "add-device form and saved draft",
+    "backup review cancellation preserves monitored inventory",
+    "applying a map updates the dashboard without opening Backups",
+    "loading a saved map reviews draft replacement",
+    "draft never inherits live checks",
+    "disconnected and empty states"
+  ],
+  "screenshots": [
+    "docs/screenshots/redesign-desktop-map.png",
+    "docs/screenshots/redesign-desktop-details.png",
+    "docs/screenshots/redesign-desktop-devices.png",
+    "docs/screenshots/redesign-desktop-add.png",
+    "docs/screenshots/redesign-desktop-editor.png",
+    "docs/screenshots/redesign-desktop-backups.png",
+    "docs/screenshots/redesign-desktop-disconnected.png",
+    "docs/screenshots/redesign-narrow-map.png",
+    "docs/screenshots/redesign-narrow-details.png",
+    "docs/screenshots/redesign-narrow-devices.png",
+    "docs/screenshots/redesign-narrow-add.png",
+    "docs/screenshots/redesign-narrow-editor.png",
+    "docs/screenshots/redesign-narrow-backups.png",
+    "docs/screenshots/redesign-narrow-disconnected.png",
+    "docs/screenshots/redesign-empty.png"
+  ],
+  "errors": []
+}

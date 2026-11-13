@@ -1,3 +1,4 @@
+import {refreshNetwork} from './browser-controls.mjs'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -28,7 +29,7 @@ page.setDefaultTimeout(12000)
 const errors = []; page.on('pageerror', error => errors.push(error.message))
 const base = `http://127.0.0.1:${server.address().port}`
 const node = id => page.locator(`.react-flow__node[data-id="${id}"]`)
-const refresh = () => page.getByRole('button', { name: 'Refresh host', exact: true }).click()
+const refresh = () => refreshNetwork(page)
 const status = async (id, value) => { await node(id).locator(`.health-node-${value}`).waitFor() }
 const inspect = async id => { await node(id).focus(); await page.keyboard.press('Enter'); await page.getByRole('dialog').waitFor() }
 const close = () => page.keyboard.press('Escape')
@@ -43,10 +44,10 @@ try {
   await page.getByLabel('Device status filter').selectOption('all')
   await page.getByText('View options', { exact: true }).click()
   await inspect('r')
-  await page.getByText('Recent history', { exact: true }).click()
-  await page.getByRole('region', { name: 'Recent device history' }).locator('li').nth(24).waitFor()
-  await page.getByRole('button', { name: 'Load older checks' }).click()
-  await page.getByRole('region', { name: 'Recent device history' }).locator('li').nth(30).waitFor()
+  await page.locator('summary').filter({hasText:/^Check history$/}).click()
+  await page.getByRole('region', { name: 'Check history' }).locator('li').nth(24).waitFor()
+  await page.getByRole('button', { name: 'Older checks' }).click()
+  await page.getByRole('region', { name: 'Check history' }).locator('li').nth(30).waitFor()
   assert.match(await page.locator('.health-history').innerText(), /up → down|down → up/)
   await page.keyboard.press('Shift+Tab')
   assert.equal(await page.getByRole('button', { name: 'Refresh history' }).evaluate(el => el === document.activeElement), true)
@@ -56,26 +57,26 @@ try {
   await page.screenshot({ path: 'docs/screenshots/monitoring-desktop.png' })
   // Preserve observations and let the UI clock age them without a successful response.
   staleAfterMs = 1000; await refresh()
-  await page.getByText(/Last update:/).first().waitFor()
+  await page.getByText(/Updated /).first().waitFor()
   await page.route('**/api/v1/snapshot', route => route.abort())
-  await refresh(); await page.getByText(/Host disconnected/).first().waitFor()
+  await refresh(); await page.getByText(/Connection lost/).first().waitFor()
   await status('r', 'stale'); await status('s', 'stale')
   await page.screenshot({ path: 'docs/screenshots/monitoring-disconnected.png' })
   await page.unroute('**/api/v1/snapshot'); staleAfterMs = 90000
   append('r', 'up'); append('s', 'up'); await refresh(); await status('r', 'up')
-  await inspect('r'); await page.getByRole('button', { name: 'Disable monitoring', exact: true }).click()
-  await page.getByRole('button', { name: 'Enable monitoring', exact: true }).waitFor()
+  await inspect('r'); await page.getByRole('button', { name: 'Turn checks off', exact: true }).click()
+  await page.getByRole('button', { name: 'Turn checks on', exact: true }).waitFor()
   assert.equal(store.read().monitoring.r, false)
-  await page.getByRole('button', { name: 'Enable monitoring', exact: true }).click()
-  await page.getByRole('button', { name: 'Disable monitoring', exact: true }).waitFor()
+  await page.getByRole('button', { name: 'Turn checks on', exact: true }).click()
+  await page.getByRole('button', { name: 'Turn checks off', exact: true }).waitFor()
   assert.equal(store.read().monitoring.r, true)
   // Concurrent writes surface validation/conflict feedback and preserve the winner.
   store.write({ source: 'inventory', ...store.read() }, store.read().revision)
-  await page.getByRole('button', { name: 'Disable monitoring', exact: true }).click()
-  await page.getByRole('alert').filter({ hasText: 'Saved devices changed' }).waitFor()
+  await page.getByRole('button', { name: 'Turn checks off', exact: true }).click()
+  await page.getByRole('alert').filter({ hasText: 'Unable to save checks' }).waitFor()
   assert.equal(store.read().monitoring.r, true)
   await close(); await refresh()
-  await inspect('empty'); assert.equal(await page.getByRole('button', { name: 'Enable monitoring', exact: true }).isDisabled(), true); await close()
+  await inspect('empty'); assert.equal(await page.getByRole('button', { name: 'Turn checks on', exact: true }).isDisabled(), true); await close()
   assert.equal(await page.getByRole('button', { name: /sample|preview/i }).count(), 0)
   await page.setViewportSize({ width: 390, height: 844 })
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true)
@@ -83,7 +84,7 @@ try {
   store.write({ source: 'inventory', topology: { ...topology, nodes: topology.nodes.filter(n => n.id !== 'r'), edges: [] }, monitoring: { s: true } }, store.read().revision)
   await refresh(); await node('r').waitFor({ state: 'detached' })
   store.write({ source: 'inventory', topology: { schemaVersion: 1, nodes: [], edges: [] } }, store.read().revision)
-  await refresh(); await page.getByText('Your network map starts here').waitFor()
+  await refresh(); await page.getByText('Your network starts here').waitFor()
   assert.deepEqual(errors, [])
   writeFileSync('docs/monitoring-results.json', JSON.stringify({ verifiedAt: new Date().toISOString(), platform: process.platform, controlledObservations: true, probes: 0, checks: ['host inventory source', 'filter counts', 'keyboard details and focus trap', 'history pagination and transitions', 'independent failure and recovery', 'disconnect, clock-driven stale, reconnect', 'explicit monitoring disable/enable', 'revision conflict', 'missing address', 'no demo controls', '390px overflow and details', 'deleted device and empty host'], screenshots: ['monitoring-desktop.png', 'monitoring-disconnected.png', 'monitoring-narrow.png'], pageErrors: errors }, null, 2) + '\n')
   console.log('Controlled monitoring browser checks passed; no probes or existing data used.')

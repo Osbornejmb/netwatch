@@ -9,8 +9,8 @@ export default function SwitchNode({ data, selected }) {
       <div className="device-icon switch-icon"><Network size={20} /></div>
       <div className="device-copy">
         <strong>{data.label}</strong>
-        <span>{data.ip || 'IP not configured'}</span>
-        <small className="state state-unknown">NOT MONITORED</small>
+        <span>{data.ip || 'No IP address'}</span>
+        <small className="state state-unknown">Draft device</small>
       </div>
       <Handle type="source" position={Position.Bottom} />
       <Handle type="source" position={Position.Right} id="right" />

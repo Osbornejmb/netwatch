@@ -1,3 +1,4 @@
+import {setSource} from './browser-controls.mjs'
 import { createEditorNetwork } from '../tests/fixtures/editor-network.js'
 import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
@@ -11,6 +12,7 @@ const errors=[]
 page.on('pageerror',error=>errors.push(error.message))
 const url=process.env.NETWATCH_URL || 'http://127.0.0.1:4173'
 await page.goto(url)
+await setSource(page,'browser')
 await page.locator('.health-node').first().waitFor()
 const stored=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('netwatch-topology-v1')))
 const transforms=()=>page.locator('.react-flow__node').evaluateAll(nodes=>Object.fromEntries(nodes.map(node=>[node.dataset.id,node.style.transform])))
@@ -52,19 +54,20 @@ assert.deepEqual(saved.edges,original.edges)
 for(const node of original.nodes)if(node.id!=='s1')assert.deepEqual(saved.nodes.find(n=>n.id===node.id),node)
 await page.screenshot({path:fileURLToPath(new URL('../docs/screenshots/dashboard-drag-saved.jpg',import.meta.url))})
 await page.reload()
+await setSource(page,'browser')
 await page.locator('.health-node').first().waitFor()
 assert.deepEqual((await stored()).nodes,saved.nodes)
 // Click/keyboard inspection remains separate from dragging.
 const sw=page.locator('.react-flow__node[data-id="s1"]')
 await sw.click();await page.getByRole('dialog',{name:'CORE-SWITCH-01',exact:true}).waitFor();await page.keyboard.press('Escape')
 await page.getByRole('button',{name:'Clear connection highlight'}).click()
-const view=page.locator('.health-view-options summary')
+const view=page.locator('.health-view-options > summary')
 await view.click();await page.getByLabel('Map layout',{exact:true}).selectOption('radial');await view.click()
 await page.locator('[data-handleid="radial-source-top"]').first().waitFor()
 const radialBefore=await transforms()
 await drag('s1',-70,60,4,4)
 assert.deepEqual(await stored(),saved,'Radial dragging must not overwrite saved geometry')
-await page.getByRole('button',{name:'Reset view positions'}).click()
+await page.getByRole('button',{name:'Reset positions'}).click()
 await page.waitForFunction(expected=>document.querySelector('[data-id="s1"]').style.transform===expected,radialBefore.s1)
 assert.deepEqual(await transforms(),radialBefore)
 await page.setViewportSize({width:390,height:844})
@@ -72,7 +75,7 @@ await fitView()
 await drag('s1',25,35,4,4)
 assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
 await page.screenshot({path:fileURLToPath(new URL('../docs/screenshots/dashboard-drag-narrow.jpg',import.meta.url))})
-await page.getByRole('button',{name:'Reset view positions'}).click()
+await page.getByRole('button',{name:'Reset positions'}).click()
 assert.deepEqual(await stored(),saved)
 await view.click();await page.getByLabel('Map layout',{exact:true}).selectOption('manual');await view.click()
 // A denied write must preserve the in-memory move and show the existing warning.
