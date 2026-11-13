@@ -84,6 +84,8 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
       return next
     })
   }, [nodes, layoutKey])
+  const openIncidents = new Set((live?.activeIncidents || []).map(item => item.deviceId))
+  const needsAttention = node => ['down', 'stale'].includes(node.health) || openIncidents.has(node.id)
   const counts = summarizeHealth(nodes, checks, now, staleAfterMs)
   const devices = layoutNodes.map(node => ({ ...node, position: positionOverrides[node.id] || node.position, health: deviceHealth(checks[node.id], now, staleAfterMs) }))
 
@@ -132,7 +134,7 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
           {mapLayout === 'radial' && <><label className="health-filter">Center <select aria-label="Radial center" value={effectiveCenterId} onChange={event => { setDragState({ source: null, key: '', positions: {} }); setCenterId(event.target.value) }}><option value="">Automatic</option>{nodes.map(node => <option key={node.id} value={node.id}>{node.data.label}</option>)}</select></label><p className="health-map-count">Display only: saved positions and connections stay unchanged. Automatic centers prefer a connected router; rings follow configured links.</p></>}
           <label className="health-search"><Search size={15} aria-hidden="true"/><input aria-label="Search dashboard devices" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search name or IP"/></label>
           <label className="health-filter">Status <select aria-label="Device status filter" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}><option value="all">All devices ({counts.all})</option>{Object.entries(HEALTH).map(([key, value]) => <option key={key} value={key}>{value.label} ({counts[key]})</option>)}</select></label>
-          <div className="health-attention"><p>Needs attention ({devices.filter(node => ['down', 'stale'].includes(node.health)).length})</p>{devices.filter(node => ['down', 'stale'].includes(node.health)).map(node => <button className="health-button" key={node.id} onClick={() => selectDevice(node)}>{node.data.label} · {HEALTH[node.health].label}</button>)}</div>
+          <div className="health-attention"><p>Needs attention ({devices.filter(needsAttention).length})</p>{devices.filter(needsAttention).map(node => <button className="health-button" key={node.id} onClick={() => selectDevice(node)}>{node.data.label} · {HEALTH[node.health].label}{openIncidents.has(node.id) ? ' · Open outage' : ''}</button>)}</div>
           <p className="health-map-count">{visible.length} of {nodes.length} devices</p><p className="health-map-count">Drag a device to move it and highlight its direct connections. Browser saved-layout drags autosave; host and radial adjustments stay in this view. Click or press Enter for details.</p><p className="health-map-count">Path colors summarize device reachability, not verified interface state.</p>
         </div></details>
       </div>

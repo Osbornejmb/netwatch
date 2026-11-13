@@ -1,11 +1,11 @@
 export const ICMP_POLICY = Object.freeze({
-  intervalMs: 30000,
+  intervalMs: 10000,
   timeoutMs: 1500,
   processTimeoutMs: 4000,
   concurrency: 8,
-  failuresForDown: 3,
+  failuresForDown: 2,
   successesForRecovery: 1,
-  minimumStaleAfterMs: 90000,
+  minimumStaleAfterMs: 30000,
 })
 
 export function cycleBudget(deviceCount, policy = ICMP_POLICY) {
