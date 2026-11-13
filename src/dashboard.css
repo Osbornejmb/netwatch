@@ -625,10 +625,10 @@
   border: 1px solid #60758e;
   border-radius: 5px;
 }
-.simple-shell .backup-recovery details[open] {
-  position: fixed;
-  right: 12px;
-  top: 8px;
+.simple-shell .backup-recovery .backup-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
   width: min(480px, calc(100vw - 24px));
   max-height: 75dvh;
   overflow: auto;
@@ -656,9 +656,7 @@
   .simple-shell .backup-recovery {
     margin-left: auto;
   }
-  .simple-shell .backup-recovery details[open] {
-    top: 8px;
-  }
+
   .simple-shell .backup-recovery summary {
     min-height: 44px;
   }
@@ -883,4 +881,71 @@
 
 .health-page-titlebar p.connection-lost {
   color: var(--health-stale);
+}
+
+.health-table-wrap {
+  overflow-x: visible;
+}
+.health-inventory table {
+  table-layout: fixed;
+  white-space: normal;
+}
+.health-inventory th,
+.health-inventory td {
+  overflow-wrap: anywhere;
+}
+.health-table-device {
+  min-width: 0;
+}
+.health-table-device svg {
+  flex-shrink: 0;
+}
+.health-device-cards {
+  display: none;
+}
+.simple-shell .backup-panel .host-storage,
+.editor-network-settings .host-storage {
+  padding: 12px 0;
+  margin-top: 12px;
+}
+@media (max-width: 720px) {
+  .health-inventory table {
+    display: none;
+  }
+  .health-device-cards {
+    display: grid;
+    gap: 12px;
+    padding: 12px;
+  }
+  .health-device-card {
+    display: flex;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--health-border);
+    border-radius: 6px;
+    overflow-wrap: anywhere;
+    min-width: 0;
+  }
+  .health-device-card > strong,
+  .health-device-card > span {
+    max-width: 100%;
+  }
+  .simple-shell .backup-recovery .backup-panel {
+    position: fixed;
+    top: 112px;
+    right: 12px;
+    max-height: calc(100dvh - 128px);
+  }
+  .health-summary {
+    padding: 0 12px;
+  }
+  .health-map-tools {
+    width: 100%;
+  }
+}
+
+.health-node .device-copy .health-address {
+  color: var(--health-muted);
 }

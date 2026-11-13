@@ -6,11 +6,12 @@ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH ||
 const context=await browser.newContext({viewport:{width:1440,height:1000}})
 await context.addInitScript(network => { if (!localStorage.getItem('netwatch-topology-v1')) localStorage.setItem('netwatch-topology-v1', JSON.stringify(network)) }, createEditorNetwork())
 const page=await context.newPage()
+page.on('dialog', dialog => dialog.accept())
 page.setDefaultTimeout(10000)
 const errors=[]
 page.on('pageerror',e=>errors.push(e.message))
 await page.goto(process.env.NETWATCH_URL || 'http://127.0.0.1:4173')
-await page.getByRole('link',{name:'Topology builder',exact:true}).click()
+await page.getByRole('link',{name:'Edit map',exact:true}).click()
 const snapshot=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('netwatch-topology-v1')))
 const original=await snapshot()
 await page.getByLabel('Selected device',{exact:true}).selectOption('r1')

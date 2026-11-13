@@ -93,7 +93,7 @@ export default function App() {
       setShowModal(false)
       return
     }
-    if (nodes.length >= 2000) { setDeviceNotice('This map supports up to 2,000 devices. Remove a device before adding another.'); return }
+    if (nodes.length >= 2000) { setShowModal(false); setDeviceNotice('This map supports up to 2,000 devices. Remove a device before adding another.'); return }
     const id = `${kind}-${createId()}`
     setNodes(ns => [...ns, {
       id, type: kind, position: nextFreePosition(ns),
@@ -164,13 +164,15 @@ export default function App() {
           </nav>
         <section className="backup-recovery" aria-label="Map backup and recovery">
           <details open={storageError || importError ? true : undefined}>
-            <summary aria-label="Map backup and recovery">Backup{storageError ? ' · Autosave paused' : importError ? ' · Import failed' : ''}</summary>
+            <summary aria-label="Map backup and recovery">Backups{storageError ? ' · Autosave paused' : importError ? ' · Import failed' : ''}</summary>
+            <div className="backup-panel">
             {storageError && <p className="notice storage-warning" role="alert">{storageError}</p>}
             {importError && <p className="notice storage-warning" role="alert">{importError} Your current map and saved data have not been replaced.</p>}
             <p>Export your map before importing a backup or replacing saved devices.</p>
             {recovery && <p>{typeof recovery.raw === 'string' ? 'Download original saved content preserves the unreadable saved text exactly. It is separate from the current visible map.' : 'The original saved content is unavailable because storage access was denied. Export the visible map, allow browser storage, then reload to access the original before replacing it.'}</p>}
             <div className="backup-actions"><button className="button secondary" onClick={exportTopology}>Export current map</button><button className="button secondary" disabled={importBusy} onClick={() => importInput.current.click()}>{importBusy ? 'Reading backup…' : 'Import backup'}</button><button className="button secondary" disabled={importBusy} onClick={saveNow}>{autosavePaused ? 'Replace saved map…' : 'Save current map'}</button>{typeof recovery?.raw === 'string' && <button className="button secondary" onClick={downloadOriginal}>Download original saved content</button>}</div>
           <HostStorage importGeneration={importGeneration} nodes={nodes} edges={edges} paused={autosavePaused} onLoad={topology => { setNodes(topology.nodes); setEdges(topology.edges); setSelectedNode(null) }}/><p className="backup-status" role="status">{importBusy ? 'Validating backup…' : backupNotice}</p>
+            </div>
           </details>
           <input ref={importInput} type="file" accept=".json,application/json" hidden onChange={importTopology}/>
         </section>
@@ -202,7 +204,7 @@ export default function App() {
                 const source = nodes.find(node => node.id === edge.source), target = nodes.find(node => node.id === edge.target)
                 return { ...edge, ...radialHandles(source.position, target.position), type: 'straight', style: { stroke: 'var(--map-link)', strokeWidth: 2 }, markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--map-link)' } }
               })} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
-              onConnect={onConnect} isValidConnection={connection => connection.source !== connection.target && edges.length < 10000} nodeTypes={nodeTypes}
+              connectionMode="loose" onConnect={onConnect} isValidConnection={connection => connection.source !== connection.target && edges.length < 10000} nodeTypes={nodeTypes}
               onNodeClick={(_, node) => setSelectedNode(node)}
               onPaneClick={() => setSelectedNode(null)}
               fitView fitViewOptions={{ padding: 0.2 }}

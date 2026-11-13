@@ -1,5 +1,12 @@
 # Working checkpoint
 
+## Current status (2026-11-13): desktop map refinements
+
+- Five requested steps: compact shared cards/formatted CSS; visible counts/status/attention; nearest-side links and deterministic grid/tidy; connection copy/hash routes/removal confirmation/inline limit; anchored Backups and responsive Devices cards. Host code and v1 storage format unchanged.
+- Focused Playwright check covers 1280–1920px and 320/390px, summary filters, accessible cards, solid stale paths, keyboard details, connection lifecycle, hash/reload/back, placement/removal and panel placement. Before/after 1440px screenshots and narrow/editor evidence are under docs/screenshots. Verification: 52 Node tests pass and the production build passes. The first full run exposed an incorrect new clearance-test expectation; corrected the test and reran successfully. Build ran once; no production edits followed it.
+- Existing checkout had no forced 136px/ellipse override, Draft device caption or duplicate backup heading to remove. Real hardware and collector behavior are outside this UI change.
+
+
 ## Current status (2026-11-13): remove built-in demo data
 
 - Removed the browser starter devices/links, generated preview statuses, preview/failure controls, demo watermark and sample-only rendering paths. Fresh browser and host inventories are empty; saved user inventory/history and import compatibility are preserved. Older saved devices are not silently erased; unwanted entries can be removed in the editor and explicitly saved to the host.

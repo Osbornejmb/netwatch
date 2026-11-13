@@ -23,9 +23,9 @@ The dashboard is available at **http://127.0.0.1:4317** on this PC. No administr
 
 ## Add your devices
 
-1. Open **Topology editor**, choose **Add device**, and enter a device name and its actual IPv4 or IPv6 address. An empty address is allowed for a device you do not monitor.
-2. Arrange devices and add their configured links. The editor saves a working copy in this browser.
-3. Open **Backup**, then under **Local host storage** choose **Check host** and **Save to host**.
+1. Open **Edit map**, choose **Add device**, and enter a device name and its actual IPv4 or IPv6 address. An empty address is allowed for a device you do not monitor.
+2. Arrange devices and add their configured links. New devices use the next free grid cell; **Tidy layout** rearranges the browser working copy. Removing a device asks for confirmation. The editor saves a working copy in this browser.
+3. Open **Backups**, then under **Local host storage** choose **Check host** and **Save to host**.
 4. Review the replacement and choose **Confirm replacement**. New or changed devices start with monitoring disabled.
 5. Return to **Dashboard**, select **Saved host network**, open a device and choose **Enable monitoring**.
 
@@ -46,9 +46,9 @@ Line colors summarize endpoint reachability, not verified cable, interface or ro
 
 **Saved host network** shows the host's saved devices and real checks. **Browser working copy** shows your local edits without live health. Loading or saving host inventory is an explicit reviewed replacement, not automatic synchronization.
 
-Use **Backup > Export current map** to download the browser working copy, or load host inventory before exporting it. **Import backup** validates a file and asks before replacing the working copy; save it to the host separately. Imports do not grant monitoring authorization. Existing saved maps and databases are preserved when updating, including devices you saved in an older version; remove unwanted devices in the editor and review **Save to host** to apply that change.
+Use **Backups > Export current map** to download the browser working copy, or load host inventory before exporting it. **Import backup** validates a file and asks before replacing the working copy; save it to the host separately. Imports do not grant monitoring authorization. Existing saved maps and databases are preserved when updating, including devices you saved in an older version; remove unwanted devices in the editor and review **Save to host** to apply that change.
 
-Saved-layout dragging in the browser working copy autosaves positions. Host and radial-layout dragging changes only the current view. Search, filters, counts, attention and layout settings are in **View options**; the **Devices** page offers a keyboard-operable list. Device details open with a click or Enter/Space.
+Saved-layout dragging in the browser working copy autosaves positions. Host and radial-layout dragging changes only the current view. Use the summary counts or Status filter to focus the map; Needs attention lists down and overdue devices. **View options** contains source, search and layout settings; the **Devices** page offers a keyboard-operable list. Device details open with a click or Enter/Space.
 
 The launcher stores data under `%LOCALAPPDATA%\NetWatch\data\netwatch.sqlite`; its control window shows the location. Browser JSON exports contain topology only, not history. For full database backup/restore, stop the host and follow [HOST-API.md](docs/HOST-API.md). Never delete a database to resolve a startup error.
 
