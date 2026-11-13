@@ -6,6 +6,8 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--no-sandbox'] })
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
 const page = await context.newPage()
+// This suite verifies browser-local storage recovery, independently of saved host inventory.
+await page.route('**/api/v1/snapshot', route => route.abort())
 page.setDefaultTimeout(10000)
 const errors = []
 page.on('pageerror', error => errors.push(error.message))

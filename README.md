@@ -21,6 +21,8 @@ npm.cmd run desktop:setup -- --desktop-shortcut
 
 The dashboard is available at **http://127.0.0.1:4317** on this PC. No administrator access or PowerShell execution-policy change is required. Keep the repository folder and Node installation in place; rerun setup if either moves. Quit NetWatch before updating its launcher.
 
+For release acceptance, safe updates and recovery, see the [Windows release runbook](docs/WINDOWS-RELEASE-RUNBOOK.md).
+
 ## Add your devices
 
 1. Open **Topology editor**, choose **Add device**, and enter a device name and its actual IPv4 or IPv6 address. An empty address is allowed for a device you do not monitor.
@@ -34,7 +36,7 @@ Only enable checks for devices you manage. Both the launcher's ICMP setting and 
 ## Read device status
 
 - **Up:** recent checks confirm a response.
-- **Down:** three consecutive failed checks confirm no response; the first successful reply restores Up.
+- **Down:** two consecutive failed checks confirm no response; the first successful reply restores Up.
 - **Stale:** the last check is too old to describe the device's current state.
 - **Not monitored:** monitoring is disabled, no address is configured, or no confirmed result is available.
 

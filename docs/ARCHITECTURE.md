@@ -29,6 +29,8 @@ A failed storage read pauses autosave until the user explicitly replaces the sav
 
 ## Dashboard observations
 
+Snapshots use the additive v3 `checks_device_latest` index and select one newest timestamp/sequence per inventory device. This bounds observation lookup by inventory size rather than scanning the full 100,000-check history for every one-second reader. See host-load-results.json for the synthetic retained-history experiment; it excludes probe-helper and real-browser costs and is not a device-capacity guarantee.
+
 `src/monitoring.js` validates and serially polls GET snapshot every second with a 10-second deadline; `useMonitoring.js` retains last-known data through failures and cancels obsolete requests when switching sources, refreshing or unmounting. The snapshot includes inventory and observations from one database transaction. Saved host inventory is the default live view; browser edits remain separate and never inherit host checks. No background inventory writes occur. Unchanged inventory revisions preserve node references and temporary host drag positions across polls.
 
 `src/health.js` uses the host freshness threshold for live evidence; a one-second clock ages checks even during disconnection. Missing/invalid/future evidence stays unknown; disabling monitoring hides retained evidence from live health but keeps history. Counts, cards, attention, details and endpoint-colored paths share one snapshot. Collector connection/readiness remains independent of device health. Synthetic checks exist only in test fixtures and controlled browser/API checks.

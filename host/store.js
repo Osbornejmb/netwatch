@@ -62,6 +62,10 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
       db.exec('PRAGMA user_version=3; COMMIT')
     } catch (error) {try {db.exec('ROLLBACK')} catch {} db.close();throw error}
   }
+  // Additive, idempotent index migration for existing v3 databases; no stored row shape changes.
+  try {
+    db.exec('BEGIN IMMEDIATE; CREATE INDEX IF NOT EXISTS checks_device_latest ON checks(device_id,checked_at DESC,seq DESC); COMMIT')
+  } catch (error) {try {db.exec('ROLLBACK')} catch {} db.close();throw error}
   const incidentRow = r => ({id:r.id,deviceId:r.device_id,openedAt:new Date(r.opened_at).toISOString(),resolvedAt:r.resolved_at === null ? null : new Date(r.resolved_at).toISOString()})
   const transaction = fn => {
     db.exec('BEGIN IMMEDIATE')
@@ -145,8 +149,10 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
     snapshot() {
       return transaction(() => {
       cleanup()
-      const observations = db.prepare('SELECT c.* FROM checks c JOIN (SELECT device_id,MAX(checked_at) time FROM checks GROUP BY device_id) latest ON c.device_id=latest.device_id AND c.checked_at=latest.time ORDER BY c.seq').all()
-      return {inventory:read(),activeIncidents:db.prepare('SELECT * FROM incidents WHERE resolved_at IS NULL ORDER BY id DESC').all().map(incidentRow),generatedAt:new Date(now()).toISOString(),collector:{state:'not-implemented',lastSeenAt:null},freshness:{staleAfterMs:90000},observations:Object.values(Object.fromEntries(observations.map(r=>[r.device_id,{deviceId:r.device_id,status:r.status,checkedAt:new Date(r.checked_at).toISOString(),outcome:r.outcome,reason:r.reason,latencyMs:r.latency_ms}])))}
+      const state=read()
+      const latest=db.prepare('SELECT * FROM checks WHERE device_id=? ORDER BY checked_at DESC,seq DESC LIMIT 1')
+      const observations=state.topology.nodes.map(node=>latest.get(node.id)).filter(Boolean)
+      return {inventory:state,activeIncidents:db.prepare('SELECT * FROM incidents WHERE resolved_at IS NULL ORDER BY id DESC').all().map(incidentRow),generatedAt:new Date(now()).toISOString(),collector:{state:'not-implemented',lastSeenAt:null},freshness:{staleAfterMs:90000},observations:observations.map(r=>({deviceId:r.device_id,status:r.status,checkedAt:new Date(r.checked_at).toISOString(),outcome:r.outcome,reason:r.reason,latencyMs:r.latency_ms}))}
       })
     },
     close:()=>db.close(), db,

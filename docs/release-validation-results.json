@@ -1,0 +1,211 @@
+{
+  "sourceCommit": "311ccf3842acedcb101ad57507e44da2b4601509",
+  "platform": "win32",
+  "windowsBuild": "10.0.26200",
+  "node": "v26.13.1",
+  "cleanSourceInstall": {
+    "method": "Git archive of merged main into an empty temporary directory",
+    "install": "npm ci passed",
+    "tests": {
+      "passed": 56,
+      "failed": 0
+    },
+    "build": "passed"
+  },
+  "loopback": {
+    "scope": "IPv4 and IPv6 loopbacks only",
+    "cycleMs": 736,
+    "collectorErrors": 0,
+    "shutdownMs": 30,
+    "restartShutdownMs": 18,
+    "backupAndRestart": true,
+    "activeCancellation": true,
+    "processErrorsDoNotCreateDown": true
+  },
+  "approvedDevice": {
+    "targets": 1,
+    "control": "Owner manually toggled Wi-Fi; target and exact times omitted",
+    "policy": {
+      "intervalMs": 10000,
+      "timeoutMs": 1500,
+      "processTimeoutMs": 4000,
+      "concurrency": 8,
+      "failuresForDown": 2,
+      "successesForRecovery": 1,
+      "minimumStaleAfterMs": 30000
+    },
+    "secondFailureDown": true,
+    "firstReplyRecovery": true,
+    "incidentOpenedOnceAndResolvedOnce": true,
+    "downDisplayLagMs": 896,
+    "recoveryDisplayLagMs": 918,
+    "reconnectCollectorErrors": 0,
+    "browserErrors": [],
+    "staleAndReconnect": true,
+    "backupRestorePreservesInventoryObservationsIncidents": true,
+    "scope": "No radio-transition times recorded; not a capacity test",
+    "errorsAtRecovery": 0
+  },
+  "browser": {
+    "scope": "Isolated browser checks on clean source snapshot; collector disabled; synthetic fixtures only",
+    "runs": [
+      {
+        "script": "check-empty-browser.mjs",
+        "code": 0
+      },
+      {
+        "script": "check-host-browser.mjs",
+        "code": 0
+      },
+      {
+        "script": "check-recovery-browser.mjs",
+        "code": 0
+      },
+      {
+        "script": "check-scale-browser.mjs",
+        "code": 0
+      }
+    ]
+  },
+  "scale": {
+    "scope": "100 synthetic devices and 180 links; controlled HTTP snapshots; no probes",
+    "browser": "157.0.8103.51",
+    "runs": [
+      {
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "initialUnknownRenderMs": 493,
+        "filters": [
+          {
+            "status": "down",
+            "ms": 88
+          },
+          {
+            "status": "stale",
+            "ms": 46
+          },
+          {
+            "status": "unknown",
+            "ms": 40
+          },
+          {
+            "status": "up",
+            "ms": 115
+          },
+          {
+            "status": "all",
+            "ms": 80
+          }
+        ],
+        "initialBounds": {
+          "outside": 0,
+          "map": {
+            "width": 1440,
+            "height": 777
+          },
+          "minLabelPx": 5.55657958984375
+        },
+        "mixedSnapshotRenderMs": 259,
+        "searchMs": 79,
+        "focusedLabelPx": 20.8
+      },
+      {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "initialUnknownRenderMs": 456,
+        "filters": [
+          {
+            "status": "down",
+            "ms": 95
+          },
+          {
+            "status": "stale",
+            "ms": 45
+          },
+          {
+            "status": "unknown",
+            "ms": 45
+          },
+          {
+            "status": "up",
+            "ms": 120
+          },
+          {
+            "status": "all",
+            "ms": 79
+          }
+        ],
+        "initialBounds": {
+          "outside": 0,
+          "map": {
+            "width": 390,
+            "height": 619.703125
+          },
+          "minLabelPx": 1.6727932458636405
+        },
+        "mixedSnapshotRenderMs": 217,
+        "searchMs": 68,
+        "focusedLabelPx": 20.8
+      }
+    ]
+  },
+  "launcher": {
+    "scope": "Isolated empty database; ICMP disabled; native pointer actions",
+    "readableAtCurrentScale": true,
+    "start": true,
+    "openDashboardInvoked": true,
+    "hideKeepsHostReady": true,
+    "duplicateReopensSameWindow": true,
+    "stopReleasesLock": true,
+    "quit": true,
+    "dpiMatrix": true,
+    "trayMenuPointer": true,
+    "dpiEvidence": {
+      "scalesVisuallyChecked": [
+        100,
+        125
+      ],
+      "result": "Controls, data path and helper text fit without clipping",
+      "unavailableScale": 150,
+      "unavailableReason": "Owner reports no 150% option on intended host",
+      "scope": "Native screenshots at current host scales; no claim for unavailable scales"
+    },
+    "trayEvidence": {
+      "method": "Owner performed notification-area pointer actions; assistant verified resulting accessibility/API state and database lock/listener state",
+      "start": "Healthy empty host, collector disabled, QA lock held",
+      "openDashboard": "Owner confirmed page opened",
+      "stop": "Owner reported database closed; assistant verified listener closed and QA lock released",
+      "showControls": "Owner confirmed hidden window reopened",
+      "quit": "Owner confirmed tray icon disappeared; assistant verified no NetWatch process window remained and lock released"
+    },
+    "originalDisplayScaleRestored": 100
+  },
+  "remaining": [],
+  "followup": {
+    "testsPassed": 57,
+    "testsFailed": 0,
+    "build": "passed",
+    "scope": "Retained-history lookup optimization after the earlier physical-device check",
+    "loadEvidence": "host-load-results.json",
+    "baselineEvidence": "host-load-baseline-results.json",
+    "actualMultiDeviceInventoryAvailable": false
+  },
+  "deferredByOwner": {
+    "multiDeviceCapacity": {
+      "date": "2026-11-13",
+      "reason": "Owner explicitly requested skipping real multi-device capacity testing; no multi-device inventory available",
+      "capacityClaim": false
+    }
+  },
+  "knownLimitations": [
+    "Real multi-device capacity deferred by owner; no supported production count claimed",
+    "150% display scale unavailable on intended host; only 100% and 125% visually checked",
+    "Full screen-reader and other-platform coverage not claimed",
+    "Short synthetic load run excludes probe helpers and actual browser process CPU"
+  ],
+  "acceptance": "Scoped local Windows release checks complete, pending PR CI and merge"
+}
