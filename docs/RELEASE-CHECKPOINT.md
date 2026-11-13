@@ -1,0 +1,23 @@
+# Windows release checkpoint — issue #16
+
+Scoped local acceptance is complete, pending PR CI and merge. The owner explicitly deferred real multi-device capacity testing; no supported production device count is claimed. Native screenshots were inspected at 100% and 125%; the owner reports 150% is unavailable. The original 100% scale was restored.
+
+The owner performed tray-menu Start/Open dashboard/Stop/Show controls/Quit pointer actions. The assistant verified healthy empty host/collector disabled, stop/listener closure/lock release, and controller exit. Installed settings and data were preserved. These observations supersede the earlier pending DPI/tray notes below.
+
+## Owner scope update (2026-11-13)
+
+- Real multi-device capacity testing is explicitly deferred and no longer blocks #16; no production-capacity claim is made. Canonical acceptance text, roadmap and runbook reflect that decision. The isolated launcher is being used for the remaining DPI/tray checks, with ICMP disabled and user settings preserved. Windows Settings/taskbar are not targetable through the desktop helper; manual user assistance was requested to expose the tray menu and select display scales. These checks remain unverified until observed.
+
+## Current status (2026-11-13): retained-history performance
+
+- The owner confirmed that 100 devices is a plausible planning target but has no real multi-device test inventory yet. No additional devices were probed. The desktop tool does not expose a targetable taskbar window; tray-pointer and additional DPI checks remain unverified rather than inferred from code.
+- A repeatable isolated load script seeds 100 synthetic devices, 100,000 checks and 10,000 resolved incidents, with two one-second HTTP readers and individual-result write cycles. The old snapshot query scanned retained history: p95 1,043 ms, combined test-process CPU 99.2% of one core. An additive transactional v3 latest-check index and per-inventory-device indexed lookup reduced p95 to 46 ms and combined CPU to 12.3%; 100-result write cycles fell from 1,019–1,044 ms to 514–552 ms in this short run. Index disk/write cost remains; these results exclude Windows probe helpers and real browsers, and are not a sustained capacity SLA.
+- All 57 tests pass, including newest timestamp/tied-sequence behavior and preservation when upgrading an existing v3 database without the index. Schema/data row shapes stay v3. See host-load-results.json, HOST-API.md and the Windows release runbook. Real multi-device capacity, DPI matrix and tray-menu pointer acceptance still prevent closing #16.
+
+## Current status (2026-11-13): Windows release acceptance #16
+
+- Branch fix/windows-release-validation adds the Windows release runbook and a reusable, explicitly approved single-device acceptance script. Clean source extraction of merged main passes npm ci, all 56 tests and build on Windows build 10.0.26200 / Node v26.13.1. Loopback helper/lifecycle checks pass: restart persistence, backup, cancellation, error isolation and lock release. This complements Node 22 Windows/Ubuntu CI from PR #32, rather than claiming a local Node 22 run.
+- Owner-controlled Wi-Fi testing on one explicitly approved device verified second-failure Down and first-reply Up, exactly one incident with one recovery, 390px layout, API disconnect/real-time Stale/reconnect, and offline inventory/check/incident backup/restore. Dashboard lag from persisted observation: Down 896 ms; recovery 918 ms. Owner radio-transition timestamps are unknown; these are display-lag measurements, not outage-detection timing or capacity proof. Target/private paths are omitted from the report; screenshots stay ignored/local.
+- Clean-source browser checks pass for empty startup, host inventory migration/opt-in/conflict handling, recovery, and the synthetic 100-device/180-link map. Desktop/390px initial render: 493/456 ms; mixed-state render: 259/217 ms. Fixed the empty-start check to choose Browser working copy after reload, and explicitly isolated browser-local recovery checks from host inventory. Corrected README's stale three-failure description.
+- Native pointer checks on a separate empty, ICMP-disabled launcher verified readable current-scale layout, Start, Open dashboard invocation, hide with host still ready, duplicate reopening the same controller, Stop/database lock release and Quit. Installed settings/data were preserved. Other DPI scales, actual tray-menu pointer operation, physical multi-device collector capacity and broad accessibility/platform acceptance remain unverified; #16 stays open. See release-validation-results.json and WINDOWS-RELEASE-RUNBOOK.md. No publication or new CI result is claimed for this branch.
+

@@ -59,6 +59,8 @@ Issues: [#10](https://github.com/Osbornejmb/netwatch/issues/10), [#12](https://g
 
 ## Current evidence and next action
 
+- Owner scope decision (2026-11-13): real multi-device collector capacity testing is deferred for #16. Keep the synthetic 100-device UI/storage evidence and single approved-device Windows acceptance, without claiming a supported production device count. DPI checks at the available 100%/125% scales and owner-assisted tray-menu pointer acceptance are now verified; 150% is unavailable on this host.
+
 - Built-in starter inventory and sample preview are removed by the owner's request; new networks start empty. Test-only fixtures retain regression coverage; existing saved inventory/history are preserved.
 
 - The dashboard foundation and solo instructions were merged through [PR #14](https://github.com/Osbornejmb/netwatch/pull/14), with eight tests/build and desktop/narrow acceptance evidence.
@@ -67,7 +69,7 @@ Issues: [#10](https://github.com/Osbornejmb/netwatch/issues/10), [#12](https://g
 - Issue #24's radial layout, direct-peer highlights and individual dashboard dragging are merged through #25. All 21 tests, build, browser regression suites and pre-merge CI checks passed. Real saved-layout moves autosave; radial/sample moves remain temporary and resettable.
 - Issue #4 (2.1) is merged through PR #26 and closed: loopback API/SQLite, explicit inventory transfer, monitoring opt-in and bounded history/backup/restore. All 30 tests/build and final Ubuntu/Windows checks passed.
 - Issue #5 is complete through merged PR #27 (a08c179), with 43 tests/build, Windows/Ubuntu CI and actual approved router/phone failure/recovery and console-shutdown evidence. See ICMP-COLLECTOR.md for timing and limits.
-- Issue #6 is merged through PR #30 (6190bb9) and closed, with controlled browser evidence and a real USB-phone dashboard failure/recovery, disconnected/stale/reconnect run; Ubuntu/Windows CI passed. Issue #11 local incident implementation is in progress on feat/local-incidents; release-wide Windows acceptance remains #16. #28 tray/desktop controls are merged in #29. WINDOWS-LAUNCHER.md explains the interactive launcher and future service handoff. SNMP/LLDP, external notifications, unattended service and remote access remain planned. #16 requires actual Windows release evidence.
+- Issue #6 is merged through PR #30 (6190bb9) and closed, with controlled browser evidence and a real USB-phone dashboard failure/recovery, disconnected/stale/reconnect run; Ubuntu/Windows CI passed. Local incident implementation (#11) is merged through PR #32; Windows release acceptance remains #16 with real multi-device capacity deferred by the owner. #28 tray/desktop controls are merged in #29. WINDOWS-LAUNCHER.md explains the interactive launcher and future service handoff. SNMP/LLDP, external notifications, unattended service and remote access remain planned. #16 requires actual Windows release evidence.
 - Deployment is one Windows host connected to the monitored network and multiple browser clients. The tray is host-local; remote browser closure never owns collection lifetime. #12's unattended service must survive sign-out/reboot and be the single collector/database owner, with optional tray controls attached to it. Remote shared URLs require #10/#12 security first.
 
 ## Plan maintenance

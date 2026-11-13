@@ -25,6 +25,7 @@ try {
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('netwatch-topology-v1')).nodes.length === 1)
   const saved = await stored()
   await page.reload()
+  await page.getByLabel('Network source').selectOption('browser')
   await page.locator('.health-node').waitFor()
   assert.deepEqual(await stored(), saved)
   await page.getByRole('link', { name: 'Device inventory', exact: true }).click()
