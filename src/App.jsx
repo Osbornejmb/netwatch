@@ -28,6 +28,7 @@ export default function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState(saved.topology.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(saved.topology.edges)
   const [view, setView] = useState(viewFromHash)
+  const [layoutMoves, setLayoutMoves] = useState({})
   useEffect(() => {
     const navigate = () => setView(viewFromHash())
     window.addEventListener('hashchange', navigate)
@@ -124,7 +125,7 @@ export default function App() {
   const [editorLayout, setEditorLayout] = useState('radial')
   const mapEdges = useMemo(() => uniqueConnections(edges), [edges])
   const layoutNodes = useMemo(() => editorLayout === 'radial' ? radialLayout(nodes, edges) : tidyLayout(nodes, edges), [nodes, edges, editorLayout])
-  const editorDrag = useLayoutDrag(layoutNodes, `${view}-${editorLayout}`)
+  const editorDrag = useLayoutDrag(layoutNodes, edges, `editor-${editorLayout}`, layoutMoves, setLayoutMoves)
   const editorNodes = layoutNodes.map(node => ({ ...node, position: editorDrag.positions[node.id] || node.position }))
   const nodesById = new Map(editorNodes.map(node => [node.id, node]))
   const changeEditorNodes = changes => {
@@ -198,7 +199,7 @@ export default function App() {
         </section>
         </header>
 
-        {view !== 'editor' ? <Dashboard nodes={nodes} edges={edges} showInventory={view === 'inventory'} onEdit={() => { location.hash = 'topology' }}/> : <section className="page-content" id="topology">
+        {view !== 'editor' ? <Dashboard nodes={nodes} edges={edges} layoutMoves={layoutMoves} setLayoutMoves={setLayoutMoves} showInventory={view === 'inventory'} onEdit={() => { location.hash = 'topology' }}/> : <section className="page-content" id="topology">
           <div className="page-heading">
             <div><h1>Edit your map</h1><p>Changes save as a draft until you choose Use this map.</p></div>
             <div className="heading-actions"><button className="button secondary" disabled={autosavePaused||importBusy} onClick={()=>void hostStorage.current.reviewLoad()}>Load saved map</button><button className="button primary" onClick={() => setShowModal('add')}><Plus size={17}/> Add device</button></div>
@@ -207,16 +208,16 @@ export default function App() {
           {deviceNotice && <p role="alert" className="notice">{deviceNotice}</p>}
           <div className="canvas-toolbar">
             <div className="canvas-title"><GitBranch size={18}/><div><strong>Draft map</strong><span>{nodes.length} {nodes.length===1?'device':'devices'} · {mapEdges.length} {mapEdges.length===1?'connection':'connections'}</span></div></div>
-            <div className="canvas-actions"><label className="health-filter">Map layout <select aria-label="Map layout" value={editorLayout} onChange={event => setEditorLayout(event.target.value)}><option value="radial">Circle</option><option value="tidy">Tidy layout</option></select></label><button className="button secondary" onClick={() => setNodes(current => editorLayout === 'radial' ? radialLayout(current, edges) : tidyLayout(current, edges))}>Save layout</button><div className="search-box"><Search size={15}/><input aria-label="Find a device" value={query} onChange={e => setQuery(e.target.value)} placeholder="Find a device" /></div><button className="button primary" disabled={autosavePaused||importBusy} onClick={()=>void hostStorage.current.reviewSave()}><Check size={15}/>Use this map</button></div>
+            <div className="canvas-actions"><label className="health-filter">Map layout <select aria-label="Map layout" value={editorLayout} onChange={event => setEditorLayout(event.target.value)}><option value="radial">Circle</option><option value="tidy">Tidy layout</option></select></label><button className="button secondary" onClick={() => setNodes(current => current.map(node => ({ ...node, position: nodesById.get(node.id).position })))}>Save layout</button><div className="search-box"><Search size={15}/><input aria-label="Find a device" value={query} onChange={e => setQuery(e.target.value)} placeholder="Find a device" /></div><button className="button primary" disabled={autosavePaused||importBusy} onClick={()=>void hostStorage.current.reviewSave()}><Check size={15}/>Use this map</button></div>
           </div>
 
           <div className="canvas-wrap">
             <ReactFlow
-              nodes={editorNodes.map(n => ({ ...n, domAttributes: { onKeyUp: event => { if (event.key.startsWith('Arrow')) editorDrag.reset() } }, hidden: !filteredNodes.some(f => f.id === n.id) }))}
+              nodes={editorNodes.map(n => ({ ...n, domAttributes: { onKeyDown: event => editorDrag.moveByKey(event, n), onKeyUp: event => { if (event.key.startsWith('Arrow')) editorDrag.finish() } }, hidden: !filteredNodes.some(f => f.id === n.id) }))}
               edges={mapEdges.map(edge => {
                 const source = nodesById.get(edge.source), target = nodesById.get(edge.target)
                 return { ...edge, ...radialHandles(source.position, target.position), type: 'straight', style: { stroke: 'var(--map-link)', strokeWidth: 2 } }
-              })} onNodesChange={changeEditorNodes} onNodeDragStop={editorDrag.reset} onEdgesChange={changeEditorEdges}
+              })} onNodesChange={changeEditorNodes} onNodeDragStop={editorDrag.finish} onEdgesChange={changeEditorEdges}
               connectionMode="loose" onConnect={onConnect} isValidConnection={connection => connection.source !== connection.target && edges.length < 10000 && !edges.some(edge => connectionKey(edge) === connectionKey(connection))} nodeTypes={nodeTypes}
               onNodeClick={(_, node) => setSelectedNode(node)}
               onPaneClick={() => setSelectedNode(null)}

@@ -19,15 +19,27 @@ test('side handles account for compact card proportions', async () => {
   assert.deepEqual(radialHandles({ x: 0, y: 0 }, { x: 200, y: 190 }), { sourceHandle: 'radial-source-bottom', targetHandle: 'radial-target-top' })
 })
 
-test('dragging stays tethered to the tidy position and refuses overlapping cards', async () => {
+test('dragging is not tethered to an anchor but still refuses collisions and invalid positions', async () => {
   const { constrainDrag } = await import('../src/nodes/placement.js')
   const nodes = [{ id: 'a', position: { x: 0, y: 0 } }, { id: 'b', position: { x: 0, y: 104 } }]
-  assert.deepEqual(constrainDrag('a', { x: 0, y: 20 }, nodes), { x: 0, y: 20 })
-  assert.equal(constrainDrag('a', { x: 0, y: 1000 }, nodes), null)
-  const limited = constrainDrag('a', { x: -10000, y: -10000 }, nodes)
-  assert.ok(Math.hypot(limited.x, limited.y) <= 64.000001)
+  assert.deepEqual(constrainDrag('a', { x: -10000, y: -10000 }, nodes), { x: -10000, y: -10000 })
+  assert.equal(constrainDrag('a', { x: 0, y: 74 }, nodes), null)
   assert.equal(constrainDrag('b', { x: 0, y: 74 }, nodes, { a: { x: 0, y: 30 } }), null)
   assert.equal(constrainDrag('missing', { x: 0, y: 0 }, nodes), null)
   assert.equal(constrainDrag('a', { x: NaN, y: 0 }, nodes), null)
   assert.deepEqual(nodes[0].position, { x: 0, y: 0 })
+})
+
+test('reach limits use connected peers, honor existing long layouts and prevent repeated drag drift', async () => {
+  const { withinLinkReach } = await import('../src/nodes/placement.js')
+  const nodes = [{ id: 'a', position: { x: 0, y: 0 } }, { id: 'b', position: { x: 0, y: 104 } }, { id: 'isolated', position: { x: 1000, y: 0 } }]
+  const edges = [{ source: 'b', target: 'a' }]
+  assert.equal(withinLinkReach(nodes, edges, { a: { x: 300, y: 0 } }), true)
+  assert.equal(withinLinkReach(nodes, edges, { a: { x: 400, y: 0 } }), false)
+  assert.equal(withinLinkReach(nodes, edges, { a: { x: 1000, y: 1000 }, b: { x: 1000, y: 1104 }, isolated: { x: 10000, y: 10000 } }), true)
+  assert.equal(withinLinkReach(nodes, edges, { a: { x: NaN, y: 0 } }), false)
+  assert.equal(withinLinkReach(nodes, [], { isolated: { x: 10000, y: 10000 } }), true)
+  const long = nodes.map(node => node.id === 'b' ? { ...node, position: { x: 1000, y: 0 } } : node)
+  assert.equal(withinLinkReach(long, edges, { b: { x: 1500, y: 0 } }), true)
+  assert.equal(withinLinkReach(long, edges, { b: { x: 1501, y: 0 } }), false)
 })

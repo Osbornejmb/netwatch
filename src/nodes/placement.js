@@ -12,15 +12,26 @@ export function nextFreePosition(nodes) {
   }
 }
 
-// A short tether permits inspection gestures without moving devices into neighboring cards.
+// Reject overlapping cards while letting the pointer move freely.
 export function constrainDrag(id, position, nodes, positions = {}) {
   const node = nodes.find(node => node.id === id)
   if (!node || !Number.isFinite(position?.x) || !Number.isFinite(position?.y)) return null
-  const dx = position.x - node.position.x, dy = position.y - node.position.y
-  const scale = Math.min(1, 64 / (Math.hypot(dx, dy) || 1))
-  const candidate = { x: node.position.x + dx * scale, y: node.position.y + dy * scale }
+  const candidate = { x: position.x, y: position.y }
   return nodes.some(other => {
     const otherPosition = positions[other.id] || other.position
     return other.id !== id && Math.abs(otherPosition.x - candidate.x) < NODE_MAX_WIDTH + 8 && Math.abs(otherPosition.y - candidate.y) < NODE_HEIGHT + 8
   }) ? null : candidate
+}
+
+// Each connection gets half its arranged length as slack, with room for small groups.
+export function withinLinkReach(nodes, edges, positions) {
+  const byId = new Map(nodes.map(node => [node.id, node]))
+  return edges.every(edge => {
+    const source = byId.get(edge.source), target = byId.get(edge.target)
+    if (!source || !target) return false
+    const a = positions[source.id] || source.position, b = positions[target.id] || target.position
+    const arranged = Math.hypot(source.position.x - target.position.x, source.position.y - target.position.y)
+    return Number.isFinite(a.x) && Number.isFinite(a.y) && Number.isFinite(b.x) && Number.isFinite(b.y) &&
+      Math.hypot(a.x - b.x, a.y - b.y) <= Math.max(NODE_MAX_WIDTH + GAP, arranged * 1.5)
+  })
 }

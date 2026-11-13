@@ -35,7 +35,7 @@ function HealthNode({ data, selected }) {
 const nodeTypes = { health: HealthNode }
 const NO_CHECKS = {}
 
-export default function Dashboard({ nodes: inventory, edges: inventoryEdges, showInventory = false, onEdit }) {
+export default function Dashboard({ nodes: inventory, edges: inventoryEdges, showInventory = false, onEdit, layoutMoves, setLayoutMoves }) {
   const [source, setSource] = useState('host')
   const host = useMonitoring(source === 'host')
   const live = source === 'host' && host.snapshot
@@ -64,8 +64,8 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
   const edges = useMemo(() => uniqueConnections(sourceEdges), [sourceEdges])
   const effectiveCenterId = nodes.some(node => node.id === centerId) ? centerId : ''
   const layoutNodes = useMemo(() => mapLayout === 'radial' ? radialLayout(nodes, edges, effectiveCenterId) : tidyLayout(nodes, edges), [nodes, edges, mapLayout, effectiveCenterId])
-  const layoutKey = `${live ? 'host' : 'draft'}-${mapLayout}-${effectiveCenterId}-${showInventory}`
-  const { positions: positionOverrides, onPositionChanges, reset: finishDrag } = useLayoutDrag(layoutNodes, layoutKey)
+  const layoutKey = `${live ? 'host' : 'draft'}-${mapLayout}`
+  const { positions: positionOverrides, onPositionChanges, moveByKey, finish: finishDrag } = useLayoutDrag(layoutNodes, edges, layoutKey, layoutMoves, setLayoutMoves)
   // Preserve React Flow's measured health-card dimensions across clock/filter
   // renders. Replacing controlled nodes without them resets initialization.
   const onDimensionsChange = useCallback(changes => {
@@ -125,7 +125,7 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
           {source === 'host' && <button className="health-button" onClick={host.refresh}>Refresh now</button>}
           <label className="health-filter">Map layout <select aria-label="Map layout" value={mapLayout} onChange={event => { finishDrag(); setMapLayout(event.target.value) }}><option value="radial">Circle</option><option value="tidy">Tidy layout</option></select></label>
           {mapLayout === 'radial' && <><label className="health-filter">Center <select aria-label="Radial center" value={effectiveCenterId} onChange={event => { finishDrag(); setCenterId(event.target.value) }}><option value="">Automatic</option>{nodes.map(node => <option key={node.id} value={node.id}>{node.data.label}</option>)}</select></label><p className="health-map-count">This arranges devices in rings without changing your saved map.</p></>}
-          <p className="health-map-count">{visible.length} of {nodes.length} devices</p><details className="view-help"><summary>About this map</summary><p className="health-map-count">Click a device for details; dragged devices snap back into place.</p><p className="health-map-count">The tidy layout keeps connected devices close and prevents overlap.</p><p className="health-map-count">Line colors follow device checks; they do not confirm a cable or port is working.</p></details>
+          <p className="health-map-count">{visible.length} of {nodes.length} devices</p><details className="view-help"><summary>About this map</summary><p className="health-map-count">Moves stay in place unless a connection stretches too far.</p><p className="health-map-count">The tidy layout keeps connected devices close and prevents overlap.</p><p className="health-map-count">Line colors follow device checks; they do not confirm a cable or port is working.</p></details>
         </div></details>
       </div>
     </header>
@@ -138,8 +138,8 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
     </section>
     ) : (
         <div className="health-map">
-          <ReactFlow key={layoutKey} onNodesChange={changes => { onDimensionsChange(changes); onPositionChanges(changes) }}
-            nodes={devices.map(node => ({ ...node, measured: nodeSizes[node.id], type: 'health', ariaRole: 'button', domAttributes: { 'aria-haspopup': 'dialog', onKeyUp: event => { if (event.key.startsWith('Arrow')) finishDrag() }, onKeyDown: event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); selectDevice(node) } } }, hidden: !visibleIds.has(node.id), selected: selectedId === node.id, ariaLabel: `${node.data.label}, ${node.type === "router" ? "Router" : "Switch"}, ${HEALTH[node.health].label}.${highlightedDevice ? node.id === highlightedId ? ' Connection focus.' : connectedIds.has(node.id) ? ` Directly connected to ${highlightedDevice.data.label}.` : '' : ''} Open device details`, data: { ...node.data, kind: node.type, status: node.health, radial: mapLayout === 'radial', connectionRole: highlightedDevice ? node.id === highlightedId ? 'focus' : connectedIds.has(node.id) ? 'connected' : 'muted' : '' } }))}
+          <ReactFlow key={`${layoutKey}-${effectiveCenterId}`} onNodesChange={changes => { onDimensionsChange(changes); onPositionChanges(changes) }}
+            nodes={devices.map(node => ({ ...node, measured: nodeSizes[node.id], type: 'health', ariaRole: 'button', domAttributes: { 'aria-haspopup': 'dialog', onKeyUp: event => { if (event.key.startsWith('Arrow')) finishDrag() }, onKeyDown: event => { if (moveByKey(event, node)) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); selectDevice(node) } } }, hidden: !visibleIds.has(node.id), selected: selectedId === node.id, ariaLabel: `${node.data.label}, ${node.type === "router" ? "Router" : "Switch"}, ${HEALTH[node.health].label}.${highlightedDevice ? node.id === highlightedId ? ' Connection focus.' : connectedIds.has(node.id) ? ` Directly connected to ${highlightedDevice.data.label}.` : '' : ''} Open device details`, data: { ...node.data, kind: node.type, status: node.health, radial: mapLayout === 'radial', connectionRole: highlightedDevice ? node.id === highlightedId ? 'focus' : connectedIds.has(node.id) ? 'connected' : 'muted' : '' } }))}
             edges={mapEdges}
             nodeTypes={nodeTypes} onNodeClick={(_, node) => selectDevice(node)} onPaneClick={() => { setSelectedId(null); setHighlightedId(null) }}
             nodesDraggable nodesConnectable={false} multiSelectionKeyCode={null} nodeDragThreshold={3} nodeClickDistance={5}

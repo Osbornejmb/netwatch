@@ -1,5 +1,12 @@
 # Working checkpoint
 
+## Current status (2026-11-14): retain valid moves, snap only for overstretched connections
+
+- Replaced the 64px anchor tether and unconditional release/tab reset with collision-only movement and connection-based validation on release. Each link allows max(320px, 1.5× arranged length), measured to the peer's current position; exceeding it restores the gesture's last valid positions. Unconnected devices are unconstrained except for collisions.
+- App owns separate bounded session adjustments for host/draft/editor and Circle/Tidy. Valid pointer/keyboard moves survive tab/view/layout/source switches and browser blur. Structural graph changes invalidate stale geometry. Save layout saves the visible moved positions; host/storage formats and probe settings are unchanged.
+- Tests cover connected-peer limits, long initial links, collision avoidance, retained moves, excessive-drag rollback, keyboard, navigation, both layouts and sources, saving and undirected links. Production build and six browser suites pass: focused movement/undirected, inventory, radial, desktop, 100-device scale and monitoring. Local npm test passes 74/77; three launcher lifecycle checks are blocked by the installed monitor on port 4317, which was preserved. GitHub Windows/Ubuntu CI and PR/merge status are recorded at handoff.
+
+
 ## Current status (2026-11-14): Circle default with shared layout constraints
 
 - Circle is the default in Dashboard and Edit map. Both expose Circle/Tidy, sharing collision checks, the 64px tether, snap-back on release/view/tab changes and undirected-link handling. The editor Save layout action explicitly saves the selected layout.
