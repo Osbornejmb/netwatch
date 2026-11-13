@@ -52,7 +52,7 @@ test('snapshot chooses newest timestamp then sequence, including after adding th
  assert.equal(store.snapshot().observations.length,1);assert.equal(store.snapshot().observations[0].status,'down')
  const saved=store.read(),history=store.history('r1');store.db.exec('DROP INDEX checks_device_latest');store.close()
  const reopened=openStore(path,{now:()=>now});try {
- assert.equal(reopened.db.prepare('PRAGMA user_version').get().user_version,3)
+ assert.equal(reopened.db.prepare('PRAGMA user_version').get().user_version,4)
  assert.deepEqual(reopened.read(),saved);assert.deepEqual(reopened.history('r1'),history)
  assert.equal(reopened.snapshot().observations[0].status,'down')
  assert.ok(reopened.db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='checks_device_latest'").get())
@@ -74,8 +74,8 @@ test('history total cap bounds growth',t=>{
 test('failed initial migration rolls back schema; future schemas are rejected without modification',t=>{
  const dir=mkdtempSync(join(tmpdir(),'netwatch-migration-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));const path=join(dir,'db')
  assert.throws(()=>openStore(path,{migrate:()=>{throw new Error('migration interrupted')}}),/interrupted/)
- const db=new DatabaseSync(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,0);assert.equal(db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name='inventory'").get().n,0);db.exec('PRAGMA user_version=4');db.close()
- assert.throws(()=>openStore(path),/newer/);const check=new DatabaseSync(path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,4);check.close()
+ const db=new DatabaseSync(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,0);assert.equal(db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name='inventory'").get().n,0);db.exec('PRAGMA user_version=5');db.close()
+ assert.throws(()=>openStore(path),/newer/);const check=new DatabaseSync(path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,5);check.close()
 })
 test('offline backup/restore validates data, advances revision and rejects corrupt backups and active locks',t=>{
  const {dir,path,store}=fixture(t);store.write(input({r1:true}),0);store.append([{deviceId:'r1',status:'up',checkedAt:new Date().toISOString()}]);store.close()

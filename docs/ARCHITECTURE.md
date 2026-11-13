@@ -1,5 +1,11 @@
 # NetWatch architecture
 
+## Opt-in interface collection (#7, local implementation)
+
+The Windows host can run a separate bounded SNMPv3 authPriv collector when NETWATCH_SNMP=1 and an operator enrolls saved-device credentials locally. `net-snmp` is pinned as a host-only protocol dependency. `snmp-probe.js` performs GET/GETBULK only, validates OID order/types/counters and caps rows/requests/time; `snmp-collector.js` separates workers, freshness and diagnostics from ICMP health/incidents. Inventory revisions cancel obsolete work. A repository-owned CurrentUser DPAPI helper protects credentials in a separate host directory; no browser configuration endpoint or credential response exists.
+
+Schema v4 adds explicit SNMP authorization and latest interface samples while preserving prior data. Address/type changes or deletion revoke the target. Restore clears SNMP authorizations; matching local credential enrollment is required again. Rate computation suppresses resets/wrap ambiguity, missing discontinuity evidence and long gaps. Device details lazily poll paginated interfaces only while expanded, retain last-known results on errors, and never infer a device or configured topology link is down from missing SNMP. Cisco 3750/2811 are intended lab targets; physical vendor acceptance remains unverified. See SNMP-INTERFACES.md.
+
 ## Implemented foundation
 
 React + Vite opens the network health dashboard by default. `src/Dashboard.jsx` renders a viewport-filling interactive React Flow map with title/status, optional View controls, and click-to-open detail dialogs. App.jsx provides horizontal Dashboard/Topology editor/Devices navigation; the supporting device table is shown only for the Devices view. The existing topology canvas remains available through Edit topology. Router and switch components share the topology data contract. `src/topology.js` validates imported and saved maps and strips untrusted rendering properties. The browser stores a versioned topology; export/import is the portability boundary. Valid v1 exports remain readable; invalid or duplicate management addresses are rejected without replacement (see README recovery guidance).
@@ -37,7 +43,7 @@ Snapshots use the additive v3 `checks_device_latest` index and select one newest
 
 Device details enable/disable only saved host devices using the snapshot revision and complete saved host inventory, preserving other devices and rejecting conflicts without retry. A missing address prevents authorization. `DeviceHistory.jsx` fetches 25 checks per page up to 200 displayed, validates device IDs/sequence/revision, cancels obsolete requests and labels adjacent retained transitions in local time. New checks reset pagination to the newest page. No uptime percentage or continuity is inferred. History is collapsible; service/errors use everyday language.
 
-System fonts replace the starter's Google Fonts import so the dashboard does not need a font CDN at runtime. `src/dashboard.css` contains the light dashboard tokens; the editor retains its original dark workspace. The dashboard itself adds no runtime dependencies. Host SQLite schema v3 (with transactional v1/v2 migration) is separate from the unchanged browser v1 JSON contract.
+System fonts replace the starter's Google Fonts import so the dashboard does not need a font CDN at runtime. `src/dashboard.css` contains the light dashboard tokens; the editor retains its original dark workspace. The dashboard itself adds no runtime dependencies. Host SQLite schema v4 (with transactional v1/v2/v3 migration) is separate from the unchanged browser v1 JSON contract.
 
 ## Device selection
 

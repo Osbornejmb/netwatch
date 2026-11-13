@@ -15,4 +15,6 @@ Topology creation/import remains a supporting workflow. Keep the existing editor
 
 ## Delivery boundary
 
+Read-only SNMPv3 interface collection is implemented locally for #7, behind separate Windows-host enrollment and global opt-in. It adds interface evidence without changing device reachability semantics. Cisco Catalyst 3750/Cisco 2811 hardware validation is still pending; no model support is claimed solely from protocol fixtures.
+
 The dashboard displays genuine host observations; fresh browser and host inventories start empty. Built-in demo devices/statuses and preview controls are removed. Synthetic observations exist only in tests. See ARCHITECTURE.md for implemented components and ROADMAP.md for remaining work.

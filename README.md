@@ -35,6 +35,8 @@ Only enable checks for devices you manage. Both the launcher's ICMP setting and 
 
 ## Read device status
 
+An optional Windows-host SNMPv3 feature adds interface status and traffic rates under device details → **Interfaces**. It requires local credential enrollment and separate opt-in; it does not change ping-based device health. See [SNMP interface setup](docs/SNMP-INTERFACES.md). Cisco 3750/2811 physical verification is pending.
+
 - **Up:** recent checks confirm a response.
 - **Down:** two consecutive failed checks confirm no response; the first successful reply restores Up.
 - **Stale:** the last check is too old to describe the device's current state.

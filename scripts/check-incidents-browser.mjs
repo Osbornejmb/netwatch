@@ -20,7 +20,7 @@ const errors=[];page.on('pageerror',error=>errors.push(error.message))
 page.setDefaultTimeout(12000)
 const base=`http://127.0.0.1:${server.address().port}`
 const refresh=()=>page.getByRole('button',{name:'Refresh host',exact:true}).click()
-const inspect=async()=>{await page.locator('.react-flow__node[data-id="a"]').focus();await page.keyboard.press('Enter');await page.getByRole('dialog').waitFor();await page.getByText('Incidents',{exact:true}).click()}
+const inspect=async()=>{const node=page.locator('.react-flow__node[data-id="a"]');await node.waitFor({state:'visible'});await node.press('Enter');await page.getByRole('dialog').waitFor();await page.getByText('Incidents',{exact:true}).click()}
 const region=()=>page.getByRole('region',{name:'Device incidents',exact:true})
 mkdirSync('docs/screenshots',{recursive:true})
 try {

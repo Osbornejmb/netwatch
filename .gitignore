@@ -9,3 +9,5 @@ dist/
 
 data/
 *.sqlite*
+snmp-credentials/
+*.dpapi

@@ -5,11 +5,13 @@ import { useRef, useState } from 'react'
 import { hostRequest, formatCheckTime, collectorLabel } from './monitoring'
 import DeviceHistory from './DeviceHistory'
 import DeviceIncidents from './DeviceIncidents'
+import DeviceInterfaces from './DeviceInterfaces'
 
 export default function DeviceDetails({ device, check, connections, host, onClose }) {
   const modal = useModal(onClose)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [interfacesOpen,setInterfacesOpen]=useState(false)
   const history = useRef(null)
   const viewChecks = () => { history.current.open = true; history.current.querySelector('summary').focus(); history.current.scrollIntoView({ block: 'nearest' }) }
   const enabled = host?.snapshot.inventory.monitoring[device.id] === true
@@ -34,6 +36,7 @@ export default function DeviceDetails({ device, check, connections, host, onClos
         {host && <><div><dt>Monitoring</dt><dd>{!device.data.ip ? 'No device address' : enabled ? check ? check.status === 'unknown' ? 'Enabled · Confirming result' : 'Enabled' : 'Enabled · Awaiting first check' : 'Disabled'}</dd></div><div><dt>Monitoring service</dt><dd>{host.state === 'connected' ? 'Connected' : 'Disconnected'} · {collectorLabel(host.snapshot.collector.state)}</dd></div></>}
       </dl>
       {host && <><p>Enable checks only for devices you manage, with monitoring started in the Windows app.</p><button className="health-button" disabled={saving || host.state !== 'connected' || !device.data.ip} onClick={changeMonitoring}>{saving ? 'Saving…' : enabled ? 'Disable monitoring' : 'Enable monitoring'}</button>{error && <p role="alert">{error}</p>}<details className="health-history-options"><summary>Incidents</summary><DeviceIncidents onViewChecks={viewChecks} deviceId={device.id} revision={host.snapshot.inventory.revision} checkedAt={check?.checkedAt}/></details><details ref={history} className="health-history-options"><summary>Recent history</summary><DeviceHistory deviceId={device.id} revision={host.snapshot.inventory.revision} checkedAt={check?.checkedAt}/></details></>}
+      {host&&<details className="health-history-options" onToggle={event=>setInterfacesOpen(event.currentTarget.open)}><summary>Interfaces</summary>{interfacesOpen&&<DeviceInterfaces deviceId={device.id} revision={host.snapshot.inventory.revision}/>}</details>}
       <h3>Connected devices</h3>
       {connections.length ? <ul className="health-neighbors">{connections.map(item => <li key={item.id}><div><strong>{item.device.data.label}</strong><span className={`health-status health-${item.device.health}`}>{HEALTH[item.device.health].label}</span></div><small>{item.health === 'down' ? 'Red path · a connected device is down' : item.health === 'up' ? 'Green path · both devices are up' : item.health === 'stale' ? 'Amber path · a check is overdue' : 'Gray path · reachability unknown'}</small></li>)}</ul> : <p>No configured connections.</p>}
       <p className="health-dialog-note">Device health is checked independently. Line colors summarize endpoint reachability; they do not verify interface or routing-session state.</p>

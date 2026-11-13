@@ -1,5 +1,7 @@
 # Dashboard design direction
 
+- Saved-device details now include a collapsed Interfaces section with separate admin/oper state, last interface check, conservative rates, 50-row paging and explicit paused/unknown/stale/error states. It loads only when opened and keeps last-known rows on connection failure. Interface state does not change ICMP device colors or imply physical-link verification. Credential enrollment remains local to the host; passwords are never entered in the browser.
+
 Reference guidance: [UI/UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill), using its status/incident dashboard and minimal enterprise recommendations. Keep existing React Flow and Lucide rather than adding a design framework.
 
 - A white topology-first landing screen with one small horizontal navigation bar at the top: Dashboard, Topology editor, Devices. No sidebar, avatar, breadcrumbs, promotional heading, summary-card row, or always-visible inventory.

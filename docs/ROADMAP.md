@@ -59,6 +59,8 @@ Issues: [#10](https://github.com/Osbornejmb/netwatch/issues/10), [#12](https://g
 
 ## Current evidence and next action
 
+- Issue #7 implementation is local on feat/snmp-interfaces: bounded read-only SNMPv3, Windows CurrentUser DPAPI enrollment, schema v4 latest-interface storage and separate device-detail interface state. Cisco Catalyst 3750/Cisco 2811 are intended targets; devices are not connected yet, so physical read-only verification remains required before vendor support or issue completion is claimed. #16 was merged/closed through PR #33 under the owner-deferred capacity scope.
+
 - Owner scope decision (2026-11-13): real multi-device collector capacity testing is deferred for #16. Keep the synthetic 100-device UI/storage evidence and single approved-device Windows acceptance, without claiming a supported production device count. DPI checks at the available 100%/125% scales and owner-assisted tray-menu pointer acceptance are now verified; 150% is unavailable on this host.
 
 - Built-in starter inventory and sample preview are removed by the owner's request; new networks start empty. Test-only fixtures retain regression coverage; existing saved inventory/history are preserved.
