@@ -5,6 +5,7 @@ import { HEALTH, deviceHealth, summarizeHealth, connectionHealth } from './healt
 import DeviceDetails from './DeviceDetails'
 import useMonitoring from './useMonitoring'
 import useLayoutDrag from './useLayoutDrag'
+import { uniqueConnections } from './connections'
 import { formatCheckTime, collectorLabel } from './monitoring'
 import { tidyLayout, radialLayout, radialHandles, connectedDevices } from './radial'
 
@@ -59,7 +60,8 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
       document.removeEventListener('visibilitychange', update)
     }
   }, [])
-  const { nodes, edges, checks } = live ? { nodes: live.inventory.topology.nodes, edges: live.inventory.topology.edges, checks: live.checks } : { nodes: inventory, edges: inventoryEdges, checks: NO_CHECKS }
+  const { nodes, edges: sourceEdges, checks } = live ? { nodes: live.inventory.topology.nodes, edges: live.inventory.topology.edges, checks: live.checks } : { nodes: inventory, edges: inventoryEdges, checks: NO_CHECKS }
+  const edges = useMemo(() => uniqueConnections(sourceEdges), [sourceEdges])
   const effectiveCenterId = nodes.some(node => node.id === centerId) ? centerId : ''
   const layoutNodes = useMemo(() => mapLayout === 'radial' ? radialLayout(nodes, edges, effectiveCenterId) : tidyLayout(nodes, edges), [nodes, edges, mapLayout, effectiveCenterId])
   const layoutKey = `${live ? 'host' : 'draft'}-${mapLayout}-${effectiveCenterId}-${showInventory}`
@@ -99,7 +101,7 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
       ...radialHandles(source.position, target.position),
       hidden: !visibleIds.has(edge.source) || !visibleIds.has(edge.target),
       type: 'straight',
-      ariaLabel: `${source?.data.label} to ${target?.data.label}: ${label}`,
+      ariaLabel: `${source?.data.label} and ${target?.data.label}: ${label}`,
       className: `health-path-${status}${highlightedDevice && (edge.source === highlightedId || edge.target === highlightedId) ? ' health-path-highlighted' : ''}`,
       style: { stroke: HEALTH[status].color, strokeWidth: highlightedDevice && (edge.source === highlightedId || edge.target === highlightedId) ? 5 : 3, opacity: highlightedDevice && edge.source !== highlightedId && edge.target !== highlightedId ? 0.18 : 1, strokeDasharray: status === 'down' ? '7 5' : status === 'unknown' ? '3 5' : undefined },
     }
@@ -137,7 +139,7 @@ export default function Dashboard({ nodes: inventory, edges: inventoryEdges, sho
     ) : (
         <div className="health-map">
           <ReactFlow key={layoutKey} onNodesChange={changes => { onDimensionsChange(changes); onPositionChanges(changes) }}
-            nodes={devices.map(node => ({ ...node, measured: nodeSizes[node.id], type: 'health', ariaRole: 'button', domAttributes: { 'aria-haspopup': 'dialog', onKeyDown: event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); selectDevice(node) } } }, hidden: !visibleIds.has(node.id), selected: selectedId === node.id, ariaLabel: `${node.data.label}, ${node.type === "router" ? "Router" : "Switch"}, ${HEALTH[node.health].label}.${highlightedDevice ? node.id === highlightedId ? ' Connection focus.' : connectedIds.has(node.id) ? ` Directly connected to ${highlightedDevice.data.label}.` : '' : ''} Open device details`, data: { ...node.data, kind: node.type, status: node.health, radial: mapLayout === 'radial', connectionRole: highlightedDevice ? node.id === highlightedId ? 'focus' : connectedIds.has(node.id) ? 'connected' : 'muted' : '' } }))}
+            nodes={devices.map(node => ({ ...node, measured: nodeSizes[node.id], type: 'health', ariaRole: 'button', domAttributes: { 'aria-haspopup': 'dialog', onKeyUp: event => { if (event.key.startsWith('Arrow')) finishDrag() }, onKeyDown: event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); selectDevice(node) } } }, hidden: !visibleIds.has(node.id), selected: selectedId === node.id, ariaLabel: `${node.data.label}, ${node.type === "router" ? "Router" : "Switch"}, ${HEALTH[node.health].label}.${highlightedDevice ? node.id === highlightedId ? ' Connection focus.' : connectedIds.has(node.id) ? ` Directly connected to ${highlightedDevice.data.label}.` : '' : ''} Open device details`, data: { ...node.data, kind: node.type, status: node.health, radial: mapLayout === 'radial', connectionRole: highlightedDevice ? node.id === highlightedId ? 'focus' : connectedIds.has(node.id) ? 'connected' : 'muted' : '' } }))}
             edges={mapEdges}
             nodeTypes={nodeTypes} onNodeClick={(_, node) => selectDevice(node)} onPaneClick={() => { setSelectedId(null); setHighlightedId(null) }}
             nodesDraggable nodesConnectable={false} multiSelectionKeyCode={null} nodeDragThreshold={3} nodeClickDistance={5}

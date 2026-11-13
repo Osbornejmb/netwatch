@@ -1,5 +1,12 @@
 # Working checkpoint
 
+## Current status (2026-11-13): tidy layouts, snap-back and undirected connections
+
+- Both maps now default to compact, deterministic router-first layers with wrapped rows and separate component packing. Layouts ignore old scattered/stacked saved positions. Shared drag handling limits movement to 64 layout pixels, rejects card collisions and snaps back on release, view/layout/source changes and browser blur/hidden events. Only explicit Tidy layout persists positions.
+- One rendered line and details/list entry per unordered device pair; reverse/parallel additions are blocked and removing a displayed connection removes all its old reciprocal records. Imported duplicate records and original coordinates remain intact until an explicit editing action. No host or persisted-format changes.
+- Pure layout/drag/link regression checks and a focused desktop/narrow browser check cover compactness, overlap, snap-back, focus/tab resets, unchanged storage and undirected add/remove/render/details behavior. Production build and five browser suites pass (focused snap-back/undirected, inventory, radial, desktop, 100-device scale). Full npm test: 71/75 pass; the early-shutdown case passes on isolated rerun, leaving three launcher lifecycle checks blocked by the running installed host on port 4317. The installed monitor was preserved. No CI/publication is claimed.
+
+
 ## Current status (2026-11-13): integrate desktop-map commits with current main
 
 - Reviewed all six desktop-map commits and merged current main into the branch, resolving overlapping App/Dashboard/CSS/docs/browser checks. Preserved the off-white redesign, direct map replacement reviews, persistent Outages, Ports and all host changes already on main; no new host/schema changes. Compact content-sized oblong routers, filters/attention, side handles, grid/tidy, hash navigation, connection copy, removal confirmation and responsive panels remain.

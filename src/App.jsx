@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ReactFlow, Background, Controls, addEdge, useEdgesState,
-  useNodesState, MarkerType, Panel,
+  ReactFlow, Background, Controls, useEdgesState,
+  useNodesState, Panel,
 } from '@xyflow/react'
 import { Activity, Check, GitBranch, Plus, Search, Trash2, X } from 'lucide-react'
 import RouterNode from './nodes/RouterNode'
@@ -12,6 +12,7 @@ import DeviceDialog from './DeviceDialog'
 import RecoveryDialog from './RecoveryDialog'
 import InventoryControls from './InventoryControls'
 import { createId } from './id'
+import { connectionKey, uniqueConnections } from './connections'
 import useLayoutDrag from './useLayoutDrag'
 import { tidyLayout, radialHandles } from './radial'
 import { nextFreePosition } from './nodes/placement'
@@ -79,14 +80,24 @@ export default function App() {
     }
   }
 
-  const onConnect = useCallback((params) => {
-    setEdges(eds => addEdge({
-      ...params, id: `edge-${createId()}`, label: 'Link',
-      style: { stroke: 'var(--map-link)', strokeWidth: 2 },
-      labelStyle: { fill: 'var(--muted)', fontSize: 12 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--map-link)' },
-    }, eds))
-  }, [setEdges])
+  const onConnect = useCallback(params => {
+    setEdges(current => {
+      if (params.source === params.target || current.length >= 10000 ||
+          !nodes.some(node => node.id === params.source) || !nodes.some(node => node.id === params.target) ||
+          current.some(edge => connectionKey(edge) === connectionKey(params))) return current
+      return [...current, { ...params, id: `edge-${createId()}`, label: 'Link' }]
+    })
+  }, [setEdges, nodes])
+
+  const removeConnection = id => setEdges(current => {
+    const edge = current.find(edge => edge.id === id)
+    return edge ? current.filter(other => connectionKey(other) !== connectionKey(edge)) : current
+  })
+  const changeEditorEdges = changes => {
+    const updates = changes.filter(change => change.type !== 'remove')
+    if (updates.length) onEdgesChange(updates)
+    for (const change of changes) if (change.type === 'remove') removeConnection(change.id)
+  }
 
   const saveDevice = ({ kind, label, ip, description }) => {
     if (showModal === 'edit' && selectedNode) {
@@ -110,6 +121,7 @@ export default function App() {
     setSelectedNode(null)
   }
 
+  const mapEdges = useMemo(() => uniqueConnections(edges), [edges])
   const layoutNodes = useMemo(() => tidyLayout(nodes, edges), [nodes, edges])
   const editorDrag = useLayoutDrag(layoutNodes, view)
   const editorNodes = layoutNodes.map(node => ({ ...node, position: editorDrag.positions[node.id] || node.position }))
@@ -193,24 +205,24 @@ export default function App() {
 
           {deviceNotice && <p role="alert" className="notice">{deviceNotice}</p>}
           <div className="canvas-toolbar">
-            <div className="canvas-title"><GitBranch size={18}/><div><strong>Draft map</strong><span>{nodes.length} {nodes.length===1?'device':'devices'} · {edges.length} {edges.length===1?'connection':'connections'}</span></div></div>
+            <div className="canvas-title"><GitBranch size={18}/><div><strong>Draft map</strong><span>{nodes.length} {nodes.length===1?'device':'devices'} · {mapEdges.length} {mapEdges.length===1?'connection':'connections'}</span></div></div>
             <div className="canvas-actions"><button className="button secondary" onClick={() => setNodes(current => tidyLayout(current, edges))}>Tidy layout</button><div className="search-box"><Search size={15}/><input aria-label="Find a device" value={query} onChange={e => setQuery(e.target.value)} placeholder="Find a device" /></div><button className="button primary" disabled={autosavePaused||importBusy} onClick={()=>void hostStorage.current.reviewSave()}><Check size={15}/>Use this map</button></div>
           </div>
 
           <div className="canvas-wrap">
             <ReactFlow
-              nodes={editorNodes.map(n => ({ ...n, hidden: !filteredNodes.some(f => f.id === n.id) }))}
-              edges={edges.map(edge => {
+              nodes={editorNodes.map(n => ({ ...n, domAttributes: { onKeyUp: event => { if (event.key.startsWith('Arrow')) editorDrag.reset() } }, hidden: !filteredNodes.some(f => f.id === n.id) }))}
+              edges={mapEdges.map(edge => {
                 const source = nodesById.get(edge.source), target = nodesById.get(edge.target)
-                return { ...edge, ...radialHandles(source.position, target.position), type: 'straight', style: { stroke: 'var(--map-link)', strokeWidth: 2 }, markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--map-link)' } }
-              })} onNodesChange={changeEditorNodes} onNodeDragStop={editorDrag.reset} onEdgesChange={onEdgesChange}
-              connectionMode="loose" onConnect={onConnect} isValidConnection={connection => connection.source !== connection.target && edges.length < 10000} nodeTypes={nodeTypes}
+                return { ...edge, ...radialHandles(source.position, target.position), type: 'straight', style: { stroke: 'var(--map-link)', strokeWidth: 2 } }
+              })} onNodesChange={changeEditorNodes} onNodeDragStop={editorDrag.reset} onEdgesChange={changeEditorEdges}
+              connectionMode="loose" onConnect={onConnect} isValidConnection={connection => connection.source !== connection.target && edges.length < 10000 && !edges.some(edge => connectionKey(edge) === connectionKey(connection))} nodeTypes={nodeTypes}
               onNodeClick={(_, node) => setSelectedNode(node)}
               onPaneClick={() => setSelectedNode(null)}
               fitView fitViewOptions={{ padding: 0.2 }}
               onBeforeDelete={async ({ nodes: removed }) => !removed.length || window.confirm(`Remove ${removed.length} device(s) and their links?`)}
               deleteKeyCode={['Backspace', 'Delete']}
-              defaultEdgeOptions={{ markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--map-link)' }, type: 'straight', style: { stroke: 'var(--map-link)', strokeWidth: 2 }, labelStyle: { fill: 'var(--muted)', fontSize: 12 } }}
+              defaultEdgeOptions={{ type: 'straight', style: { stroke: 'var(--map-link)', strokeWidth: 2 }, labelStyle: { fill: 'var(--muted)', fontSize: 12 } }}
               proOptions={{ hideAttribution: true }}
             >
               <Background color="var(--map-grid)" gap={24} size={1}/>
@@ -227,7 +239,7 @@ export default function App() {
             </div>}
           </div>
 
-          <details className="editor-tools"><summary>Devices & connections</summary><InventoryControls nodes={nodes} edges={edges} selectedId={selectedId} onSelect={setSelectedId} onEdit={() => setShowModal('edit')} onRemove={removeSelected} onConnect={onConnect} onRemoveLink={id => setEdges(es => es.filter(edge => edge.id !== id))}/></details>
+          <details className="editor-tools"><summary>Devices & connections</summary><InventoryControls nodes={nodes} edges={edges} selectedId={selectedId} onSelect={setSelectedId} onEdit={() => setShowModal('edit')} onRemove={removeSelected} onConnect={onConnect} onRemoveLink={removeConnection}/></details>
         </section>}
         <div hidden={view!=='editor'} className="editor-network-settings"><HostStorage ref={hostStorage} importGeneration={importGeneration} nodes={nodes} edges={edges} paused={autosavePaused} onLoad={topology=>{setNodes(topology.nodes);setEdges(topology.edges);setSelectedNode(null)}}/></div>
       </main>

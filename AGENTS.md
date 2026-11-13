@@ -110,7 +110,7 @@ The latest explicit user decision defines scope. Code and passing checks establi
 - `PUT /api/v1/topology` needs `Content-Type: application/json`, `X-NetWatch-Write: 1`, `source: "inventory"` and the current `baseRevision`. There is no observation-write route and no probe-trigger route; keep it that way.
 - `node:sqlite` prints an experimental warning on Node 22; that is expected. The DB is `user_version=4`; a newer schema is rejected. Never delete a database to get past a migration error.
 - The collector reports `unsupported` off Windows. Live dashboard freshness uses the host's `freshness.staleAfterMs`; the 90-second default in `src/health.js` remains for test fixtures and callers without a host policy.
-- Dashboard drag moves are view-local overrides; only the Saved-positions layout persists, through App's existing autosave callback. Keep measured React Flow node dimensions across freshness-clock updates or cards disappear.
+- Both maps default to display-only tidy positions; drag moves are collision-checked, tethered and reset on release/view/tab changes. Only the explicit editor Tidy layout action saves tidy coordinates. Keep measured React Flow node dimensions across freshness-clock updates or cards disappear.
 - Never commit `.env*`, `data/`, `*.sqlite*`, `dist/`, `node_modules/`, `.tools/` (all gitignored), device credentials, or real topology exports (these are not gitignored, so check `git status` before committing).
 
 ## Handoff
