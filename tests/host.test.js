@@ -44,6 +44,21 @@ test('observations require opt-in; bad batches rollback; snapshots retain timest
  assert.throws(()=>store.append([{deviceId:'toString',status:'up',checkedAt:new Date(now).toISOString()}]))
  assert.throws(()=>store.append([null]))
 })
+test('snapshot chooses newest timestamp then sequence, including after adding the index to an existing v3 database',t=>{
+ const now=Date.now();const {store,path}=fixture(t,{now:()=>now});store.write(input({r1:true,s1:true}),0)
+ store.append([{deviceId:'r1',status:'up',checkedAt:new Date(now-1000).toISOString()},{deviceId:'r1',status:'down',checkedAt:new Date(now-2000).toISOString()}])
+ assert.equal(store.snapshot().observations.find(o=>o.deviceId==='r1').status,'up')
+ store.append([{deviceId:'r1',status:'down',checkedAt:new Date(now-1000).toISOString()}])
+ assert.equal(store.snapshot().observations.length,1);assert.equal(store.snapshot().observations[0].status,'down')
+ const saved=store.read(),history=store.history('r1');store.db.exec('DROP INDEX checks_device_latest');store.close()
+ const reopened=openStore(path,{now:()=>now});try {
+ assert.equal(reopened.db.prepare('PRAGMA user_version').get().user_version,4)
+ assert.deepEqual(reopened.read(),saved);assert.deepEqual(reopened.history('r1'),history)
+ assert.equal(reopened.snapshot().observations[0].status,'down')
+ assert.ok(reopened.db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='checks_device_latest'").get())
+ } finally {reopened.close()}
+})
+
 test('history pagination has stable cursors, bounds and retention; restart removes old rows',t=>{
  let now=Date.now();const {store,path}=fixture(t,{now:()=>now});store.write(input({r1:true}),0)
  store.append(Array.from({length:5},(_,i)=>({deviceId:'r1',status:'up',checkedAt:new Date(now-i*1000).toISOString()})))
@@ -59,8 +74,8 @@ test('history total cap bounds growth',t=>{
 test('failed initial migration rolls back schema; future schemas are rejected without modification',t=>{
  const dir=mkdtempSync(join(tmpdir(),'netwatch-migration-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));const path=join(dir,'db')
  assert.throws(()=>openStore(path,{migrate:()=>{throw new Error('migration interrupted')}}),/interrupted/)
- const db=new DatabaseSync(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,0);assert.equal(db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name='inventory'").get().n,0);db.exec('PRAGMA user_version=3');db.close()
- assert.throws(()=>openStore(path),/newer/);const check=new DatabaseSync(path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,3);check.close()
+ const db=new DatabaseSync(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,0);assert.equal(db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name='inventory'").get().n,0);db.exec('PRAGMA user_version=5');db.close()
+ assert.throws(()=>openStore(path),/newer/);const check=new DatabaseSync(path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,5);check.close()
 })
 test('offline backup/restore validates data, advances revision and rejects corrupt backups and active locks',t=>{
  const {dir,path,store}=fixture(t);store.write(input({r1:true}),0);store.append([{deviceId:'r1',status:'up',checkedAt:new Date().toISOString()}]);store.close()

@@ -17,38 +17,42 @@ npm.cmd run desktop:setup -- --desktop-shortcut
 ```
 
 4. Open the **NetWatch** desktop shortcut.
-5. Enable its **ICMP** checkbox if you want reachability checks, then click **Start** and **Open dashboard**.
+5. Enable its **Check devices on next start** checkbox if you want reachability checks, then click **Start** and **Open dashboard**.
 
 The dashboard is available at **http://127.0.0.1:4317** on this PC. No administrator access or PowerShell execution-policy change is required. Keep the repository folder and Node installation in place; rerun setup if either moves. Quit NetWatch before updating its launcher.
+
+For release acceptance, safe updates and recovery, see the [Windows release runbook](docs/WINDOWS-RELEASE-RUNBOOK.md).
 
 ## Add your devices
 
 1. Open **Edit map**, choose **Add device**, and enter a device name and its actual IPv4 or IPv6 address. An empty address is allowed for a device you do not monitor.
-2. Arrange devices and add their configured links. New devices use the next free grid cell; **Tidy layout** rearranges the browser working copy. Removing a device asks for confirmation. The editor saves a working copy in this browser.
-3. Open **Backups**, then under **Local host storage** choose **Check host** and **Save to host**.
+2. Arrange devices and add their configured links. The editor saves a working copy in this browser.
+3. Choose **Use this map** above the editor to prepare a fresh replacement review.
 4. Review the replacement and choose **Confirm replacement**. New or changed devices start with monitoring disabled.
-5. Return to **Dashboard**, select **Saved host network**, open a device and choose **Enable monitoring**.
+5. Return to **Dashboard**, open a device and choose **Turn checks on**; select the monitored network under **View options → Show** if needed.
 
 Only enable checks for devices you manage. Both the launcher's ICMP setting and each saved device's monitoring setting must be enabled. Devices must be reachable from the monitoring PC; some hotspots isolate their clients. NetWatch does not scan networks, discover hotspot clients or add devices automatically.
 
 ## Read device status
 
+An optional Windows-host SNMPv3 feature adds interface status and traffic rates under device details → **Ports**. It requires local credential enrollment and separate opt-in; it does not change ping-based device health. See [SNMP interface setup](docs/SNMP-INTERFACES.md). Cisco 3750/2811 physical verification is pending.
+
 - **Up:** recent checks confirm a response.
-- **Down:** three consecutive failed checks confirm no response; the first successful reply restores Up.
-- **Stale:** the last check is too old to describe the device's current state.
+- **Down:** two consecutive failed checks confirm no response; the first successful reply restores Up.
+- **Overdue:** the last check is too old to describe the device's current state.
 - **Not monitored:** monitoring is disabled, no address is configured, or no confirmed result is available.
 
-The collector normally checks every 30 seconds. The dashboard refreshes every five seconds and ages checks using the host's freshness policy (at least 90 seconds). Host disconnection preserves the last-known result and its timestamp; it does not turn devices Down. Device details show last check, measured response time, service state and collapsible recent history, 25 checks per page up to 200 displayed. No uptime percentage is inferred.
+The collector normally checks every 10 seconds. The dashboard refreshes every second and ages checks using the host's freshness policy (at least 30 seconds, increasing with device count). Host disconnection preserves the last-known result and its timestamp; it does not turn devices Down. Device details show last check, measured response time, service state and collapsible recent history, 25 checks per page up to 200 displayed. No uptime percentage is inferred.
 
 Line colors summarize endpoint reachability, not verified cable, interface or routing-session health. A responding switch remains Up when a connected router fails.
 
 ## Edit, back up and restore
 
-**Saved host network** shows the host's saved devices and real checks. **Browser working copy** shows your local edits without live health. Loading or saving host inventory is an explicit reviewed replacement, not automatic synchronization.
+**Monitored network** shows the host's saved devices and real checks. **Draft map** shows your local edits without live health. Loading or saving host inventory is an explicit reviewed replacement, not automatic synchronization.
 
-Use **Backups > Export current map** to download the browser working copy, or load host inventory before exporting it. **Import backup** validates a file and asks before replacing the working copy; save it to the host separately. Imports do not grant monitoring authorization. Existing saved maps and databases are preserved when updating, including devices you saved in an older version; remove unwanted devices in the editor and review **Save to host** to apply that change.
+Use **Backups → Download map** to keep a copy of your draft, or **Edit map → Load saved map** to review the monitored map before downloading it. **Restore map** checks a backup file and asks before replacing the draft; **Use this map** applies the draft to the dashboard separately. Loading or restoring a draft never enables checks. Updates preserve saved maps and history; remove unwanted devices in the editor and review **Use this map** to apply the change.
 
-Saved-layout dragging in the browser working copy autosaves positions. Host and radial-layout dragging changes only the current view. Use the summary counts or Status filter to focus the map; Needs attention lists down and overdue devices. **View options** contains source, search and layout settings; the **Devices** page offers a keyboard-operable list. Device details open with a click or Enter/Space.
+Saved-layout dragging in the browser working copy autosaves positions. Host and radial-layout dragging changes only the current view. Search stays beside the map; filters, attention and layout settings are in **View options**; the **Devices** page offers a keyboard-operable list. Device details open with a click or Enter/Space.
 
 The launcher stores data under `%LOCALAPPDATA%\NetWatch\data\netwatch.sqlite`; its control window shows the location. Browser JSON exports contain topology only, not history. For full database backup/restore, stop the host and follow [HOST-API.md](docs/HOST-API.md). Never delete a database to resolve a startup error.
 
@@ -80,3 +84,11 @@ The Vite development UI is browser-only and does not run the monitoring host. Us
 Local incidents/notifications (#11), broader Windows release/capacity/accessibility validation (#16), SNMP/LLDP/interface/redundancy work (#7/#8/#9), authentication (#10), and secured remote access/unattended service packaging (#12) remain planned. The current host is local-only; other PCs cannot access its dashboard. Do not expose the development server or bypass the host's loopback protections.
 
 See [ROADMAP.md](docs/ROADMAP.md), [Windows launcher](docs/WINDOWS-LAUNCHER.md), [monitoring policy](docs/ICMP-COLLECTOR.md), and [WORKLOG.md](docs/WORKLOG.md) for details and evidence.
+
+### Outages and recovery
+
+In device details, expand **Incidents** to see outages and recovery times; **View checks** opens the recent check history. Two failed checks open an outage, and the next reply confirms recovery. Repeated failures keep one outage open. **View options → Needs attention** includes open outages. Paused or disconnected monitoring leaves incidents open until a reply confirms recovery; check freshness and monitoring state before acting.
+
+Incidents survive host restart. Resolved incidents are kept for up to 30 days, with a 10,000-record network-wide limit; check history can expire earlier. Removing a device or replacing its address/type removes its old incident evidence. Existing databases upgrade automatically; back up before upgrading. Only new confirmed results create incidents after upgrade. External email/chat notifications remain planned and send nothing.
+
+The dashboard summary counts and Status filter narrow the displayed devices; Needs attention includes down/overdue devices and open outages. Edit map adds new devices to the next free grid cell; Tidy layout rearranges draft positions. Removing a device asks for confirmation. Routers fit their content in an oblong shape; long names use a tooltip. Devices uses cards on narrow screens, and Backups opens below navigation. Dashboard/Edit map/Devices links support reload and browser Back/Forward.

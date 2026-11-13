@@ -1,5 +1,5 @@
 {
-  "verifiedAt": "2026-11-12T17:48:05.237Z",
+  "verifiedAt": "2026-11-13T01:21:35.298Z",
   "platform": "win32",
   "controlledObservations": true,
   "probes": 0,
@@ -13,7 +13,7 @@
     "explicit monitoring disable/enable",
     "revision conflict",
     "missing address",
-    "sample isolation",
+    "no demo controls",
     "390px overflow and details",
     "deleted device and empty host"
   ],

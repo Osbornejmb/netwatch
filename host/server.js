@@ -16,7 +16,7 @@ function readBody(req) {
   })
 }
 
-export function createHost(store, { port = 4317, dist = resolve('dist'), collector } = {}) {
+export function createHost(store, { port = 4317, dist = resolve('dist'), collector, interfaces } = {}) {
   const server = http.createServer(async (req,res) => {
     const send = (status,body) => {res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(body))}
     try {
@@ -25,9 +25,13 @@ export function createHost(store, { port = 4317, dist = resolve('dist'), collect
       if (req.headers.origin && req.headers.origin !== `http://${authority}`) throw invalid('Unexpected origin.',403)
       if (req.headers['sec-fetch-site'] && !['same-origin','none'].includes(req.headers['sec-fetch-site'])) throw invalid('Cross-site requests are disabled.',403)
       const url = new URL(req.url,`http://${authority}`)
-      if (req.method==='GET' && url.pathname==='/api/v1/health') {store.read();return send(200,{apiVersion:1,ready:true,collector:collector?.snapshot() ?? {state:'not-implemented'}})}
+      if (req.method==='GET' && url.pathname==='/api/v1/health') {store.read();return send(200,{apiVersion:1,ready:true,collector:collector?.snapshot() ?? {state:'not-implemented'},interfaces:interfaces?.snapshot()??{state:'disabled'}})}
       if (req.method==='GET' && url.pathname==='/api/v1/topology') return send(200,store.read())
       if (req.method==='GET' && url.pathname==='/api/v1/snapshot') {const snapshot=store.snapshot();const status=collector?.snapshot();if(status){snapshot.collector=status;snapshot.freshness=status.freshness}return send(200,snapshot)}
+      const incidents = url.pathname.match(/^\/api\/v1\/devices\/([^/]+)\/incidents$/)
+      const ports=url.pathname.match(/^\/api\/v1\/devices\/([^/]+)\/interfaces$/)
+      if(req.method==='GET'&&ports){const id=decodeURIComponent(ports[1]);return send(200,{...store.interfaces(id,{after:url.searchParams.has('after')?Number(url.searchParams.get('after')):0,limit:url.searchParams.has('limit')?Number(url.searchParams.get('limit')):50}),monitoring:interfaces?.device(id)??{collectorState:'disabled',staleAfterMs:180000}})}
+      if (req.method==='GET' && incidents) return send(200,store.incidents(decodeURIComponent(incidents[1]),{limit:url.searchParams.has('limit')?Number(url.searchParams.get('limit')):25,before:url.searchParams.has('before')?Number(url.searchParams.get('before')):undefined}))
       const history = url.pathname.match(/^\/api\/v1\/devices\/([^/]+)\/checks$/)
       if (req.method==='GET' && history) return send(200,store.history(decodeURIComponent(history[1]),{limit:url.searchParams.has('limit')?Number(url.searchParams.get('limit')):50,before:url.searchParams.has('before')?Number(url.searchParams.get('before')):undefined}))
       if (req.method==='PUT' && url.pathname==='/api/v1/topology') {

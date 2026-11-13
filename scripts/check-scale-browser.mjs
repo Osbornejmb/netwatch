@@ -1,3 +1,4 @@
+import {refreshNetwork} from './browser-controls.mjs'
 import { hostSnapshot } from '../tests/fixtures/host-snapshot.js'
 import { validateTopology } from '../src/topology.js'
 import { createScaleNetwork } from '../tests/fixtures/scale-network.js'
@@ -26,26 +27,27 @@ for (const viewport of [{width:1440,height:900},{width:390,height:844}]) {
   const started = performance.now()
   await page.goto(url)
   await page.waitForFunction(() => document.querySelectorAll('.react-flow__node').length === 100 && [...document.querySelectorAll('.react-flow__node')].every(node => getComputedStyle(node).visibility === 'visible'))
+  await page.waitForFunction(()=>{const map=document.querySelector('.health-map').getBoundingClientRect();return [...document.querySelectorAll('.react-flow__node')].every(node=>{const r=node.getBoundingClientRect();return r.left>=map.left-1&&r.right<=map.right+1&&r.top>=map.top-1&&r.bottom<=map.bottom+1})})
   const run = {viewport, initialUnknownRenderMs: Math.round(performance.now()-started), filters:[]}
   report.runs.push(run)
   assert.equal(await page.locator('table,.sidebar,.health-stats').count(),0)
   const initialBounds = await page.evaluate(() => {
     const map = document.querySelector('.health-map').getBoundingClientRect()
     const nodes = [...document.querySelectorAll('.react-flow__node')].map(node=>node.getBoundingClientRect())
-    return { outside: nodes.filter(node=>node.left<map.left-1||node.right>map.right+1||node.top<map.top-1||node.bottom>map.bottom+1).length, map:{width:map.width,height:map.height}, minLabelPx: Math.min(...[...document.querySelectorAll('.health-node>strong')].map(node=>parseFloat(getComputedStyle(node).fontSize)*node.getBoundingClientRect().width/node.offsetWidth)) }
+    return { outside: nodes.filter(node=>node.left<map.left-1||node.right>map.right+1||node.top<map.top-1||node.bottom>map.bottom+1).length, map:{width:map.width,height:map.height}, minLabelPx: Math.min(...[...document.querySelectorAll('.health-node .device-copy strong')].map(node=>parseFloat(getComputedStyle(node).fontSize)*node.getBoundingClientRect().width/node.offsetWidth)) }
   })
   run.initialBounds=initialBounds
   console.log(JSON.stringify({viewport,initialBounds,initialUnknownRenderMs:run.initialUnknownRenderMs}))
   assert.equal(initialBounds.outside,0,'Default full map must fit all 100 devices')
   const stored=()=>page.evaluate(()=>localStorage.getItem('netwatch-topology-v1'))
   assert.equal(await stored(),serialized)
-  const view=page.locator('.health-view-options summary')
+  const view=page.locator('.health-view-options > summary')
   await view.click()
   assert.match(await page.locator('option[value=unknown]').textContent(),/100/)
   await view.click()
   const mixedStarted=performance.now()
   checks = initial.checks
-  await page.getByRole('button',{name:'Refresh host',exact:true}).click()
+  await refreshNetwork(page)
   await page.locator('.health-node-down').first().waitFor()
   run.mixedSnapshotRenderMs=Math.round(performance.now()-mixedStarted)
   assert.equal(await page.locator('.health-node-down').count(),10)
@@ -82,17 +84,19 @@ for (const viewport of [{width:1440,height:900},{width:390,height:844}]) {
   await view.click()
   await page.locator('.react-flow__controls-fitview').click()
   await page.waitForFunction(()=>{
-    const node=document.querySelector('.health-node>strong')
+    const node=document.querySelector('.health-node .device-copy strong')
     return node && parseFloat(getComputedStyle(node).fontSize)*node.getBoundingClientRect().width/node.offsetWidth>=12
   })
-  const readablePx=await page.locator('.health-node>strong').evaluate(node=>parseFloat(getComputedStyle(node).fontSize)*node.getBoundingClientRect().width/node.offsetWidth)
+  const readablePx=await page.locator('.health-node .device-copy strong').evaluate(node=>parseFloat(getComputedStyle(node).fontSize)*node.getBoundingClientRect().width/node.offsetWidth)
   assert.ok(readablePx>=12,'Focused label must be readable at fit zoom')
   run.focusedLabelPx=Math.round(readablePx*10)/10
   await page.screenshot({path:fileURLToPath(new URL(`../docs/screenshots/scale-${viewport.width}-readable.jpg`,import.meta.url))})
   await view.click()
   await page.getByLabel('Search dashboard devices').fill('no-such-device')
   assert.ok(await page.getByText('No matching devices',{exact:true}).isVisible())
+  await view.click()
   await page.getByRole('button',{name:'Clear filters'}).click()
+  await view.click()
   await page.getByLabel('Device status filter').selectOption('down')
   await view.click()
   await page.locator('.react-flow__controls-fitview').click()
@@ -122,7 +126,7 @@ for (const viewport of [{width:1440,height:900},{width:390,height:844}]) {
   await page.waitForFunction(style=>document.querySelector('.react-flow__viewport').getAttribute('style')!==style,beforePan)
   await page.locator('.react-flow__controls-fitview').click()
   await page.screenshot({path:fileURLToPath(new URL(`../docs/screenshots/scale-${viewport.width}-overview.jpg`,import.meta.url))})
-  await page.getByRole('link',{name:'Device inventory',exact:true}).click()
+  await page.getByRole('link',{name:'Devices',exact:true}).click()
   await view.click()
   await page.getByLabel('Device status filter').selectOption('stale')
   assert.equal(await page.locator('tbody tr').count(),10)
@@ -140,7 +144,7 @@ for (const viewport of [{width:1440,height:900},{width:390,height:844}]) {
 const empty=await browser.newContext()
 await empty.addInitScript(()=>localStorage.setItem('netwatch-topology-v1',JSON.stringify({nodes:[],edges:[]})))
 const page=await empty.newPage();await page.goto(url)
-assert.ok(await page.getByText('Your network map starts here',{exact:true}).isVisible())
+assert.ok(await page.getByText('Your network starts here',{exact:true}).isVisible())
 await empty.close()
 assert.deepEqual(errors,[])
 await writeFile(fileURLToPath(new URL('../docs/scale-results.json',import.meta.url)),JSON.stringify(report,null,2)+'\n')

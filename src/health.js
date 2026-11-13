@@ -1,7 +1,7 @@
 export const HEALTH = {
   up: { label: 'Up', note: 'Responding to checks', color: '#15803d' },
   down: { label: 'Down', note: 'Not responding', color: '#b91c1c' },
-  stale: { label: 'Stale', note: 'Check is overdue', color: '#a16207' },
+  stale: { label: 'Overdue', note: 'Check is overdue', color: '#a16207' },
   unknown: { label: 'Not monitored', note: 'No verified check', color: '#64748b' },
 }
 

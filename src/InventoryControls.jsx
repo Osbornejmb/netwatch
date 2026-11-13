@@ -24,23 +24,23 @@ export default function InventoryControls({ nodes, edges, selectedId, onSelect, 
     setLinkError(''); setNotice('Link added.')
   }
   return <section className="inventory-controls" aria-labelledby="inventory-controls-title">
-    <h2 id="inventory-controls-title">Device and link controls</h2><p>Use these controls to edit the map with a keyboard or pointer.</p>
+    <h2 id="inventory-controls-title">Devices & connections</h2><p>Choose a device to edit, or connect two devices below.</p>
     <label htmlFor="editor-device">Selected device</label>
     <select id="editor-device" value={selected?.id || ''} onChange={event => { onSelect(event.target.value); setNotice('') }}><option value="">Choose a device</option>{nodes.map(node => <option key={node.id} value={node.id}>{node.data.label}</option>)}</select>
     {selected && <div className="inventory-device-actions">
-      <button className="button secondary" onClick={onEdit}>Edit selected device</button><button className="button danger" onClick={onRemove}>Delete selected device</button>
+      <button className="button secondary" onClick={onEdit}>Edit device</button><button className="button danger" onClick={onRemove}>Delete device</button>
       <form key={`${selected.id}-${selected.position.x}-${selected.position.y}`} onSubmit={move} className="position-form">
         <label>X position<input name="x" type="number" step="any" required defaultValue={selected.position.x}/></label><label>Y position<input name="y" type="number" step="any" required defaultValue={selected.position.y}/></label><button className="button secondary" type="submit">Apply position</button>
       </form>
     </div>}
     <form onSubmit={connect} className="link-form">
-      <div className="link-endpoint"><label htmlFor="link-source">Link source</label><select id="link-source" name="source" required defaultValue=""><option value="" disabled>Choose source</option>{nodes.map(node => <option key={node.id} value={node.id}>{node.data.label}</option>)}</select></div>
-      <div className="link-endpoint"><label htmlFor="link-target">Link target</label><select id="link-target" name="target" required defaultValue=""><option value="" disabled>Choose target</option>{nodes.map(node => <option key={node.id} value={node.id}>{node.data.label}</option>)}</select></div>
-      <button className="button secondary" type="submit" disabled={nodes.length < 2}>Add link</button>
+      <div className="link-endpoint"><label htmlFor="link-source">From device</label><select id="link-source" name="source" required defaultValue=""><option value="" disabled>Choose a device</option>{nodes.map(node => <option key={node.id} value={node.id}>{node.data.label}</option>)}</select></div>
+      <div className="link-endpoint"><label htmlFor="link-target">To device</label><select id="link-target" name="target" required defaultValue=""><option value="" disabled>Choose a device</option>{nodes.map(node => <option key={node.id} value={node.id}>{node.data.label}</option>)}</select></div>
+      <button className="button secondary" type="submit" disabled={nodes.length < 2}>Add connection</button>
     </form>
     {linkError && <p className="field-error" role="alert">{linkError}</p>}
     <p role="status">{notice}</p>
     <ul className="editable-links">{edges.map(edge => <li key={edge.id}><span>{nodes.find(node => node.id === edge.source)?.data.label} → {nodes.find(node => node.id === edge.target)?.data.label}</span><button className="button secondary" aria-label={`Remove link ${nodes.find(node => node.id === edge.source)?.data.label} to ${nodes.find(node => node.id === edge.target)?.data.label}`} onClick={() => { onRemoveLink(edge.id); setNotice('Link removed.') }}>Remove link</button></li>)}</ul>
-    {!edges.length && <p>No configured links.</p>}
+    {!edges.length && <p>No connections added.</p>}
   </section>
 }

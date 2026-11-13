@@ -47,15 +47,15 @@ test('healthy, transient loss, sustained failure and recovery persist raw outcom
  const {store}=setup(t);const results=[up,down,up,down,down,down,up];const c=collector(store,async()=>results.shift())
  const statuses=[]
  for(let i=0;i<7;i++){await c.runOnce();statuses.push(store.history('d0').checks[0].status)}
- assert.deepEqual(statuses,['up','up','up','up','up','down','up'])
- const checks=store.history('d0').checks;assert.equal(checks[0].latencyMs,2);assert.equal(checks[1].latencyMs,null);assert.equal(checks[2].outcome,'unreachable');assert.equal(checks[2].status,'up')
+ assert.deepEqual(statuses,['up','up','up','up','down','down','up'])
+ const checks=store.history('d0').checks;assert.equal(checks[0].latencyMs,2);assert.equal(checks[1].latencyMs,null);assert.equal(checks[2].outcome,'unreachable');assert.equal(checks[2].status,'down')
  assert.ok(c.snapshot().lastSuccessfulCycleAt);assert.equal(c.snapshot().errors,0);await c.stop()
 })
 test('initial packet loss stays unknown until threshold; process/permission errors do not become device down',async t=>{
- const {store}=setup(t);const results=[down,down,{outcome:'error',code:'icmp_exception'},down,down,down]
+ const {store}=setup(t);const results=[down,{outcome:'error',code:'icmp_exception'},down,down]
  const c=collector(store,async()=>results.shift());await c.runOnce();assert.equal(store.snapshot().observations[0].status,'unknown')
- await c.runOnce();await c.runOnce();assert.equal(c.snapshot().state,'degraded');assert.equal(c.snapshot().ready,false);assert.equal(store.history('d0').checks.length,2)
- await c.runOnce();assert.equal(store.history('d0').checks[0].status,'unknown');await c.runOnce();await c.runOnce();assert.equal(store.history('d0').checks[0].status,'down');await c.stop()
+ await c.runOnce();assert.equal(c.snapshot().state,'degraded');assert.equal(c.snapshot().ready,false);assert.equal(store.history('d0').checks.length,1)
+ await c.runOnce();assert.equal(store.history('d0').checks[0].status,'unknown');await c.runOnce();assert.equal(store.history('d0').checks[0].status,'down');await c.stop()
 })
 test('only opted-in inventory is visited; unsupported and disabled collectors never invoke a runner',async t=>{
  const {store,input}=setup(t,3);input.monitoring.d1=false;input.monitoring.d2=false;store.write(input,1)
@@ -103,7 +103,7 @@ test('Windows adapter validates targets and uses fixed argv, bounded output/time
 })
 test('v1 schema migration preserves inventory/history; interrupted v2 migration rolls back; backups restore latency data',t=>{
  const {store,path,dir}=setup(t);store.close();const old=new DatabaseSync(path)
- old.exec(`DROP TABLE checks;CREATE TABLE checks(seq INTEGER PRIMARY KEY AUTOINCREMENT,device_id TEXT NOT NULL,status TEXT NOT NULL,checked_at INTEGER NOT NULL);CREATE INDEX checks_device_time ON checks(device_id,seq);CREATE INDEX checks_time ON checks(checked_at);PRAGMA user_version=1;`)
+ old.exec(`DROP TABLE interface_samples;DROP TABLE snmp_targets;DROP TABLE incidents;DROP TABLE checks;CREATE TABLE checks(seq INTEGER PRIMARY KEY AUTOINCREMENT,device_id TEXT NOT NULL,status TEXT NOT NULL,checked_at INTEGER NOT NULL);CREATE INDEX checks_device_time ON checks(device_id,seq);CREATE INDEX checks_time ON checks(checked_at);PRAGMA user_version=1;`)
  old.prepare('INSERT INTO checks VALUES(1,?,?,?)').run('d0','up',Date.now());old.close()
  const legacy=join(dir,'legacy-backup');backupDatabase(path,legacy)
  assert.throws(()=>openStore(path,{migrateV2:()=>{throw new Error('interrupted')}}),/interrupted/)
@@ -116,7 +116,7 @@ test('v1 schema migration preserves inventory/history; interrupted v2 migration 
 test('v1 migration never reuses history IDs after the newest rows were deleted',t=>{
  const {store,path}=setup(t);store.close()
  const old=new DatabaseSync(path)
- old.exec(`DROP TABLE checks;CREATE TABLE checks(seq INTEGER PRIMARY KEY AUTOINCREMENT,device_id TEXT NOT NULL,status TEXT NOT NULL,checked_at INTEGER NOT NULL);PRAGMA user_version=1;`)
+ old.exec(`DROP TABLE interface_samples;DROP TABLE snmp_targets;DROP TABLE incidents;DROP TABLE checks;CREATE TABLE checks(seq INTEGER PRIMARY KEY AUTOINCREMENT,device_id TEXT NOT NULL,status TEXT NOT NULL,checked_at INTEGER NOT NULL);PRAGMA user_version=1;`)
  old.prepare('INSERT INTO checks VALUES(500,?,?,?)').run('d0','up',Date.now())
  old.exec('DELETE FROM checks');old.close()
  const migrated=openStore(path)
@@ -127,7 +127,7 @@ test('v1 migration never reuses history IDs after the newest rows were deleted',
 })
 
 test('cycle/freshness budget scales with worker capacity and collector errors never refresh old observations',async t=>{
- assert.equal(cycleBudget(1),30000);assert.equal(cycleBudget(100),52000);assert.equal(cycleBudget(2000),1000000);assert.equal(freshnessPolicy(100).staleAfterMs,114000)
+ assert.equal(cycleBudget(1),10000);assert.equal(freshnessPolicy(1).staleAfterMs,30000);assert.equal(cycleBudget(100),52000);assert.equal(cycleBudget(2000),1000000);assert.equal(freshnessPolicy(100).staleAfterMs,114000)
  const {store}=setup(t);let result=up;const c=collector(store,async()=>result);await c.runOnce();const previous=store.history('d0').checks[0];const successful=c.snapshot().lastSuccessfulCycleAt
  result={outcome:'error',code:'runner_process_error'};await c.runOnce();assert.deepEqual(store.history('d0').checks[0],previous);assert.equal(c.snapshot().lastSuccessfulCycleAt,successful);await c.stop()
 })
@@ -137,7 +137,7 @@ test('host API separates database readiness, collector readiness, raw outcomes a
  const {store}=setup(t);let result=up;const c=collector(store,async()=>result)
  const server=createHost(store,{port:0,collector:c});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}`
  try {
-  await c.runOnce();const first=await (await fetch(base+'/api/v1/snapshot')).json();assert.equal(first.observations[0].latencyMs,2);assert.equal(first.collector.ready,true);assert.equal(first.freshness.staleAfterMs,90000)
+  await c.runOnce();const first=await (await fetch(base+'/api/v1/snapshot')).json();assert.equal(first.observations[0].latencyMs,2);assert.equal(first.collector.ready,true);assert.equal(first.freshness.staleAfterMs,30000)
   result={outcome:'error',code:'runner_process_error'};await c.runOnce()
   const health=await (await fetch(base+'/api/v1/health')).json();assert.equal(health.ready,true);assert.equal(health.collector.ready,false);assert.equal(health.collector.diagnostics[0].code,'runner_process_error')
   const snapshot=await (await fetch(base+'/api/v1/snapshot')).json();assert.deepEqual(snapshot.observations,first.observations)

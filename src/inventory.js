@@ -20,7 +20,7 @@ export function deviceFields(fields, nodes, currentId) {
   if (!label || label.length > 100) throw new Error('Enter a device name of 1–100 characters.')
   const ip = normalizeAddress(fields.ip)
   if (ip && nodes.some(node => node.id !== currentId && normalizeAddress(node.data.ip || '') === ip)) {
-    throw new Error('This management address is already assigned to another device.')
+    throw new Error('Another device already uses this IP address.')
   }
   const description = fields.description.trim()
   if (description.length > 500) throw new Error('Keep the description within 500 characters.')

@@ -39,22 +39,22 @@ Constants live in `host/icmp-policy.js` and are exposed in collector metadata, r
 
 | Setting | Initial value |
 | --- | --- |
-| Target cycle start interval | 30 seconds |
+| Target cycle start interval | 10 seconds |
 | ICMP timeout | 1.5 seconds |
 | Whole helper timeout | 4 seconds |
 | Maximum concurrency | 8 |
-| Consecutive valid network failures for down | 3 |
+| Consecutive valid network failures for down | 2 |
 | Consecutive successful replies for recovery/up | 1 |
 | Retry behavior | Next regular cycle only; no extra immediate attempts |
 | Minimum delay after an overlong cycle | 1 second |
 
-Initially status is unknown. First success makes it up; first/second failures before any success remain unknown. An up device remains up through one/two consecutive valid failures, becomes down on the third, and recovers on the next successful reply. A successful reply resets the failure streak. Collector errors break consecutive runs and freeze the last stored observation without refreshing its timestamp; they cannot accumulate a down transition. Raw outcome and effective status are separate: an `up` status with `outcome:unreachable` means loss below the configured threshold, not a successful latest echo.
+Initially status is unknown. First success makes it up; the first failure before any success remains unknown. An up device remains up through one valid failure, becomes down on the second, and recovers on the next successful reply. A successful reply resets the failure streak. Collector errors break consecutive runs and freeze the last stored observation without refreshing its timestamp; they cannot accumulate a down transition. Raw outcome and effective status are separate: an `up` status with `outcome:unreachable` means loss below the configured threshold, not a successful latest echo.
 
-Let **B = max(30 seconds, ceil(enabled devices / 8) × 4 seconds)**. This estimates the worst helper-only cycle duration/start gap. Individual device checks can move within successive cycles, so use **2B + 1 second** as a conservative per-device revisit estimate, plus event-loop/database/OS scheduling overhead. From a failure immediately after a check, allow approximately **4B + 3 seconds** for three consecutive failure checks (first next check can take up to 2B, then subsequent whole cycles); recovery takes up to approximately **2B + 1 second**. These are planning estimates, not a measured SLA: local database contention and slow hardware add overhead. Changing inventory/restarting resets streaks and extends detection. Check measured last-cycle timing before relying on a deployment's detection target.
+Let **B = max(10 seconds, ceil(enabled devices / 8) × 4 seconds)**. This estimates the worst helper-only cycle duration/start gap. Individual device checks can move within successive cycles, so use **2B + 1 second** as a conservative per-device revisit estimate, plus event-loop/database/OS scheduling overhead. From a failure immediately after a check, allow approximately **3B + 2 seconds** for two consecutive failure checks (first next check can take up to 2B, then subsequent whole cycles); recovery takes up to approximately **2B + 1 second**. These are planning estimates, not a measured SLA: local database contention and slow hardware add overhead. Changing inventory/restarting resets streaks and extends detection. Check measured last-cycle timing before relying on a deployment's detection target.
 
-Examples: 1–56 enabled devices give B=30 seconds, down planning allowance about 123 seconds and recovery about 61 seconds; 100 devices give B=52 seconds, down about 211 seconds; 2,000 devices give B=1,000 seconds and impractically long detection for most operators. Measure and reduce the enabled inventory/adjust architecture before claiming a large-company deployment.
+Examples: 1–8 enabled devices give B=10 seconds, conservative down planning allowance about 32 seconds and recovery about 21 seconds before dashboard transport delay; 100 devices give B=52 seconds, down about 158 seconds; 2,000 devices give B=1,000 seconds and impractically long detection for most operators. Measure and reduce the enabled inventory/adjust architecture before claiming a large-company deployment.
 
-Snapshot `freshness.staleAfterMs = max(90,000, 2B + 10,000)` accounts for worker capacity. Collector errors or a stopped host never create fresh down observations; existing evidence eventually becomes stale. Consumers must use the exposed freshness, raw outcome and collector metadata. The current dashboard still uses its independent sample/unknown policy until #6 wires the API in.
+Snapshot `freshness.staleAfterMs = max(30,000, 2B + 10,000)` accounts for worker capacity. Collector errors or a stopped host never create fresh down observations; existing evidence eventually becomes stale. Consumers must use the exposed freshness, raw outcome and collector metadata. The dashboard polls the snapshot every second without overlapping requests. Small healthy networks typically detect down in roughly 10–22 seconds (two checks plus timeout/display delay); this is an estimate, not measured hardware acceptance. Large or slow inventories can exceed the ten-second target cadence.
 
 ## Data/API changes
 
@@ -134,3 +134,7 @@ The browser showed real Up (61 ms baseline latency), Down after the third genuin
 Stopping the test host preserved the last-known Up result with a disconnected message; the browser clock aged it to Stale without a successful API response. Restarting the same isolated host automatically restored connected/Up. Device history displayed actual up/down transitions, and the 390px details view had no document overflow. Collector errors and browser exceptions were both zero. Phone Wi-Fi was restored with the same address; graceful shutdown took 27 ms, released the lock, and the temporary database/helper cache were removed.
 
 See [redacted live results](phone-dashboard-results.json) and [Down](screenshots/phone-dashboard-down.png), [recovered](screenshots/phone-dashboard-recovered.png), [stale/disconnected](screenshots/phone-dashboard-stale.png), [narrow history](screenshots/phone-dashboard-narrow.png). Screenshots mask the private address. This proves one phone/Wi-Fi path with the current local changes; multi-device capacity, broader Windows release checks, and publication/CI/merge remain separate work. The test stopped the host via its existing SIGINT handler over private IPC; it adds no new physical Ctrl+C evidence.
+
+## Incident integration (2.4)
+
+The store now records an incident with each newly confirmed down result and resolves it only on confirmed reachable/up recovery. The current defaults are ten-second cycles, two failures for down and one successful reply for recovery; the older measurements above used the previous 30-second/three-failure policy. Pending results and collector errors cannot create or resolve outages; restart resets in-memory streaks while preserving the incident ledger. See HOST-API.md for schema v3, retention and migration. No additional probes or notification delivery are introduced.

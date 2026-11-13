@@ -1,0 +1,15 @@
+{
+  "scope": "Controlled 55-interface fixture; no real probes or credentials",
+  "browser": "157.0.8103.51",
+  "checks": [
+    "device Up independently of interface Down",
+    "unknown/partial interface state",
+    "counter-derived rates",
+    "pagination",
+    "desktop/390px",
+    "stale and request failure",
+    "keyboard dialog",
+    "authorization removal/empty state"
+  ],
+  "errors": []
+}

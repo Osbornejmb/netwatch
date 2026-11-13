@@ -1,3 +1,4 @@
+import { refreshNetwork } from './browser-controls.mjs'
 import assert from 'node:assert/strict'
 import { createHealthNetwork } from '../tests/fixtures/health-network.js'
 import { hostSnapshot } from '../tests/fixtures/host-snapshot.js'
@@ -50,13 +51,13 @@ try {
   await page.getByRole('dialog').waitFor()
   await page.keyboard.press('Escape')
   connected = false
-  await page.getByRole('button', { name: 'Refresh host', exact: true }).click()
+  await refreshNetwork(page)
   await page.getByText('Connection lost, reconnecting', { exact: false }).waitFor()
   assert.ok(await page.locator('.connection-lost').isVisible())
   connected = true
-  await page.getByRole('button', { name: 'Refresh host', exact: true }).click()
-  await page.getByText('Host connected', { exact: false }).waitFor()
-  await page.getByRole('link', { name: 'Device inventory', exact: true }).click()
+  await refreshNetwork(page)
+  await page.locator('.health-page-titlebar > div > p[role=status]').first().filter({ hasText: /^Connected/ }).waitFor()
+  await page.getByRole('link', { name: 'Devices', exact: true }).click()
   for (const width of [1280, 1920, 390, 320]) {
     await page.setViewportSize({ width, height: 900 })
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
@@ -83,12 +84,13 @@ try {
   await page.getByRole('dialog').getByRole('button', { name: 'Add device', exact: true }).click()
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('netwatch-topology-v1')).nodes.length === 15)
   assert.equal(new Set((await snapshot()).nodes.map(node => JSON.stringify(node.position))).size, 15)
+  await page.locator('.editor-tools > summary').click()
   await page.getByLabel('Selected device', { exact: true }).selectOption('core-a')
   page.once('dialog', dialog => dialog.dismiss())
-  await page.getByRole('button', { name: 'Delete selected device', exact: true }).click()
+  await page.getByRole('button', { name: 'Delete device', exact: true }).click()
   assert.equal((await snapshot()).nodes.length, 15)
   page.once('dialog', dialog => dialog.accept())
-  await page.getByRole('button', { name: 'Delete selected device', exact: true }).click()
+  await page.getByRole('button', { name: 'Delete device', exact: true }).click()
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('netwatch-topology-v1')).nodes.length === 14)
   assert.ok((await snapshot()).edges.every(edge => edge.source !== 'core-a' && edge.target !== 'core-a'))
   await page.screenshot({ path: 'docs/screenshots/editor-after.png', fullPage: true })
@@ -97,7 +99,7 @@ try {
   await page.reload()
   await page.getByRole('heading', { name: 'Devices', exact: true }).waitFor()
   await page.goBack()
-  await page.getByRole('heading', { name: 'Topology builder', exact: true }).waitFor()
+  await page.getByRole('heading', { name: 'Edit your map', exact: true }).waitFor()
   const offline = await browser.newPage()
   await offline.route('**/api/v1/snapshot', route => route.abort())
   await offline.goto(base)

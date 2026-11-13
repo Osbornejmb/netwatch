@@ -1,5 +1,11 @@
 # Working checkpoint
 
+## Current status (2026-11-13): integrate desktop-map commits with current main
+
+- Reviewed all six desktop-map commits and merged current main into the branch, resolving overlapping App/Dashboard/CSS/docs/browser checks. Preserved the off-white redesign, direct map replacement reviews, persistent Outages, Ports and all host changes already on main; no new host/schema changes. Compact content-sized oblong routers, filters/attention, side handles, grid/tidy, hash navigation, connection copy, removal confirmation and responsive panels remain.
+- Fixed backup anchoring for the newer full-height header, preserved open-outage attention even when current device evidence is up/paused, and used one node lookup for editor links. Browser checks cover desktop/narrow rendering, no pure-white UI, transfer-review/cancellation, editing and removal. 70 Node tests pass; production build passes. All 12 matching browser suites pass: desktop, redesign, inventory, Outages, Ports, dragging, recovery, radial, 100-device scale, empty startup, monitoring and topology. Fixed narrow View options positioning and updated reload checks for hash routes. Publication and CI status are recorded at handoff.
+
+
 ## Current status (2026-11-13): content-sized router oblongs
 
 - Routers now use oblong borders in dashboard and editor, with intrinsic content width/height and compact padding. A shared 280px cap retains ellipsis/tooltips for unusually long names; switches remain 160×56 rectangles. Placement and radial spacing reserve the maximum router width. Stored topology is unchanged.

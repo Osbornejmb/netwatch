@@ -1,0 +1,31 @@
+{
+  "scope": "100 synthetic devices, 100,000 checks, 10,000 resolved incidents; two simulated clients reading once per second; no collectors or real browsers",
+  "node": "v26.13.1",
+  "windowsBuild": "10.0.26200",
+  "probes": 0,
+  "clients": 2,
+  "rounds": 12,
+  "appendCycleMs": [
+    514,
+    552
+  ],
+  "seedMs": 1321,
+  "snapshotMs": {
+    "p50": 27,
+    "p95": 46,
+    "max": 52
+  },
+  "averageSnapshotBytes": 56596,
+  "measuredWallMs": 11096,
+  "combinedHostAndClientCpuMs": 1360,
+  "combinedHostAndClientCpuPercentOfOneCore": 12.3,
+  "processRssMiB": 67,
+  "retainedChecks": 100000,
+  "retainedResolvedIncidents": 10000,
+  "limitations": [
+    "No Windows ping helper processes or network timeouts measured",
+    "No actual browser rendering in this process",
+    "One machine and short run; not a sustained deployment SLA",
+    "CPU/RSS include the synthetic HTTP clients and fixture setup process"
+  ]
+}

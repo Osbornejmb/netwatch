@@ -25,18 +25,18 @@ export default function DeviceDialog({ device, nodes, onSave, onClose }) {
   }
   return <dialog {...modal} className="modal device-dialog" aria-labelledby="device-dialog-title">
     <form onSubmit={submit} noValidate>
-      <div className="modal-head"><h2 id="device-dialog-title">{device ? 'Edit network device' : 'Add network device'}</h2><button type="button" className="icon-button" aria-label="Close device dialog" onClick={onClose}>×</button></div>
+      <div className="modal-head"><h2 id="device-dialog-title">{device ? 'Edit device' : 'Add device'}</h2><button type="button" className="icon-button" aria-label="Close device dialog" onClick={onClose}>×</button></div>
       {!device && <><label className="field-label" htmlFor="device-kind">Device type</label><select id="device-kind" value={kind} onChange={event => setKind(event.target.value)}><option value="switch">Switch</option><option value="router">Router</option></select></>}
       <label className="field-label" htmlFor="device-name">Device name (required)</label>
       <input data-initial-focus id="device-name" required maxLength={100} value={label} onChange={event => setLabel(event.target.value)} aria-invalid={Boolean(errors.label)} aria-describedby={errors.label ? 'name-error' : undefined}/>
       {errors.label && <p id="name-error" className="field-error" role="alert">{errors.label}</p>}
-      <label className="field-label" htmlFor="device-ip">Management IP address</label>
+      <label className="field-label" htmlFor="device-ip">IP address</label>
       <input id="device-ip" maxLength={253} value={ip} onChange={event => setIp(event.target.value)} aria-invalid={Boolean(errors.ip)} aria-describedby={errors.ip ? 'ip-error ip-help' : 'ip-help'}/>
-      <p id="ip-help">IPv4 or IPv6 literal. Leave empty for an unmonitored entry.</p>
+      <p id="ip-help">Enter the device’s IP address, or leave blank to add it without checks.</p>
       {errors.ip && <p id="ip-error" className="field-error" role="alert">{errors.ip}</p>}
       <label className="field-label" htmlFor="device-desc">Description (optional)</label>
       <input id="device-desc" maxLength={500} value={description} onChange={event => setDescription(event.target.value)}/>
-      <p>Inventory changes do not enable monitoring.</p>
+      <p>Adding a device leaves its checks off.</p>
       <div className="modal-actions"><button type="button" className="button secondary" onClick={onClose}>Cancel</button><button className="button primary" type="submit">{device ? 'Save changes' : 'Add device'}</button></div>
     </form>
   </dialog>
