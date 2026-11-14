@@ -29,6 +29,8 @@ Topology JSON: schemaVersion 1, nodes[{id,type,position:{x,y},data:{label,ip,des
 
 Treat browser storage, imported files, API input, discovery results, and device responses as untrusted. Validate at each boundary. Never interpolate device addresses into shell commands. Probe only configured authorized inventory, with rate/concurrency/time bounds. Keep secrets in host-managed secure storage; exclude them from logs, exports, and repository history.
 
+Opt-in local discovery reads Windows neighbor entries and keeps them separate from inventory. Results are restricted to directly attached IPv4 subnets, reviewed explicitly before adding, and never enable monitoring. See DISCOVERY.md for limits and API behavior.
+
 Bind development and the future API to loopback by default. LAN development is explicit. Remote access requires authentication, authorization, HTTPS or VPN, audit records, and restrictive firewall rules. No public development-server deployment.
 
 ## Recovery and delivery
@@ -45,7 +47,7 @@ Snapshots use the additive v3 `checks_device_latest` index and select one newest
 
 Device details enable/disable only saved host devices using the snapshot revision and complete saved host inventory, preserving other devices and rejecting conflicts without retry. A missing address prevents authorization. `DeviceHistory.jsx` fetches 25 checks per page up to 200 displayed, validates device IDs/sequence/revision, cancels obsolete requests and labels adjacent retained transitions in local time. New checks reset pagination to the newest page. No uptime percentage or continuity is inferred. History is collapsible; service/errors use everyday language.
 
-System fonts replace the starter's Google Fonts import so the dashboard does not need a font CDN at runtime. `src/dashboard.css` contains the light dashboard tokens; the editor retains its original dark workspace. The dashboard itself adds no runtime dependencies. Host SQLite schema v4 (with transactional v1/v2/v3 migration) is separate from the unchanged browser v1 JSON contract.
+System fonts replace the starter's Google Fonts import so the dashboard does not need a font CDN at runtime. `src/dashboard.css` contains the light dashboard tokens; the editor retains its original dark workspace. The dashboard itself adds no runtime dependencies. Host SQLite schema v5 (with transactional v1/v2/v3/v4 migration) is separate from the unchanged browser v1 JSON contract.
 
 ## Device selection
 

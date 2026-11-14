@@ -73,7 +73,7 @@ test('v2 upgrade rolls back safely and backup/restore preserves active and recov
   const expected=f.store.incidents('a').incidents;f.store.close()
   const backup=join(f.dir,'backup');backupDatabase(f.path,backup);restoreDatabase(f.path,backup)
   const restored=openStore(f.path,{now:f.now});assert.deepEqual(restored.incidents('a').incidents,expected);restored.close()
-  const db=new DatabaseSync(f.path);db.exec('DROP TABLE interface_samples;DROP TABLE snmp_targets;DROP TABLE incidents;PRAGMA user_version=2');db.close()
+  const db=new DatabaseSync(f.path);db.exec('DROP TABLE discovered_devices;DROP TABLE interface_samples;DROP TABLE snmp_targets;DROP TABLE incidents;PRAGMA user_version=2');db.close()
   assert.throws(()=>openStore(f.path,{migrateV3:()=>{throw new Error('interrupted')}}),/interrupted/)
   const check=new DatabaseSync(f.path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,2);check.close()
   const migrated=openStore(f.path);assert.equal(migrated.history('a').checks.length,3);assert.deepEqual(migrated.incidents('a').incidents,[]);migrated.close()

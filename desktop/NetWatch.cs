@@ -9,7 +9,7 @@ using System.Web.Script.Serialization;
 using System.Windows.Forms;
 
 public class DesktopSettings {
- public string node {get;set;} public string root {get;set;} public string database {get;set;} public bool icmp {get;set;}
+ public string node {get;set;} public string root {get;set;} public string database {get;set;} public bool icmp {get;set;} public bool discovery {get;set;} public bool discoveryIcmp {get;set;}
 }
 public class HostEvent {public string state {get;set;} public string message {get;set;}}
 public class NetWatchMenuColors : ProfessionalColorTable {
@@ -30,7 +30,7 @@ public class NetWatch : Form {
  Process host;
  NotifyIcon tray;
  Label status;
- CheckBox monitoring;
+ CheckBox monitoring,discovery,discoveryIcmp;
  Button start,stop,open;
  ToolStripMenuItem trayStart,trayStop,trayOpen;
  bool quitting=false;
@@ -49,7 +49,7 @@ public class NetWatch : Form {
  public NetWatch(EventWaitHandle showRequest) {
   settings=json.Deserialize<DesktopSettings>(File.ReadAllText(settingsPath));
   if(settings==null||!Path.IsPathRooted(settings.database)||!File.Exists(settings.node)||!File.Exists(Path.Combine(settings.root,"host","desktop.js")))throw new Exception("Launcher paths are unavailable. Run desktop:setup again from the current checkout.");
-  Text="NetWatch";ClientSize=new Size(540,350);Font=new Font(SystemFonts.MessageBoxFont.FontFamily,10);BackColor=Color.FromArgb(244,243,238);ForeColor=Color.FromArgb(37,58,54);
+  Text="NetWatch";ClientSize=new Size(540,405);Font=new Font(SystemFonts.MessageBoxFont.FontFamily,10);BackColor=Color.FromArgb(244,243,238);ForeColor=Color.FromArgb(37,58,54);
   FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;Icon=SystemIcons.Application;
   var title=new Label{Text="Your network, at a glance",Font=new Font(Font,FontStyle.Bold),Location=new Point(20,18),AutoSize=true};Controls.Add(title);
   status=new Label{Text="Stopped",Location=new Point(20,55),Size=new Size(500,65),AccessibleName="Host status"};Controls.Add(status);
@@ -59,8 +59,13 @@ public class NetWatch : Form {
   var quit=new Button{Text="&Quit",Location=new Point(430,125),Size=new Size(90,40)};quit.Click+=(s,e)=>Quit();Controls.Add(quit);
   monitoring=new CheckBox{Text="Check devices on next start",Checked=settings.icmp,Location=new Point(20,180),AutoSize=true};
   monitoring.CheckedChanged+=(s,e)=>{try{settings.icmp=monitoring.Checked;File.WriteAllText(settingsPath,json.Serialize(settings));}catch(Exception ex){MessageBox.Show(ex.Message,"Unable to save settings");}};Controls.Add(monitoring);
-  var data=new TextBox{Text="Saved data: "+settings.database,ReadOnly=true,Multiline=true,BorderStyle=BorderStyle.None,BackColor=BackColor,ForeColor=ForeColor,Location=new Point(20,215),Size=new Size(500,40),AccessibleName="Saved data location"};Controls.Add(data);
-  Controls.Add(new Label{Text="Turn on checks for each device in the dashboard.\nClosing this window keeps NetWatch running near the clock.\nStop or Quit pauses monitoring for everyone; sign-out also stops it.",Location=new Point(20,265),Size=new Size(500,70)});
+  discovery=new CheckBox{Text="Discover local network neighbors on next start",Checked=settings.discovery,Location=new Point(20,205),AutoSize=true};
+  discovery.CheckedChanged+=(s,e)=>{try{settings.discovery=discovery.Checked;File.WriteAllText(settingsPath,json.Serialize(settings));}catch(Exception ex){MessageBox.Show(ex.Message,"Unable to save settings");}};Controls.Add(discovery);
+  discoveryIcmp=new CheckBox{Text="Also check local devices with ICMP (slower)",Checked=settings.discoveryIcmp,Location=new Point(20,230),AutoSize=true,Enabled=settings.discovery};
+  discoveryIcmp.CheckedChanged+=(s,e)=>{try{settings.discoveryIcmp=discoveryIcmp.Checked;File.WriteAllText(settingsPath,json.Serialize(settings));}catch(Exception ex){MessageBox.Show(ex.Message,"Unable to save settings");}};Controls.Add(discoveryIcmp);
+  discovery.CheckedChanged+=(s,e)=>{discoveryIcmp.Enabled=discovery.Checked;if(!discovery.Checked){settings.discoveryIcmp=false;discoveryIcmp.Checked=false;}};
+  var data=new TextBox{Text="Saved data: "+settings.database,ReadOnly=true,Multiline=true,BorderStyle=BorderStyle.None,BackColor=BackColor,ForeColor=ForeColor,Location=new Point(20,260),Size=new Size(500,40),AccessibleName="Saved data location"};Controls.Add(data);
+  Controls.Add(new Label{Text="Discovery lists nearby devices for review; it never enables monitoring.\nICMP discovery is separately optional. Saved devices need their own approval.\nStop or Quit pauses the host; sign-out also stops it.",Location=new Point(20,310),Size=new Size(500,70)});
   foreach(Control control in Controls){var button=control as Button;if(button!=null){button.FlatStyle=FlatStyle.Flat;button.BackColor=Color.FromArgb(252,251,247);button.ForeColor=ForeColor;button.FlatAppearance.BorderColor=Color.FromArgb(170,183,172);button.UseVisualStyleBackColor=false;}}
   var menu=new ContextMenuStrip{BackColor=Color.FromArgb(252,251,247),ForeColor=ForeColor,Renderer=new ToolStripProfessionalRenderer(new NetWatchMenuColors())};menu.Items.Add("Show controls",null,(s,e)=>ShowControls());
   trayStart=new ToolStripMenuItem("Start",null,(s,e)=>StartHost());menu.Items.Add(trayStart);
@@ -81,13 +86,13 @@ public class NetWatch : Form {
   status.Text=message;status.AccessibleName="NetWatch status: "+message;tray.Text="NetWatch: "+next;
   bool idle=host==null;
   start.Enabled=trayStart.Enabled=idle&&!quitting;stop.Enabled=trayStop.Enabled=!idle&&next!="stopping";
-  open.Enabled=trayOpen.Enabled=next=="running";monitoring.Enabled=idle;
+  open.Enabled=trayOpen.Enabled=next=="running";monitoring.Enabled=discovery.Enabled=idle;discoveryIcmp.Enabled=idle&&settings.discovery;
  }
  void StartHost() {
   if(host!=null)return;
   try {
    var info=new ProcessStartInfo(settings.node,"host/desktop.js"){WorkingDirectory=settings.root,UseShellExecute=false,CreateNoWindow=true,RedirectStandardInput=true,RedirectStandardOutput=true,RedirectStandardError=true,StandardOutputEncoding=Encoding.UTF8,StandardErrorEncoding=Encoding.UTF8};
-   info.EnvironmentVariables["NETWATCH_DB"]=settings.database;info.EnvironmentVariables["NETWATCH_ICMP"]=settings.icmp?"1":"0";
+   info.EnvironmentVariables["NETWATCH_DB"]=settings.database;info.EnvironmentVariables["NETWATCH_ICMP"]=settings.icmp?"1":"0";info.EnvironmentVariables["NETWATCH_DISCOVERY"]=settings.discovery?"1":"0";info.EnvironmentVariables["NETWATCH_DISCOVERY_ICMP"]=settings.discovery&&settings.discoveryIcmp?"1":"0";
    host=new Process{StartInfo=info,EnableRaisingEvents=true};
    host.OutputDataReceived+=(s,e)=>{if(e.Data==null)return;try{var item=json.Deserialize<HostEvent>(e.Data);UI(()=>SetState(item.state,item.message));}catch{}};
    host.ErrorDataReceived+=(s,e)=>{if(!String.IsNullOrWhiteSpace(e.Data))UI(()=>SetState("error","Launcher error. Check Node and the data path."));};

@@ -1,7 +1,7 @@
 import { ICMP_POLICY, cycleBudget, freshnessPolicy, transition } from './icmp-policy.js'
 import { createWindowsProbe, validateProbeResult } from './windows-probe.js'
 
-export function createCollector(store, { enabled = false, platform = process.platform, runner = createWindowsProbe(), now = () => Date.now(), policy = ICMP_POLICY } = {}) {
+export function createCollector(store, { enabled = false, platform = process.platform, runner = createWindowsProbe(), now = () => Date.now(), policy = ICMP_POLICY, probeGate = async task => task() } = {}) {
   let timer, active, controller, stopped = false
   let states = new Map()
   let revision = null
@@ -48,7 +48,7 @@ export function createCollector(store, { enabled = false, platform = process.pla
       while (!signal.aborted && next < ordered.length) {
         const node = ordered[next++]
         if (store.revision() !== revision) { controller.abort(); break }
-        const result = await boundedProbe(node.data.ip,signal)
+        const result = await probeGate(()=>boundedProbe(node.data.ip,signal),signal)
         if (signal.aborted || store.revision() !== revision) { controller.abort(); break }
         if (result.outcome === 'error') {
           info.errors++

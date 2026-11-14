@@ -103,7 +103,7 @@ test('Windows adapter validates targets and uses fixed argv, bounded output/time
 })
 test('v1 schema migration preserves inventory/history; interrupted v2 migration rolls back; backups restore latency data',t=>{
  const {store,path,dir}=setup(t);store.close();const old=new DatabaseSync(path)
- old.exec(`DROP TABLE interface_samples;DROP TABLE snmp_targets;DROP TABLE incidents;DROP TABLE checks;CREATE TABLE checks(seq INTEGER PRIMARY KEY AUTOINCREMENT,device_id TEXT NOT NULL,status TEXT NOT NULL,checked_at INTEGER NOT NULL);CREATE INDEX checks_device_time ON checks(device_id,seq);CREATE INDEX checks_time ON checks(checked_at);PRAGMA user_version=1;`)
+ old.exec(`DROP TABLE discovered_devices;DROP TABLE interface_samples;DROP TABLE snmp_targets;DROP TABLE incidents;DROP TABLE checks;CREATE TABLE checks(seq INTEGER PRIMARY KEY AUTOINCREMENT,device_id TEXT NOT NULL,status TEXT NOT NULL,checked_at INTEGER NOT NULL);CREATE INDEX checks_device_time ON checks(device_id,seq);CREATE INDEX checks_time ON checks(checked_at);PRAGMA user_version=1;`)
  old.prepare('INSERT INTO checks VALUES(1,?,?,?)').run('d0','up',Date.now());old.close()
  const legacy=join(dir,'legacy-backup');backupDatabase(path,legacy)
  assert.throws(()=>openStore(path,{migrateV2:()=>{throw new Error('interrupted')}}),/interrupted/)
@@ -116,7 +116,7 @@ test('v1 schema migration preserves inventory/history; interrupted v2 migration 
 test('v1 migration never reuses history IDs after the newest rows were deleted',t=>{
  const {store,path}=setup(t);store.close()
  const old=new DatabaseSync(path)
- old.exec(`DROP TABLE interface_samples;DROP TABLE snmp_targets;DROP TABLE incidents;DROP TABLE checks;CREATE TABLE checks(seq INTEGER PRIMARY KEY AUTOINCREMENT,device_id TEXT NOT NULL,status TEXT NOT NULL,checked_at INTEGER NOT NULL);PRAGMA user_version=1;`)
+ old.exec(`DROP TABLE discovered_devices;DROP TABLE interface_samples;DROP TABLE snmp_targets;DROP TABLE incidents;DROP TABLE checks;CREATE TABLE checks(seq INTEGER PRIMARY KEY AUTOINCREMENT,device_id TEXT NOT NULL,status TEXT NOT NULL,checked_at INTEGER NOT NULL);PRAGMA user_version=1;`)
  old.prepare('INSERT INTO checks VALUES(500,?,?,?)').run('d0','up',Date.now())
  old.exec('DELETE FROM checks');old.close()
  const migrated=openStore(path)

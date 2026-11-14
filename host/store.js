@@ -1,6 +1,11 @@
 import { DatabaseSync } from 'node:sqlite'
 import { validateTopology } from '../src/topology.js'
 import {validateInterfaces,interfaceRates} from './interfaces.js'
+import { randomUUID } from 'node:crypto'
+import { normalizeAddress } from '../src/inventory.js'
+const normalizeDiscoveryIp=value=>{try{const ip=normalizeAddress(value);if(!/^\d+\.\d+\.\d+\.\d+$/.test(ip))throw Error();return ip}catch{throw invalid('Invalid discovered address.')}}
+const normalizeDiscoveryMac=value=>{if(value==null)return null;if(typeof value!=='string'||!/^([\da-f]{2}:){5}[\da-f]{2}$/i.test(value))throw invalid('Invalid discovered hardware address.');return value.toLowerCase()}
+const normalizeDiscoveryName=value=>{if(value==null)return null;if(typeof value!=='string'||value.length>253||!/^[\w.-]+$/.test(value)||value.startsWith('.')||value.endsWith('.'))throw invalid('Invalid discovered name.');return value}
 
 export const MAX_BODY = 5 * 1024 * 1024
 export function invalid(message, status = 400) { return Object.assign(new Error(message), { status }) }
@@ -17,11 +22,11 @@ export function inventory(value) {
   for (const n of topology.nodes) if (monitoring[n.id] === true && !n.data.ip) throw invalid('Monitoring requires a management address.')
   return { topology, monitoring: Object.fromEntries(topology.nodes.map(n => [n.id, monitoring[n.id] === true])) }
 }
-export function openStore(path, { now = () => Date.now(), migrate, migrateV2, migrateV3, migrateV4 } = {}) {
+export function openStore(path, { now = () => Date.now(), migrate, migrateV2, migrateV3, migrateV4, migrateV5 } = {}) {
   const db = new DatabaseSync(path)
   db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=3000;')
   const version = db.prepare('PRAGMA user_version').get().user_version
-  if (version > 4) { db.close(); throw new Error('Database schema is newer than this host. Use a compatible host; do not delete the database.') }
+  if (version > 5) { db.close(); throw new Error('Database schema is newer than this host. Use a compatible host; do not delete the database.') }
   try {
     if (!version) {
       db.exec('BEGIN IMMEDIATE')
@@ -69,6 +74,10 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
       migrateV4?.(db);db.exec('PRAGMA user_version=4; COMMIT')
     }catch(error){try{db.exec('ROLLBACK')}catch{}db.close();throw error}
   }
+  if(version<5) {
+    try {db.exec("BEGIN IMMEDIATE; CREATE TABLE discovered_devices(id TEXT PRIMARY KEY,ip TEXT NOT NULL,mac TEXT,hostname TEXT,source TEXT NOT NULL,first_seen INTEGER NOT NULL,last_seen INTEGER NOT NULL,status TEXT NOT NULL CHECK(status IN ('new','changed','ignored','added','gone')),saved_device_id TEXT,misses INTEGER NOT NULL DEFAULT 0);");migrateV5?.(db);db.exec('PRAGMA user_version=5; COMMIT')}
+    catch(error){try{db.exec('ROLLBACK')}catch{}db.close();throw error}
+  }
   // Additive, idempotent index migration; no stored check row shape changes.
   try {
     db.exec('BEGIN IMMEDIATE; CREATE INDEX IF NOT EXISTS checks_device_latest ON checks(device_id,checked_at DESC,seq DESC); COMMIT')
@@ -85,6 +94,8 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
     db.prepare('DELETE FROM checks WHERE checked_at < ?').run(now() - 30 * 86400000)
     const excess = db.prepare('SELECT COUNT(*) AS count FROM checks').get().count - 100000
     if (excess > 0) db.prepare('DELETE FROM checks WHERE seq IN (SELECT seq FROM checks ORDER BY seq LIMIT ?)').run(excess)
+    db.prepare('DELETE FROM discovered_devices WHERE last_seen < ?').run(now()-30*86400000)
+    db.exec('DELETE FROM discovered_devices WHERE rowid IN (SELECT rowid FROM discovered_devices ORDER BY last_seen DESC LIMIT -1 OFFSET 10000)')
   }
   const write = (input, revision, hook) => {
     const clean = inventory(input)
@@ -109,6 +120,12 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
   return {
     read,
     revision: () => db.prepare('SELECT revision FROM inventory').get().revision,
+    discoveryCounts:()=>db.prepare("SELECT COUNT(*) total,SUM(status='new') new,SUM(status='changed') changed,SUM(status='gone') gone,SUM(status='ignored') ignored,SUM(status='added') added FROM discovered_devices").get(),
+    discovered({after=0,limit=100}={}) {if(!Number.isSafeInteger(after)||after<0||!Number.isSafeInteger(limit)||limit<1||limit>200)throw invalid('Invalid discovery pagination.');const rows=db.prepare('SELECT rowid AS cursor,* FROM discovered_devices WHERE rowid>? ORDER BY rowid LIMIT ?').all(after,limit+1);return {devices:rows.slice(0,limit).map(r=>({id:r.id,ip:r.ip,mac:r.mac,hostname:r.hostname,source:r.source,firstSeen:new Date(r.first_seen).toISOString(),lastSeen:new Date(r.last_seen).toISOString(),status:r.status,savedDeviceId:r.saved_device_id})),nextAfter:rows.length>limit?rows[limit-1].cursor:null}},
+    recordDiscovery(rows) {return transaction(()=>{const seen=new Set();for(const item of rows){const ip=normalizeDiscoveryIp(item.ip),mac=normalizeDiscoveryMac(item.mac),hostname=normalizeDiscoveryName(item.hostname);if(seen.has(ip))continue;seen.add(ip);const old=db.prepare('SELECT * FROM discovered_devices WHERE ip=?').get(ip),other=mac&&db.prepare("SELECT * FROM discovered_devices WHERE mac=? AND ip<>? AND status NOT IN ('gone','ignored')").get(mac,ip),changed=!!old&&old.mac&&mac&&old.mac!==mac||!!other;const status=old?.status==='added'?'added':changed?'changed':old?.status==='changed'?'changed':'new';db.prepare(`INSERT INTO discovered_devices(id,ip,mac,hostname,source,first_seen,last_seen,status,saved_device_id,misses) VALUES(?,?,?,?,?,?,?,?,?,0) ON CONFLICT(id) DO UPDATE SET mac=excluded.mac,hostname=excluded.hostname,source=excluded.source,last_seen=excluded.last_seen,status=excluded.status,misses=0`).run(old?.id||randomUUID(),ip,mac,hostname,item.source||'neighbor',now(),now(),status,old?.saved_device_id||null)}db.prepare("UPDATE discovered_devices SET misses=misses+1,status=CASE WHEN misses+1>=3 AND status NOT IN ('ignored','added') THEN 'gone' ELSE status END WHERE status NOT IN ('ignored','added') AND ip NOT IN ("+(seen.size?[...seen].map(()=>'?').join(','):'SELECT ip FROM discovered_devices WHERE 0')+")").run(...seen);cleanup()})},
+    discoveryAction(id,action,savedDeviceId=null){const row=db.prepare('SELECT * FROM discovered_devices WHERE id=?').get(id);if(!row)throw invalid('Discovered device not found.',404);if(action!=='added')throw invalid('Invalid discovery action.');if(row.status==='added')throw invalid('Device is already on the map.',409);db.prepare('UPDATE discovered_devices SET status=?,saved_device_id=COALESCE(?,saved_device_id) WHERE id=?').run('added',savedDeviceId,id)},
+    removeDiscovery(id){const result=db.prepare('DELETE FROM discovered_devices WHERE id=?').run(id);if(!result.changes)throw invalid('Discovered device not found.',404)},
+    clearDiscovery(){return db.prepare('DELETE FROM discovered_devices').run().changes},
     write(input, revision, hook) { return write(input,revision,hook) },
     interfaceTargets() {
       const state=read(),targets=new Map(db.prepare('SELECT * FROM snmp_targets').all().map(r=>[r.device_id,r.authorization]))

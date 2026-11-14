@@ -2,6 +2,7 @@ import http from 'node:http'
 import { readFile } from 'node:fs/promises'
 import { resolve, extname, relative, isAbsolute } from 'node:path'
 import { invalid, MAX_BODY } from './store.js'
+import { randomUUID } from 'node:crypto'
 
 function readBody(req) {
   return new Promise((resolve,reject)=>{
@@ -16,7 +17,8 @@ function readBody(req) {
   })
 }
 
-export function createHost(store, { port = 4317, dist = resolve('dist'), collector, interfaces } = {}) {
+export function createHost(store, { port = 4317, dist = resolve('dist'), collector, interfaces, discovery } = {}) {
+  let lastScanRequest=0
   const server = http.createServer(async (req,res) => {
     const send = (status,body) => {res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(body))}
     try {
@@ -25,9 +27,14 @@ export function createHost(store, { port = 4317, dist = resolve('dist'), collect
       if (req.headers.origin && req.headers.origin !== `http://${authority}`) throw invalid('Unexpected origin.',403)
       if (req.headers['sec-fetch-site'] && !['same-origin','none'].includes(req.headers['sec-fetch-site'])) throw invalid('Cross-site requests are disabled.',403)
       const url = new URL(req.url,`http://${authority}`)
-      if (req.method==='GET' && url.pathname==='/api/v1/health') {store.read();return send(200,{apiVersion:1,ready:true,collector:collector?.snapshot() ?? {state:'not-implemented'},interfaces:interfaces?.snapshot()??{state:'disabled'}})}
+      if (req.method==='GET' && url.pathname==='/api/v1/health') {store.read();return send(200,{apiVersion:1,ready:true,collector:collector?.snapshot() ?? {state:'not-implemented'},interfaces:interfaces?.snapshot()??{state:'disabled'},discovery:discovery?.snapshot()??{state:'disabled'}})}
       if (req.method==='GET' && url.pathname==='/api/v1/topology') return send(200,store.read())
-      if (req.method==='GET' && url.pathname==='/api/v1/snapshot') {const snapshot=store.snapshot();const status=collector?.snapshot();if(status){snapshot.collector=status;snapshot.freshness=status.freshness}return send(200,snapshot)}
+      if (req.method==='GET' && url.pathname==='/api/v1/snapshot') {const snapshot=store.snapshot();const status=collector?.snapshot();if(status){snapshot.collector=status;snapshot.freshness=status.freshness}snapshot.discovery=discovery?.snapshot()??{state:'disabled'};return send(200,snapshot)}
+      if(req.method==='GET'&&url.pathname==='/api/v1/discovered')return send(200,store.discovered({after:url.searchParams.has('after')?Number(url.searchParams.get('after')):0,limit:url.searchParams.has('limit')?Number(url.searchParams.get('limit')):100}))
+      if(req.method==='POST'&&url.pathname==='/api/v1/discovered/scan-now'){if(req.headers['x-netwatch-write']!=='1')throw invalid('Explicit write header required.',403);if((Number(req.headers['content-length'])||0)>0||req.headers['transfer-encoding'])throw invalid('Scan requests do not accept a body.');if(Date.now()-lastScanRequest<30000)throw invalid('Wait before starting another scan.',429);lastScanRequest=Date.now();await discovery?.runOnce();return send(200,discovery?.snapshot()??{state:'disabled'})}
+      if(req.method==='POST'&&url.pathname==='/api/v1/discovered/clear'){if(req.headers['x-netwatch-write']!=='1')throw invalid('Explicit write header required.',403);if((Number(req.headers['content-length'])||0)>0||req.headers['transfer-encoding'])throw invalid('Clear requests do not accept a body.');return send(200,{removed:store.clearDiscovery()})}
+      const discoveredAction=url.pathname.match(/^\/api\/v1\/discovered\/([^/]+)\/(add-to-map|remove)$/)
+      if(req.method==='POST'&&discoveredAction){if(req.headers['x-netwatch-write']!=='1')throw invalid('Explicit write header required.',403);if(req.headers['content-type']?.split(';')[0]!=='application/json')throw invalid('Use application/json.',415);let body;try{body=JSON.parse(await readBody(req))}catch(e){if(e.status)throw e;throw invalid('Invalid JSON.')}const id=decodeURIComponent(discoveredAction[1]),action=discoveredAction[2];if(action==='remove'){store.removeDiscovery(id);return send(200,{ok:true})}const item=store.discovered({limit:200}).devices.find(d=>d.id===id);if(!item)throw invalid('Discovered device not found.',404);const current=store.read();if(body?.baseRevision!==current.revision)throw invalid('Inventory changed.',409);const topology={...current.topology,nodes:[...current.topology.nodes,{id:randomUUID(),type:'switch',position:{x:0,y:0},data:{label:item.hostname||item.ip,ip:item.ip,description:''}}]};const saved=store.write({source:'inventory',topology,monitoring:{...current.monitoring}},current.revision);store.discoveryAction(id,'added',topology.nodes.at(-1).id);return send(200,saved)}
       const incidents = url.pathname.match(/^\/api\/v1\/devices\/([^/]+)\/incidents$/)
       const ports=url.pathname.match(/^\/api\/v1\/devices\/([^/]+)\/interfaces$/)
       if(req.method==='GET'&&ports){const id=decodeURIComponent(ports[1]);return send(200,{...store.interfaces(id,{after:url.searchParams.has('after')?Number(url.searchParams.get('after')):0,limit:url.searchParams.has('limit')?Number(url.searchParams.get('limit')):50}),monitoring:interfaces?.device(id)??{collectorState:'disabled',staleAfterMs:180000}})}

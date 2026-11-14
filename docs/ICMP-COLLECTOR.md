@@ -1,6 +1,6 @@
 # Windows ICMP collector (2.2)
 
-The host now has an opt-in Windows ICMP collector. Dashboard observation integration is still issue #6: the current map remains unmonitored, even while the host APIs contain results. This is not discovery, interface verification, BGP monitoring, remote access or a packaged Windows service.
+The host has an opt-in Windows ICMP collector. Dashboard observation integration is implemented locally for issue #6. Separately, opt-in local discovery may use the same bounded probe runner for a directly attached private IPv4 subnet; discovery results remain review-only and are never monitoring authorization. See DISCOVERY.md.
 
 ## Enable deliberately
 
@@ -19,7 +19,7 @@ npm.cmd start
 4. Open http://127.0.0.1:4317/api/v1/health for host/collector readiness and http://127.0.0.1:4317/api/v1/snapshot for current observations/diagnostics. Use `/api/v1/devices/<encoded-ID>/checks?limit=50` for history. The browser has no probe-trigger or observation-write endpoint.
 5. Ctrl+C cancels in-flight helpers, prevents queued probes and further cycles, waits for workers, closes SQLite and releases the host lock. To disable all collection, stop the host and `Remove-Item Env:NETWATCH_ICMP`, then restart. Per-device monitoring can also be disabled by explicitly saving it to the host.
 
-Without NETWATCH_ICMP=1 the collector is `disabled`. Both service enablement and per-device explicit opt-in are required. No network ranges, DNS names, scans or imported observation data are accepted. Only canonical IPv4/IPv6 literals already authorized in the host database are visited.
+Without NETWATCH_ICMP=1 the inventory collector is `disabled`. Both service enablement and per-device explicit opt-in are required for saved-device checks. The separate NETWATCH_DISCOVERY_ICMP option requires NETWATCH_DISCOVERY=1 and only probes the host-derived attached subnet; it never imports observations or authorizes devices.
 
 ## Probe mechanism and bounds
 
