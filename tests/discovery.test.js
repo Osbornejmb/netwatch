@@ -9,6 +9,8 @@ import { DatabaseSync } from 'node:sqlite'
 import { backupDatabase,restoreDatabase } from '../host/maintenance.js'
 import { createHost } from '../host/server.js'
 import { createProbeGate } from '../host/probe-gate.js'
+import { reverseHints } from '../host/discovery-names.js'
+import { guessDeviceType } from '../src/discoveryType.js'
 
 test('subnet derivation excludes public, loopback, link-local and unsupported wide networks',()=>{
  const ifaces={a:[{family:'IPv4',internal:false,address:'192.168.5.2',netmask:'255.255.255.0'},{family:'IPv4',internal:false,address:'169.254.1.2',netmask:'255.255.0.0'},{family:'IPv4',internal:true,address:'127.0.0.1',netmask:'255.0.0.0'},{family:'IPv4',internal:false,address:'8.8.8.8',netmask:'255.255.255.0'}]}
@@ -38,6 +40,12 @@ test('neighbor parser bounds untrusted output and accepts only valid IPv4/MAC pa
  assert.deepEqual(parseNeighbors(' 192.168.1.9 aa-bb-cc-dd-ee-ff dynamic\n 999.1.1.1 aa-bb-cc-dd-ee-ff dynamic\n 192.168.1.3 nope dynamic').map(x=>x.ip),['192.168.1.9'])
  assert.throws(()=>parseNeighbors('x'.repeat(70000)),/invalid_output/)
 })
+test('reverse name hints are bounded, sanitized, and type guesses include evidence or stay unknown',async()=>{
+ const rows=Array.from({length:6},(_,i)=>({ip:`192.168.1.${i+1}`})),looked=[]
+ const names=await reverseHints(rows,{limit:4,concurrency:2,lookup:async ip=>{looked.push(ip);return ip.endsWith('.1')?['router.home.']:ip.endsWith('.2')?['<script>']:ip.endsWith('.3')?['-bad.local']:['host.local']}})
+ assert.equal(looked.length,4);assert.equal(names.get('192.168.1.1'),'router.home');assert.equal(names.has('192.168.1.2'),false);assert.equal(names.has('192.168.1.3'),false)
+ assert.deepEqual(guessDeviceType('router.home').type,'Router');assert.equal(guessDeviceType('Alex-iPhone').type,'Phone');assert.equal(guessDeviceType(null).type,'Unknown');assert.match(guessDeviceType('my-switch').evidence,/Name hint/)
+})
 test('successful scans mark missing rows gone only after three misses; errors freeze prior results',async t=>{
  const dir=mkdtempSync(join(tmpdir(),'nw-discovery-')),store=openStore(join(dir,'db'));t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true})})
  const row={ip:'192.168.1.9',mac:'aa:bb:cc:dd:ee:ff',source:'neighbor'};store.recordDiscovery([row]);const id=store.discovered().devices[0].id
@@ -66,4 +74,5 @@ test('discovery API paginates, rate limits scan requests and adds without enabli
  assert.deepEqual(store.read().monitoring,{[store.read().topology.nodes[0].id]:false});assert.equal(store.discovered().devices[0].status,'added')
  assert.equal((await fetch(`${base}/discovered/${id}/remove`,{method:'POST',headers,body:'{}'})).status,200);assert.equal(store.discovered().devices.length,1)
  const remaining=store.discovered({after:page.nextAfter-1,limit:1}).devices[0];assert.equal((await fetch(`${base}/discovered/${remaining.id}/remove`,{method:'POST',headers,body:'{}'})).status,200);assert.equal(store.discovered().devices.length,0);assert.equal(store.read().topology.nodes.length,1)
+ store.recordDiscovery([{ip:'192.168.1.20',mac:null,source:'neighbor'},{ip:'192.168.1.21',mac:null,source:'neighbor'}]);assert.equal((await fetch(`${base}/discovered/clear`,{method:'POST'})).status,403);assert.equal((await fetch(`${base}/discovered/clear`,{method:'POST',headers,body:'{}'})).status,400);assert.equal((await fetch(`${base}/discovered/clear`,{method:'POST',headers})).status,200);assert.equal(store.discovered().devices.length,0);assert.equal(store.read().topology.nodes.length,1)
 })

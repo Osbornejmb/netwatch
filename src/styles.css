@@ -625,10 +625,26 @@ label {
     14px/1.5 "Segoe UI",
     Arial,
     sans-serif;
+  opacity: 0;
+  transform: translateY(8px) scale(.99);
+  transition: opacity 180ms ease, transform 180ms ease, display 180ms allow-discrete;
+}
+.modal[open],
+.health-device-dialog[open] {
+  opacity: 1;
+  transform: none;
+}
+@starting-style {
+  .modal[open],
+  .health-device-dialog[open] {
+    opacity: 0;
+    transform: translateY(8px) scale(.99);
+  }
 }
 .modal::backdrop,
 .health-device-dialog::backdrop {
   background: #1d302b66;
+  transition: background-color 180ms ease;
 }
 .modal h2 {
   font-size: 23px;
@@ -649,6 +665,10 @@ label {
 }
 .modal-head h2 {
   margin: 0;
+}
+.modal button:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
 }
 .field-label {
   display: block;

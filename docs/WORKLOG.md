@@ -1,15 +1,25 @@
 # Working checkpoint
 
+## Current status (2026-11-14): discovered-device list controls
+
+- Added confirmed Clear all for discovery records only, searchable/status-filtered 200-row pages, and previous/next navigation. Bulk clear never changes saved map devices; page controls and inputs are keyboard/touch usable.
+- Discovery tests pass 9/9, including bulk-clear authorization/body checks and map preservation; production build passes. Browser check updated but Playwright/Chromium are unavailable here. No network scan was performed.
+
+## Current status (2026-11-14): local discovery device type hints
+
+- Bounded reverse-DNS name hints (up to 128 results, four lookups at once, 600 ms each) can now suggest Router, Switch, Phone or PC from the hostname. The UI shows the evidence and labels these as guesses; unknown is expected. This is not port, OS or hardware fingerprinting.
+- Focused discovery tests pass (9/9). Latest full `npm test` passes 85/86; the Windows DPAPI helper test fails in this environment (`Credential operation failed`). Earlier desktop lifecycle port conflicts did not recur. Production build passes when run with repository filesystem access. Browser check was updated for the current remove-only action; Playwright/Chromium are unavailable. No real network scan was performed.
+
 ## Current status (2026-11-14): discovery scan feedback and removal
 
-- The Discovered devices view now polls host health while Scan now runs and announces neighbor-table, active ICMP progress, and saving phases. Ignore is explained as retaining a reviewed candidate while hiding Add to map; Remove deletes only the discovery row and leaves any saved map device untouched.
+- The Discovered devices view polls host health while Scan now runs and announces neighbor-table, active ICMP progress, and saving phases. Remove deletes only the discovery row and leaves any saved map device untouched.
 - Added remove API/store behavior, in-progress snapshot assertions, and browser-check coverage for scan feedback/removal. Focused discovery tests pass. Browser visual/keyboard check remains unrun because Playwright is unavailable in this environment; no network scan was performed.
 
 ## Current status (2026-11-14): opt-in local discovery
 
 - Added opt-in Windows ARP discovery and optional bounded ICMP sweep over attached private IPv4 networks. Active probes share a host-wide eight-permit gate with monitoring ICMP. Discovery stays off by default and remains separate until explicit revision-checked Add to map; new devices remain monitoring-disabled. Schema v5 includes retained discovery rows in backup/restore.
 - Loopback API, launcher controls, responsive review screen and fake-runner tests cover migration rollback, error freeze, three missed scans, subnet derivation, sweep cap, shared workers, pagination, rate limit and monitoring-off add. Focused discovery/collector tests passed. Full `npm test` passed 83/84; the remaining Windows DPAPI credential test fails in this environment. Production build passed.
-- Browser check is present but Playwright is unavailable here. No real-network scan or Windows home-router comparison was performed. Optional reverse DNS/mDNS/SSDP hints are not included.
+- Bounded reverse DNS hostname hints and conservative type suggestions are now implemented; mDNS/SSDP, port scanning, OS fingerprints and vendor lookup are not included. No real-network scan or Windows home-router comparison was performed.
 
 ## Current status (2026-11-14): retain valid moves, snap only for overstretched connections
 
