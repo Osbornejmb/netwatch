@@ -29,7 +29,7 @@ Topology JSON: schemaVersion 1, nodes[{id,type,position:{x,y},data:{label,ip,des
 
 Treat browser storage, imported files, API input, discovery results, and device responses as untrusted. Validate at each boundary. Never interpolate device addresses into shell commands. Probe only configured authorized inventory, with rate/concurrency/time bounds. Keep secrets in host-managed secure storage; exclude them from logs, exports, and repository history.
 
-Opt-in local discovery reads Windows neighbor entries and keeps them separate from inventory. Results are restricted to directly attached IPv4 subnets, reviewed explicitly before adding, and never enable monitoring. See DISCOVERY.md for limits and API behavior.
+Opt-in local discovery reads Windows neighbor entries and keeps them separate from inventory. Results are restricted to directly attached IPv4 subnets and reviewed explicitly before adding. Discovery alone never authorizes checks; the explicit Add to map action saves the device with normal checks enabled, subject to the separately enabled global collector. Optional discovery ICMP does not create saved-device observations. See DISCOVERY.md for limits and API behavior.
 
 Bind development and the future API to loopback by default. LAN development is explicit. Remote access requires authentication, authorization, HTTPS or VPN, audit records, and restrictive firewall rules. No public development-server deployment.
 

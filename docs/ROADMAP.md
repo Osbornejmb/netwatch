@@ -82,5 +82,5 @@ The Publish project plan workflow matches stable markers or titles before creati
 
 # Local discovery (implementation in progress)
 
-Opt-in local neighbor discovery presents candidates for review, with optional bounded ICMP sweep. It never authorizes monitoring; topology changes require explicit review. See DISCOVERY.md. Real network validation remains an operator task.
+Opt-in local neighbor discovery presents candidates for review, with optional bounded ICMP sweep. Discovery alone never authorizes monitoring; an explicit Add to map action saves a candidate with normal checks enabled. Topology changes require explicit review. See DISCOVERY.md. Real network validation remains an operator task.
 

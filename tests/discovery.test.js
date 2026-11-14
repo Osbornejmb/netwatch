@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { localSubnets, parseNeighbors, createDiscovery } from '../host/discovery.js'
+import { localSubnets, parseNeighbors, parseDefaultGateways, createDiscovery } from '../host/discovery.js'
 import { openStore } from '../host/store.js'
 import { mkdtempSync,rmSync } from 'node:fs'
 import {join} from 'node:path'
@@ -19,6 +19,12 @@ test('subnet derivation excludes public, loopback, link-local and unsupported wi
  assert.deepEqual(localSubnets({a:[{family:'IPv4',address:'192.168.7.0',netmask:'255.255.255.254'}]}).flatMap(s=>s.addresses),['192.168.7.0','192.168.7.1'])
  assert.deepEqual(localSubnets({a:[{family:'IPv4',address:'192.168.7.7',netmask:'255.255.255.255'}]}),[])
  assert.equal(localSubnets({a:[{family:'IPv4',address:'192.168.1.2',netmask:'255.255.255.0'}],b:[{family:'IPv4',address:'10.2.0.2',netmask:'255.255.255.0'}]}).length,2)
+})
+test('default gateway parser accepts the lowest-metric gateway only for a matching private interface',()=>{
+ const interfaces={a:[{family:'IPv4',internal:false,address:'192.168.1.5',netmask:'255.255.255.0'},{family:'IPv4',internal:false,address:'8.8.8.8',netmask:'255.255.255.0'}]}
+ const output='0.0.0.0 0.0.0.0 192.168.1.1 192.168.1.5 35\n0.0.0.0 0.0.0.0 192.168.1.254 192.168.1.5 5\n0.0.0.0 0.0.0.0 8.8.8.1 8.8.8.8 1\n0.0.0.0 0.0.0.0 10.0.0.1 192.168.1.5 2'
+ assert.equal(parseDefaultGateways(output,interfaces).get('192.168.1.5'),'192.168.1.254')
+ assert.throws(()=>parseDefaultGateways('x'.repeat(33000),interfaces),/invalid_routes/)
 })
 test('active sweep uses the shared cap, stores responsive hosts, and cancels queued workers',async t=>{
  const dir=mkdtempSync(join(tmpdir(),'nw-discovery-sweep-')),store=openStore(join(dir,'db'));t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true})})
@@ -62,17 +68,34 @@ test('v4 to v5 discovery migration rolls back, and backups preserve discovery ro
  store=openStore(path);store.recordDiscovery([{ip:'192.168.1.5',mac:'aa:bb:cc:dd:ee:ff',source:'neighbor'}]);store.close()
  const backup=join(dir,'backup');backupDatabase(path,backup);restoreDatabase(path,backup);store=openStore(path);assert.equal(store.discovered().devices[0].ip,'192.168.1.5');store.close()
 })
-test('discovery API paginates, rate limits scan requests and adds without enabling monitoring',async t=>{
+test('discovery API paginates, rate limits scan requests and adds with monitoring enabled',async t=>{
  const dir=mkdtempSync(join(tmpdir(),'nw-discovery-api-')),store=openStore(join(dir,'db'));t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true})})
+ store.write({source:'inventory',topology:{schemaVersion:1,nodes:[{id:'gateway',type:'router',position:{x:0,y:0},data:{label:'Main router',ip:'192.168.1.1'}}],edges:[]},monitoring:{}},0)
  store.recordDiscovery([{ip:'192.168.1.5',mac:'aa:bb:cc:dd:ee:ff',source:'neighbor'},{ip:'192.168.1.6',mac:null,source:'neighbor'}])
- const server=createHost(store,{port:0,discovery:{runOnce:async()=>{},snapshot:()=>({state:'idle'})}});server.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)))
+ const server=createHost(store,{port:0,discovery:{runOnce:async()=>{},snapshot:()=>({state:'idle'}),gatewayFor:async ip=>ip.endsWith('.5')?'192.168.1.1':'192.168.1.254'}});server.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)))
  const base=`http://127.0.0.1:${server.address().port}/api/v1`,headers={'X-NetWatch-Write':'1','Content-Type':'application/json'}
  const page=await fetch(`${base}/discovered?limit=1`).then(r=>r.json());assert.equal(page.devices.length,1);assert.ok(page.nextAfter)
  assert.equal((await fetch(`${base}/discovered/scan-now`,{method:'POST',headers})).status,200);assert.equal((await fetch(`${base}/discovered/scan-now`,{method:'POST',headers})).status,429)
  const id=page.devices[0].id;assert.equal((await fetch(`${base}/discovered/${id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:99})})).status,409)
- assert.equal((await fetch(`${base}/discovered/${id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:0})})).status,200)
- assert.deepEqual(store.read().monitoring,{[store.read().topology.nodes[0].id]:false});assert.equal(store.discovered().devices[0].status,'added')
+ const added=await fetch(`${base}/discovered/${id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:1})}).then(r=>r.json())
+ assert.equal(added.discoveryLink.label,'Main router');assert.equal(added.topology.edges[0].label,'Gateway route');assert.equal(added.topology.edges[0].target,'gateway');assert.equal(added.topology.edges[0].source,added.topology.nodes[1].id)
+ assert.equal(added.monitoring[added.topology.nodes[1].id],true);assert.equal(store.discovered().devices[0].status,'added')
  assert.equal((await fetch(`${base}/discovered/${id}/remove`,{method:'POST',headers,body:'{}'})).status,200);assert.equal(store.discovered().devices.length,1)
- const remaining=store.discovered({after:page.nextAfter-1,limit:1}).devices[0];assert.equal((await fetch(`${base}/discovered/${remaining.id}/remove`,{method:'POST',headers,body:'{}'})).status,200);assert.equal(store.discovered().devices.length,0);assert.equal(store.read().topology.nodes.length,1)
- store.recordDiscovery([{ip:'192.168.1.20',mac:null,source:'neighbor'},{ip:'192.168.1.21',mac:null,source:'neighbor'}]);assert.equal((await fetch(`${base}/discovered/clear`,{method:'POST'})).status,403);assert.equal((await fetch(`${base}/discovered/clear`,{method:'POST',headers,body:'{}'})).status,400);assert.equal((await fetch(`${base}/discovered/clear`,{method:'POST',headers})).status,200);assert.equal(store.discovered().devices.length,0);assert.equal(store.read().topology.nodes.length,1)
+ const remaining=store.discovered({after:page.nextAfter-1,limit:1}).devices[0],addedWithoutRouter=await fetch(`${base}/discovered/${remaining.id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:added.revision})}).then(r=>r.json());assert.equal(addedWithoutRouter.discoveryLink,null);assert.equal(addedWithoutRouter.topology.edges.length,1)
+ assert.equal((await fetch(`${base}/discovered/${remaining.id}/remove`,{method:'POST',headers,body:'{}'})).status,200);assert.equal(store.discovered().devices.length,0);assert.equal(store.read().topology.nodes.length,3)
+ store.recordDiscovery([{ip:'192.168.1.20',mac:null,source:'neighbor'},{ip:'192.168.1.21',mac:null,source:'neighbor'}]);assert.equal((await fetch(`${base}/discovered/clear`,{method:'POST'})).status,403);assert.equal((await fetch(`${base}/discovered/clear`,{method:'POST',headers,body:'{}'})).status,400);assert.equal((await fetch(`${base}/discovered/clear`,{method:'POST',headers})).status,200);assert.equal(store.discovered().devices.length,0);assert.equal(store.read().topology.nodes.length,3)
+})
+test('an already-added gateway can be corrected and existing clients can be linked without duplicates',async t=>{
+ const dir=mkdtempSync(join(tmpdir(),'nw-discovery-gateway-fix-')),store=openStore(join(dir,'db'));t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true})})
+ store.write({source:'inventory',topology:{schemaVersion:1,nodes:[{id:'gateway',type:'switch',position:{x:0,y:0},data:{label:'Router',ip:'192.168.100.1'}},{id:'client',type:'switch',position:{x:0,y:0},data:{label:'PC',ip:'192.168.100.20'}}],edges:[]},monitoring:{}},0)
+ store.recordDiscovery([{ip:'192.168.100.1',mac:null,source:'neighbor'},{ip:'192.168.100.20',mac:null,source:'neighbor'}])
+ const rows=store.discovered().devices;store.discoveryAction(rows[0].id,'added','gateway');store.discoveryAction(rows[1].id,'added','client')
+ const server=createHost(store,{port:0,discovery:{gatewayFor:async()=> '192.168.100.1'}});server.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)))
+ const base=`http://127.0.0.1:${server.address().port}/api/v1`,headers={'X-NetWatch-Write':'1','Content-Type':'application/json'}
+ const promote=await fetch(`${base}/discovered/${rows[0].id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:1})}).then(r=>r.json())
+ assert.equal(promote.promotedRouter,true);assert.equal(promote.topology.nodes.find(node=>node.id==='gateway').type,'router');assert.equal(promote.topology.nodes.length,2)
+ const linked=await fetch(`${base}/discovered/${rows[1].id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:promote.revision})}).then(r=>r.json())
+ assert.equal(linked.discoveryLink.label,'Router');assert.equal(linked.topology.edges.length,1);assert.equal(linked.topology.edges[0].label,'Gateway route');assert.equal(linked.monitoring.client,false)
+ const repeat=await fetch(`${base}/discovered/${rows[1].id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:linked.revision})}).then(r=>r.json())
+ assert.equal(repeat.topology.edges.length,1);assert.equal(repeat.revision,linked.revision)
 })
