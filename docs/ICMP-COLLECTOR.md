@@ -1,6 +1,6 @@
 # Windows ICMP collector (2.2)
 
-The host has an opt-in Windows ICMP collector. Dashboard observation integration is implemented locally for issue #6. Separately, opt-in local discovery may use the same bounded probe runner for a directly attached private IPv4 subnet; discovery results remain review-only and are never monitoring authorization. See DISCOVERY.md.
+The host has an opt-in Windows ICMP collector. Dashboard observation integration is implemented locally for issue #6. Separately, opt-in local discovery may use the same bounded probe runner for a directly attached private IPv4 subnet. Discovery results are review-only; only the explicit Add to map action saves a device and enables its normal checks. See DISCOVERY.md.
 
 ## Enable deliberately
 

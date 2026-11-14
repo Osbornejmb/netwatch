@@ -1,5 +1,10 @@
 # Working checkpoint
 
+## Current status (2026-11-14): link discovered devices to known gateways
+
+- Add to map reads the local Windows default route, classifies the matching gateway as a router, and creates a `Gateway route` map edge for clients when the gateway matches a saved router. New entries start with normal monitoring checks on; ICMP authorization remains separately off. Already-added entries can be updated without duplicates, and the UI explains gateway links are routing hints rather than confirmed cable paths.
+- Discovery tests pass 11/11, including promotion of an already-added gateway, linking an already-added client, duplicate protection, and normal checks enabled on new additions. Production build passes. Full `npm test` previously passed 86/87; the Windows DPAPI credential test failed in this local environment (`Credential operation failed`). Browser/visual verification remains unavailable without Playwright/Chromium. No real network discovery was performed.
+
 ## Current status (2026-11-14): discovered-device list controls
 
 - Added confirmed Clear all for discovery records only, searchable/status-filtered 200-row pages, and previous/next navigation. Bulk clear never changes saved map devices; page controls and inputs are keyboard/touch usable.
@@ -18,7 +23,7 @@
 ## Current status (2026-11-14): opt-in local discovery
 
 - Added opt-in Windows ARP discovery and optional bounded ICMP sweep over attached private IPv4 networks. Active probes share a host-wide eight-permit gate with monitoring ICMP. Discovery stays off by default and remains separate until explicit revision-checked Add to map; new devices remain monitoring-disabled. Schema v5 includes retained discovery rows in backup/restore.
-- Loopback API, launcher controls, responsive review screen and fake-runner tests cover migration rollback, error freeze, three missed scans, subnet derivation, sweep cap, shared workers, pagination, rate limit and monitoring-off add. Focused discovery/collector tests passed. Full `npm test` passed 83/84; the remaining Windows DPAPI credential test fails in this environment. Production build passed.
+- Loopback API, launcher controls, responsive review screen and fake-runner tests cover migration rollback, error freeze, three missed scans, subnet derivation, sweep cap, shared workers, pagination, rate limit and the original monitoring-off add behavior. Discovery Add to map now intentionally enables normal checks; the host inventory editor and imports continue defaulting to off. Focused discovery/collector tests passed. Full `npm test` passed 83/84; the remaining Windows DPAPI credential test fails in this environment. Production build passed.
 - Bounded reverse DNS hostname hints and conservative type suggestions are now implemented; mDNS/SSDP, port scanning, OS fingerprints and vendor lookup are not included. No real-network scan or Windows home-router comparison was performed.
 
 ## Current status (2026-11-14): retain valid moves, snap only for overstretched connections
