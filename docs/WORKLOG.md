@@ -1,5 +1,11 @@
 # Working checkpoint
 
+## Current status (2026-11-14): opt-in local discovery
+
+- Added opt-in Windows ARP discovery and optional bounded ICMP sweep over attached private IPv4 networks. Active probes share a host-wide eight-permit gate with monitoring ICMP. Discovery stays off by default and remains separate until explicit revision-checked Add to map; new devices remain monitoring-disabled. Schema v5 includes retained discovery rows in backup/restore.
+- Loopback API, launcher controls, responsive review screen and fake-runner tests cover migration rollback, error freeze, three missed scans, subnet derivation, sweep cap, shared workers, pagination, rate limit and monitoring-off add. Focused discovery/collector tests passed. Full `npm test` passed 83/84; the remaining Windows DPAPI credential test fails in this environment. Production build passed.
+- Browser check is present but Playwright is unavailable here. No real-network scan or Windows home-router comparison was performed. Optional reverse DNS/mDNS/SSDP hints are not included.
+
 ## Current status (2026-11-14): retain valid moves, snap only for overstretched connections
 
 - Replaced the 64px anchor tether and unconditional release/tab reset with collision-only movement and connection-based validation on release. Each link allows max(320px, 1.5× arranged length), measured to the peer's current position; exceeding it restores the gesture's last valid positions. Unconnected devices are unconstrained except for collisions.
@@ -61,7 +67,7 @@
 
 - #11: local incidents, deduplication/recovery and optional approved notifications remain unimplemented.
 - #16: full clean-install release/runbook, intended multi-device scale, incident acceptance, broader recovery/failure checks, launcher visual/DPI and tray-menu pointer validation remain open; one phone is not a full release gate.
-- #7/#8/#9: SNMP/LLDP/interface/redundancy work remains planned. Hotspot clients are not automatically discovered or added; LLDP proposals are a separate later workflow and do not guarantee phone discovery.
+- #7/#8/#9: SNMP/LLDP/interface/redundancy work remains planned. Hotspot clients are not guaranteed to appear in local discovery; LLDP proposals remain separate and do not guarantee phone discovery.
 - #10/#12: authentication, protected remote browser access and an unattended Windows service remain planned; the interactive host must stay awake and signed in.
 - Full screen-reader coverage and cross-device/browser/platform capacity are not established by the current evidence.
 

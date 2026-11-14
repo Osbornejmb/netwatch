@@ -8,6 +8,7 @@ import RouterNode from './nodes/RouterNode'
 import SwitchNode from './nodes/SwitchNode'
 import Dashboard from './Dashboard'
 import HostStorage from './HostStorage'
+import DiscoveredDevices from './DiscoveredDevices'
 import DeviceDialog from './DeviceDialog'
 import RecoveryDialog from './RecoveryDialog'
 import InventoryControls from './InventoryControls'
@@ -19,7 +20,7 @@ import { nextFreePosition } from './nodes/placement'
 
 import { readTopology, writeTopology, validateTopology } from './topology'
 
-const viewFromHash = () => ({ '#dashboard': 'dashboard', '#topology': 'editor', '#editor': 'editor', '#inventory': 'inventory', '#devices': 'inventory' }[location.hash] || 'dashboard')
+const viewFromHash = () => ({ '#dashboard': 'dashboard', '#topology': 'editor', '#editor': 'editor', '#inventory': 'inventory', '#devices': 'inventory', '#discovered':'discovered' }[location.hash] || 'dashboard')
 
 const nodeTypes = { router: RouterNode, switch: SwitchNode }
 
@@ -183,6 +184,7 @@ export default function App() {
             <a href="#dashboard" aria-label="Network dashboard" aria-current={view === 'dashboard' ? 'page' : undefined} onClick={() => setView('dashboard')}>Dashboard</a>
             <a href="#topology" aria-label="Edit map" aria-current={view === 'editor' ? 'page' : undefined} onClick={() => setView('editor')}>Edit map</a>
             <a href="#inventory" aria-label="Devices" aria-current={view === 'inventory' ? 'page' : undefined} onClick={() => setView('inventory')}>Devices</a>
+            <a href="#discovered" aria-current={view === 'discovered' ? 'page' : undefined} onClick={() => setView('discovered')}>Discovered</a>
           </nav>
         <section className="backup-recovery" aria-label="Map backup and recovery">
           <details open={storageError || importError ? true : undefined}>
@@ -200,7 +202,7 @@ export default function App() {
         </section>
         </header>
 
-        {view !== 'editor' ? <Dashboard nodes={nodes} edges={edges} layoutMoves={layoutMoves} setLayoutMoves={setLayoutMoves} viewOptions={dashboardView} setViewOptions={setDashboardView} showInventory={view === 'inventory'} onEdit={() => { location.hash = 'topology' }}/> : <section className="page-content" id="topology">
+        {view==='discovered'?<DiscoveredDevices/>:view !== 'editor' ? <Dashboard nodes={nodes} edges={edges} layoutMoves={layoutMoves} setLayoutMoves={setLayoutMoves} viewOptions={dashboardView} setViewOptions={setDashboardView} showInventory={view === 'inventory'} onEdit={() => { location.hash = 'topology' }}/> : <section className="page-content" id="topology">
           <div className="page-heading">
             <div><h1>Edit your map</h1><p>Changes save as a draft until you choose Use this map.</p></div>
             <div className="heading-actions"><button className="button secondary" disabled={autosavePaused||importBusy} onClick={()=>void hostStorage.current.reviewLoad()}>Load saved map</button><button className="button primary" onClick={() => setShowModal('add')}><Plus size={17}/> Add device</button></div>

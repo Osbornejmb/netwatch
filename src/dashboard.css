@@ -710,6 +710,11 @@
 .health-device-cards {
   display: none;
 }
+.discovery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 @media (max-width: 720px) {
   .health-inventory table {
     display: none;

@@ -80,3 +80,7 @@ Issues: [#10](https://github.com/Osbornejmb/netwatch/issues/10), [#12](https://g
 
 The Publish project plan workflow matches stable markers or titles before creating missing work, updates canonical titles/milestones, and preserves existing issue bodies/states. Intentional acceptance-criteria revisions must be applied to both the plan and existing GitHub issues. It must not recreate issues solely because a title changes.
 
+# Local discovery (implementation in progress)
+
+Opt-in local neighbor discovery presents candidates for review, with optional bounded ICMP sweep. It never authorizes monitoring; topology changes require explicit review. See DISCOVERY.md. Real network validation remains an operator task.
+

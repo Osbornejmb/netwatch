@@ -9,7 +9,7 @@ export function validateDatabase(path) {
   const db=new DatabaseSync(path,{readOnly:true})
   try {
     const version=db.prepare('PRAGMA user_version').get().user_version
-    if(db.prepare('PRAGMA integrity_check').get().integrity_check!=='ok' || ![1,2,3,4].includes(version)) throw new Error('Invalid or unsupported backup database.')
+    if(db.prepare('PRAGMA integrity_check').get().integrity_check!=='ok' || ![1,2,3,4,5].includes(version)) throw new Error('Invalid or unsupported backup database.')
     const rows=db.prepare('SELECT * FROM inventory').all()
     if(rows.length!==1 || rows[0].singleton!==1 || !Number.isSafeInteger(rows[0].revision) || rows[0].revision<0 || !Number.isFinite(Date.parse(rows[0].updated_at))) throw new Error('Invalid inventory metadata.')
     const state=inventory({source:'inventory',...JSON.parse(rows[0].payload)})
@@ -38,6 +38,7 @@ export function validateDatabase(path) {
         for(const item of value.interfaces){if(Object.keys(item).some(k=>!['index','name','description','admin','oper','speedBps','discontinuity','counterBits','inOctets','outOctets','inBps','outBps'].includes(k)))throw new Error('Unexpected interface fields in backup.');for(const key of ['inBps','outBps'])if(item[key]!==null&&(!Number.isFinite(item[key])||item[key]<0||item[key]>1e15))throw new Error('Invalid interface rates in backup.')}
       }
     }
+    if(version>=5) {let count=0;for(const row of db.prepare('SELECT * FROM discovered_devices').iterate())if(++count>10000||!/^[\da-f-]{36}$/i.test(row.id)||typeof row.ip!=='string'||!/^\d{1,3}(\.\d{1,3}){3}$/.test(row.ip)||row.mac!==null&&!/^([\da-f]{2}:){5}[\da-f]{2}$/i.test(row.mac)||row.hostname!==null&&(typeof row.hostname!=='string'||row.hostname.length>253)||typeof row.source!=='string'||row.source.length>40||!['new','changed','ignored','added','gone'].includes(row.status)||!Number.isSafeInteger(row.first_seen)||!Number.isSafeInteger(row.last_seen)||row.last_seen<row.first_seen||row.misses<0||row.saved_device_id!==null&&typeof row.saved_device_id!=='string')throw new Error('Invalid discovery data in backup.')}
     return rows[0].revision
   } finally {db.close()}
 }

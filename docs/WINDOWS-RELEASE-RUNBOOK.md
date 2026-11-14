@@ -10,7 +10,7 @@ This runbook covers one awake, signed-in Windows host and local browsers. Remote
 4. Open the shortcut. Confirm the displayed data location. First installations start empty; verify that no fixture devices appear. Existing installations preserve their devices/history.
 5. Start with ICMP disabled. Start/Open dashboard should show the local dashboard at `http://127.0.0.1:4317`. Confirm that closing the browser leaves the host running.
 6. Add only owner-approved devices in Topology editor. Export the browser map as a backup. Use Backup → Local host storage → Check host → Save to host, review and confirm replacement. Verify stable IDs/counts and monitoring initially disabled. Loading a host map replaces the browser working copy only after review.
-7. Enable the collector on the next start only after target approval. Enable monitoring separately on each approved saved device. Never scan a subnet or automatically authorize imported/discovered addresses.
+7. Enable local discovery only after approval for the attached network. Review discovered devices before adding them to the map. Enable monitoring separately for each approved saved device; discovery never authorizes probes.
 
 ## Timing and status expectations
 

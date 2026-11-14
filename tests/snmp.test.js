@@ -80,7 +80,7 @@ test('SNMP samples/authorization persist separately; identity edits revoke them;
  const active=openStore(f.path);active.authorizeInterfaces('a',randomUUID(),3);changed.topology.nodes[0].data.ip='192.0.2.2';active.write(changed,3);assert.equal(active.interfaceTargets().length,0);assert.equal(active.interfaces('a').total,0);active.close()
 })
 test('v3→v4 migration preserves old data and rolls back on interruption',t=>{
- const f=fixture(t);f.store.close();const db=new DatabaseSync(f.path);db.exec('DROP TABLE interface_samples;DROP TABLE snmp_targets;PRAGMA user_version=3');db.close()
+ const f=fixture(t);f.store.close();const db=new DatabaseSync(f.path);db.exec('DROP TABLE discovered_devices;DROP TABLE interface_samples;DROP TABLE snmp_targets;PRAGMA user_version=3');db.close()
  assert.throws(()=>openStore(f.path,{migrateV4:()=>{throw Error('interrupted')}}),/interrupted/)
  const check=new DatabaseSync(f.path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,3);check.close()
  const migrated=openStore(f.path);assert.equal(migrated.read().topology.nodes.length,1);assert.equal(migrated.interfaces('a').configured,false);migrated.close()

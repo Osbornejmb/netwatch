@@ -31,7 +31,7 @@ For release acceptance, safe updates and recovery, see the [Windows release runb
 4. Review the replacement and choose **Confirm replacement**. New or changed devices start with monitoring disabled.
 5. Return to **Dashboard**, open a device and choose **Turn checks on**; select the monitored network under **View options → Show** if needed.
 
-Only enable checks for devices you manage. Both the launcher's ICMP setting and each saved device's monitoring setting must be enabled. Devices must be reachable from the monitoring PC; some hotspots isolate their clients. NetWatch does not scan networks, discover hotspot clients or add devices automatically.
+Local network discovery is opt-in through the launcher and lists neighbors on the computer's directly attached IPv4 networks for review. It never adds or monitors a device automatically. Only enable checks for devices you manage; the launcher's ICMP setting and each saved device's monitoring setting are separate approvals. Wi-Fi isolation, blocked pings, randomized phone hardware addresses, and other subnets or VLANs can hide devices. See [Discovery](docs/DISCOVERY.md).
 
 ## Read device status
 
