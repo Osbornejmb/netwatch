@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ReactFlow, Background, Controls, useEdgesState,
+  ReactFlow, Background, useEdgesState,
   useNodesState, Panel,
 } from '@xyflow/react'
 import { Activity, Check, GitBranch, Plus, Search, Trash2, X } from 'lucide-react'
@@ -11,11 +11,14 @@ import HostStorage from './HostStorage'
 import DiscoveredDevices from './DiscoveredDevices'
 import DeviceDialog from './DeviceDialog'
 import RecoveryDialog from './RecoveryDialog'
+import ConfirmDialog from './ConfirmDialog'
+import MapControls from './MapControls'
 import InventoryControls from './InventoryControls'
 import { createId } from './id'
 import { connectionKey, uniqueConnections } from './connections'
 import useLayoutDrag from './useLayoutDrag'
-import { tidyLayout, radialLayout, radialHandles } from './radial'
+import { tidyLayout, radialLayout } from './radial'
+import { mapCard, mapEdgeTypes } from './nodes/MapEdge'
 import { nextFreePosition } from './nodes/placement'
 
 import { readTopology, writeTopology, validateTopology } from './topology'
@@ -27,9 +30,9 @@ const nodeTypes = { router: RouterNode, switch: SwitchNode }
 export default function App() {
   const saved = useMemo(() => readTopology({ getItem: key => localStorage.getItem(key) }, { nodes: [], edges: [] }), [])
   const [nodes, setNodes, onNodesChange] = useNodesState(saved.topology.nodes)
+  const [editorSizes, setEditorSizes] = useState({})
   const [edges, setEdges, onEdgesChange] = useEdgesState(saved.topology.edges)
   const [view, setView] = useState(viewFromHash)
-  const [layoutMoves, setLayoutMoves] = useState({})
   const [dashboardView, setDashboardView] = useState({ source: 'host', layout: 'radial', centerId: '' })
   useEffect(() => {
     const navigate = () => setView(viewFromHash())
@@ -38,6 +41,7 @@ export default function App() {
   }, [])
   const [deviceNotice, setDeviceNotice] = useState('')
   const [showModal, setShowModal] = useState(false)
+  const [confirm, setConfirm] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
   const selectedNode = nodes.find(node => node.id === selectedId)
   const setSelectedNode = node => setSelectedId(node?.id || null)
@@ -117,25 +121,38 @@ export default function App() {
     setShowModal(false)
   }
 
-  const removeSelected = () => {
-    if (!selectedNode || !window.confirm(`Remove ${selectedNode.data.label} and its links?`)) return
-    setNodes(ns => ns.filter(n => n.id !== selectedNode.id))
-    setEdges(es => es.filter(e => e.source !== selectedNode.id && e.target !== selectedNode.id))
-    setSelectedNode(null)
+  const confirmRemoval = (removed, removedEdges = []) => {
+    const ids = new Set(removed.map(node => node.id))
+    const links = new Set(removedEdges.map(connectionKey))
+    setConfirm({
+      title: removed.length === 1 ? 'Remove device?' : 'Remove devices?',
+      message: removed.length === 1 ? `Remove ${removed[0].data.label} and its links from the draft map?` :
+        `Remove ${removed.length} devices and their links from the draft map?`,
+      label: removed.length === 1 ? 'Remove device' : 'Remove devices',
+      onConfirm: () => {
+        setNodes(current => current.filter(node => !ids.has(node.id)))
+        setEdges(current => current.filter(edge => !ids.has(edge.source) && !ids.has(edge.target) && !links.has(connectionKey(edge))))
+        setSelectedId(current => ids.has(current) ? null : current)
+      },
+    })
   }
+  const removeSelected = () => { if (selectedNode) confirmRemoval([selectedNode]) }
 
   const [editorLayout, setEditorLayout] = useState('radial')
   const mapEdges = useMemo(() => uniqueConnections(edges), [edges])
   const layoutNodes = useMemo(() => editorLayout === 'radial' ? radialLayout(nodes, edges) : tidyLayout(nodes, edges), [nodes, edges, editorLayout])
-  const editorDrag = useLayoutDrag(layoutNodes, edges, `editor-${editorLayout}`, layoutMoves, setLayoutMoves)
-  const editorNodes = layoutNodes.map(node => ({ ...node, position: editorDrag.positions[node.id] || node.position }))
-  const nodesById = new Map(editorNodes.map(node => [node.id, node]))
+  const editorDrag = useLayoutDrag(layoutNodes, edges, `${view}-${editorLayout}`, editorSizes)
+  const editorNodes = layoutNodes.map(node => ({ ...node, measured: editorSizes[node.id], position: Object.hasOwn(editorDrag.positions, node.id) ? editorDrag.positions[node.id] : node.position }))
   const changeEditorNodes = changes => {
-    const persistent = changes.filter(change => change.type !== 'position')
+    const dimensions = changes.filter(change => change.type === 'dimensions' && change.dimensions)
+    if (dimensions.length) setEditorSizes(previous => ({ ...previous, ...Object.fromEntries(dimensions.map(change => [change.id, change.dimensions])) }))
+    const persistent = changes.filter(change => change.type === 'remove')
     if (persistent.length) onNodesChange(persistent)
     editorDrag.onPositionChanges(changes)
   }
-  const filteredNodes = nodes.filter(n => `${n.data.label} ${n.data.ip}`.toLowerCase().includes(query.toLowerCase()))
+  const visibleIds = new Set(nodes.filter(n => `${n.data.label} ${n.data.ip}`.toLowerCase().includes(query.toLowerCase())).map(node => node.id))
+  const cardsById = new Map(editorNodes.filter(node => visibleIds.has(node.id)).map(node => [node.id, mapCard(node)]))
+  const cards = [...cardsById.values()]
 
   const download = (content, filename, type) => {
     const url = URL.createObjectURL(new Blob([content], { type }))
@@ -202,7 +219,7 @@ export default function App() {
         </section>
         </header>
 
-        {view==='discovered'?<DiscoveredDevices/>:view !== 'editor' ? <Dashboard nodes={nodes} edges={edges} layoutMoves={layoutMoves} setLayoutMoves={setLayoutMoves} viewOptions={dashboardView} setViewOptions={setDashboardView} showInventory={view === 'inventory'} onEdit={() => { location.hash = 'topology' }}/> : <section className="page-content" id="topology">
+        {view==='discovered'?<DiscoveredDevices/>:view !== 'editor' ? <Dashboard nodes={nodes} edges={edges} viewOptions={dashboardView} setViewOptions={setDashboardView} showInventory={view === 'inventory'} onEdit={() => { location.hash = 'topology' }}/> : <section className="page-content">
           <div className="page-heading">
             <div><h1>Edit your map</h1><p>Changes save as a draft until you choose Use this map.</p></div>
             <div className="heading-actions"><button className="button secondary" disabled={autosavePaused||importBusy} onClick={()=>void hostStorage.current.reviewLoad()}>Load saved map</button><button className="button primary" onClick={() => setShowModal('add')}><Plus size={17}/> Add device</button></div>
@@ -211,27 +228,32 @@ export default function App() {
           {deviceNotice && <p role="alert" className="notice">{deviceNotice}</p>}
           <div className="canvas-toolbar">
             <div className="canvas-title"><GitBranch size={18}/><div><strong>Draft map</strong><span>{nodes.length} {nodes.length===1?'device':'devices'} · {mapEdges.length} {mapEdges.length===1?'connection':'connections'}</span></div></div>
-            <div className="canvas-actions"><label className="health-filter">Map layout <select aria-label="Map layout" value={editorLayout} onChange={event => setEditorLayout(event.target.value)}><option value="radial">Circle</option><option value="tidy">Tidy layout</option></select></label><button className="button secondary" onClick={() => setNodes(current => current.map(node => ({ ...node, position: nodesById.get(node.id).position })))}>Save layout</button><div className="search-box"><Search size={15}/><input aria-label="Find a device" value={query} onChange={e => setQuery(e.target.value)} placeholder="Find a device" /></div><button className="button primary" disabled={autosavePaused||importBusy} onClick={()=>void hostStorage.current.reviewSave()}><Check size={15}/>Use this map</button></div>
+            <div className="canvas-actions"><label className="health-filter">Map layout <select aria-label="Map layout" value={editorLayout} onChange={event => setEditorLayout(event.target.value)}><option value="radial">Circle</option><option value="tidy">Tidy layout</option></select></label><div className="search-box"><Search size={15}/><input aria-label="Find a device" value={query} onChange={e => setQuery(e.target.value)} placeholder="Find a device" /></div><button className="button primary" disabled={autosavePaused||importBusy} onClick={()=>void hostStorage.current.reviewSave()}><Check size={15}/>Use this map</button></div>
           </div>
 
           <div className="canvas-wrap">
             <ReactFlow
-              nodes={editorNodes.map(n => ({ ...n, domAttributes: { onKeyDown: event => editorDrag.moveByKey(event, n), onKeyUp: event => { if (event.key.startsWith('Arrow')) editorDrag.finish() } }, hidden: !filteredNodes.some(f => f.id === n.id) }))}
+              nodes={editorNodes.map(n => ({ ...n, domAttributes: { onKeyDown: event => editorDrag.moveByKey(event, n), onKeyUp: event => { if (event.key.startsWith('Arrow')) editorDrag.finish() } }, hidden: !visibleIds.has(n.id) }))}
               edges={mapEdges.map(edge => {
-                const source = nodesById.get(edge.source), target = nodesById.get(edge.target)
-                return { ...edge, ...radialHandles(source.position, target.position), type: 'straight', style: { stroke: 'var(--map-link)', strokeWidth: 2 } }
+                const source = cardsById.get(edge.source), target = cardsById.get(edge.target)
+                return { ...edge, sourceHandle: 'radial-source-right', targetHandle: 'radial-target-left',
+                  hidden: !source || !target, data: { source, target, cards }, type: 'mapLink', style: { stroke: 'var(--map-link)', strokeWidth: 2 } }
               })} onNodesChange={changeEditorNodes} onNodeDragStop={editorDrag.finish} onEdgesChange={changeEditorEdges}
-              connectionMode="loose" onConnect={onConnect} isValidConnection={connection => connection.source !== connection.target && edges.length < 10000 && !edges.some(edge => connectionKey(edge) === connectionKey(connection))} nodeTypes={nodeTypes}
+              connectionMode="loose" onConnect={onConnect} isValidConnection={connection => connection.source !== connection.target && edges.length < 10000 && !edges.some(edge => connectionKey(edge) === connectionKey(connection))} nodeTypes={nodeTypes} edgeTypes={mapEdgeTypes} onMoveStart={() => document.dispatchEvent(new Event('mapviewportchange'))}
               onNodeClick={(_, node) => setSelectedNode(node)}
               onPaneClick={() => setSelectedNode(null)}
               fitView fitViewOptions={{ padding: 0.2 }}
-              onBeforeDelete={async ({ nodes: removed }) => !removed.length || window.confirm(`Remove ${removed.length} device(s) and their links?`)}
+              onBeforeDelete={async ({ nodes: removed, edges: removedEdges }) => {
+                if (!removed.length) return true
+                confirmRemoval(removed, removedEdges)
+                return false
+              }}
               deleteKeyCode={['Backspace', 'Delete']}
               defaultEdgeOptions={{ type: 'straight', style: { stroke: 'var(--map-link)', strokeWidth: 2 }, labelStyle: { fill: 'var(--muted)', fontSize: 12 } }}
               proOptions={{ hideAttribution: true }}
             >
               <Background color="var(--map-grid)" gap={24} size={1}/>
-              <Controls />
+              <MapControls />
               {!nodes.length && <Panel position="top-center"><div className="editor-empty"><GitBranch size={28}/><h2>Build your network</h2><p>Add a device, then connect it to another.</p><button className="button primary" onClick={() => setShowModal('add')}>Add first device</button></div></Panel>}
             </ReactFlow>
             {selectedNode && <div className="device-inspector">
@@ -250,6 +272,7 @@ export default function App() {
       </main>
       {pendingAction && <RecoveryDialog action={pendingAction} paused={autosavePaused} unavailable={recovery?.raw === null} hasOriginal={typeof recovery?.raw === 'string'} onDownloadOriginal={downloadOriginal} onClose={() => setPendingAction(null)} onConfirm={confirmRecovery}/>}
       {showModal && <DeviceDialog device={showModal === 'edit' ? selectedNode : null} nodes={nodes} onClose={() => setShowModal(false)} onSave={saveDevice}/>}
+      {confirm && <ConfirmDialog {...confirm} onClose={() => setConfirm(null)}/>}
     </div>
   )
 }

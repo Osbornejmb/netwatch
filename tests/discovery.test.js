@@ -99,3 +99,26 @@ test('an already-added gateway can be corrected and existing clients can be link
  const repeat=await fetch(`${base}/discovered/${rows[1].id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:linked.revision})}).then(r=>r.json())
  assert.equal(repeat.topology.edges.length,1);assert.equal(repeat.revision,linked.revision)
 })
+
+test('discovery actions find later pages and leave the map intact if a record is removed during lookup',async t=>{
+ const dir=mkdtempSync(join(tmpdir(),'nw-discovery-actions-')),store=openStore(join(dir,'db'))
+ t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true})})
+ store.recordDiscovery(Array.from({length:202},(_,i)=>({ip:`192.168.1.${i+1}`,source:'neighbor'})))
+ const {nextAfter}=store.discovered({limit:200}),[later,removed]=store.discovered({after:nextAfter}).devices
+ const server=createHost(store,{port:0,discovery:{gatewayFor:async ip=>{
+  if(ip===removed.ip)store.removeDiscovery(removed.id)
+  return null
+ }}})
+ server.listen(0,'127.0.0.1')
+ await new Promise(resolve=>server.once('listening',resolve))
+ t.after(()=>new Promise(resolve=>server.close(resolve)))
+ const add=(id,baseRevision)=>fetch(`http://127.0.0.1:${server.address().port}/api/v1/discovered/${id}/add-to-map`,{
+  method:'POST',headers:{'X-NetWatch-Write':'1','Content-Type':'application/json'},body:JSON.stringify({baseRevision})
+ })
+ assert.equal((await add(later.id,0)).status,200)
+ assert.equal(store.discovered({after:nextAfter}).devices[0].status,'added')
+ assert.equal((await add(later.id,1)).status,200)
+ assert.equal((await add(removed.id,1)).status,404)
+ assert.equal(store.read().revision,1)
+ assert.deepEqual(store.read().topology.nodes.map(node=>node.data.ip),[later.ip])
+})
