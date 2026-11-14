@@ -1,24 +1,21 @@
-import { useCallback, useEffect, useMemo } from 'react'
-import { constrainDrag, withinLinkReach } from './nodes/placement'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { pushNodes, withinLinkReach } from './nodes/placement'
 import { connectionKey } from './connections'
 
-const EMPTY = {}
-// shortcut: view adjustments reset on reload; add a saved custom-layout mode when reload persistence is requested.
-export default function useLayoutDrag(nodes, edges, context, layouts, setLayouts) {
+const EMPTY = Object.create(null)
+export default function useLayoutDrag(nodes, edges, context, sizes) {
+  const [move, setMove] = useState(null)
   const signature = useMemo(() => JSON.stringify([nodes.map(node => [node.id, node.position.x, node.position.y]), edges.map(connectionKey).sort()]), [nodes, edges])
-  const saved = layouts[context]
+  const saved = move?.context === context ? move : null
   const positions = saved?.signature === signature ? saved.positions : EMPTY
   const onPositionChanges = changes => {
     const moved = changes.filter(change => change.type === 'position' && change.position)
     if (!moved.length) return
-    setLayouts(previous => {
-      const current = previous[context]?.signature === signature ? previous[context] : null
-      const positions = { ...current?.positions }
-      for (const change of moved) {
-        const position = constrainDrag(change.id, change.position, nodes, positions)
-        if (position) positions[change.id] = position
-      }
-      return { ...previous, [context]: { signature, positions, committed: current?.committed || EMPTY } }
+    setMove(previous => {
+      const current = previous?.context === context && previous.signature === signature ? previous : null
+      let positions = current?.positions || EMPTY
+      for (const change of moved) positions = pushNodes(change.id, change.position, nodes, positions, sizes)
+      return { context, signature, positions, committed: current?.committed || EMPTY }
     })
   }
   const moveByKey = (event, node) => {
@@ -28,14 +25,14 @@ export default function useLayoutDrag(nodes, edges, context, layouts, setLayouts
     onPositionChanges([{ type: 'position', id: node.id, position: { x: node.position.x + delta[0], y: node.position.y + delta[1] } }])
     return true
   }
-  const finish = useCallback(() => setLayouts(previous => {
-    const current = previous[context]
-    if (current?.signature !== signature || current.positions === current.committed) return previous
+  const finish = useCallback(() => setMove(current => {
+    if (current?.context !== context || current.signature !== signature || current.positions === current.committed) return current
     const positions = withinLinkReach(nodes, edges, current.positions) ? current.positions : current.committed
-    return { ...previous, [context]: { ...current, positions, committed: positions } }
-  }), [nodes, edges, context, signature, setLayouts])
+    return { ...current, positions, committed: positions }
+  }), [nodes, edges, context, signature])
+  useEffect(() => { setMove(null) }, [context, signature])
   useEffect(() => {
-    const hide = () => { if (document.hidden) finish() }
+    const hide = () => { if (document.hidden) setMove(null) }
     window.addEventListener('blur', finish)
     document.addEventListener('visibilitychange', hide)
     return () => { window.removeEventListener('blur', finish); document.removeEventListener('visibilitychange', hide) }

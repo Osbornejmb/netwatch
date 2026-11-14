@@ -30,8 +30,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 20px 28px;
+  gap: 12px;
+  padding: 8px 20px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
   background: var(--surface);
@@ -45,7 +45,7 @@
 .health-page-titlebar > div > p {
   font-size: 12px;
   color: var(--muted);
-  margin: 5px 0 0;
+  margin: 0;
   max-width: 650px;
 }
 .health-map-tools {
@@ -117,26 +117,6 @@
 .health-filter select {
   width: 174px;
 }
-.health-map-count {
-  font-size: 12px;
-  color: var(--muted);
-  margin: 14px 0 0;
-}
-.health-attention {
-  border-top: 1px solid var(--border);
-  margin-top: 18px;
-  padding-top: 4px;
-}
-.health-attention p {
-  font-size: 13px;
-  font-weight: 600;
-}
-.health-attention button {
-  display: block;
-  text-align: left;
-  width: 100%;
-  margin-top: 8px;
-}
 .health-map {
   flex: 1;
   min-height: 0;
@@ -153,8 +133,6 @@
   border-radius: 12px;
 }
 .health-node {
-  width: 215px;
-  padding: 14px 16px;
   border: 1px solid #aab7ac;
   border-left-width: 4px;
   border-radius: 11px;
@@ -176,36 +154,10 @@
   border-left-color: var(--health-stale);
   background: #f8f1df;
 }
-.health-node-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-.health-device-icon {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: var(--subtle);
-  color: var(--muted);
-}
-.health-node > strong {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
 .health-address {
   font-variant-numeric: tabular-nums;
   color: var(--muted);
   font-size: 12px;
-}
-.health-node > .health-address {
-  display: block;
-  margin-top: 4px;
 }
 .health-status {
   display: inline-flex;
@@ -294,21 +246,25 @@
 }
 .health-map-focus-controls {
   position: absolute;
-  bottom: 20px;
-  right: 20px;
+  top: 12px;
+  right: 16px;
   z-index: 6;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  max-width: min(350px, calc(100% - 90px));
-  padding: 14px;
+  max-width: calc(100% - 32px);
+  align-items: center;
+  padding: 4px 8px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: 0 5px 20px #253a3614;
 }
+.health-map-focus-controls .health-highlight-status {
+  flex: 1;
+  min-width: 0;
+}
 .health-highlight-status {
-  width: 100%;
   margin: 0;
   color: var(--muted);
   font-size: 12px;
@@ -547,10 +503,10 @@
 }
 @media (max-width: 720px) {
   .health-page-titlebar {
-    padding: 18px 16px;
+    padding: 8px 12px;
     align-items: stretch;
     flex-direction: column;
-    gap: 16px;
+    gap: 6px;
   }
   .health-page-titlebar h1 {
     font-size: 22px;
@@ -608,9 +564,9 @@
     height: 44px;
   }
   .health-map-focus-controls {
-    bottom: 12px;
-    right: 12px;
-    padding: 12px;
+    top: 8px;
+    right: 8px;
+    max-width: calc(100% - 16px);
   }
   .health-empty-map strong {
     font-size: 21px;
@@ -626,18 +582,6 @@
   align-items: center;
   gap: 8px;
   padding: 8px;
-}
-.health-device-icon {
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-}
-.health-node .device-copy {
-  min-width: 0;
-  flex: 1;
-}
-.health-node .device-copy .health-address {
-  color: var(--muted);
 }
 .health-node-up .node-status {
   color: var(--health-up);
@@ -665,9 +609,14 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  padding: 0 28px;
-  border-bottom: 1px solid var(--border);
+  padding: 0 20px;
   flex-shrink: 0;
+}
+.health-overview {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
 }
 .health-summary button {
   min-height: 40px;
@@ -687,26 +636,50 @@
   text-underline-offset: 4px;
 }
 .health-attention {
+  padding: 0 12px;
+  position: relative;
+}
+.health-attention summary {
+  padding: 10px 0;
+  color: var(--health-down);
+  font-weight: 600;
+  cursor: pointer;
+}
+.health-attention > div {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 9;
+  width: min(340px, calc(100vw - 32px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: min(96px, 16dvh);
+  overflow: auto;
+  padding: 4px 4px 8px;
+}
+.health-title {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
+  gap: 0 8px;
+}
+.health-title > h1,
+.health-title > .health-highlight-status {
+  flex-basis: 100%;
+}
+.health-title > p {
+  margin: 0;
+}
+.health-view-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  padding: 8px 28px;
-  margin: 0;
-  max-height: 120px;
-  overflow: auto;
-  border-top: 0;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.health-attention p {
-  margin: 0;
-  color: var(--health-down);
-}
-.health-attention button {
-  width: auto;
-  display: inline-flex;
-  margin: 0;
+  color: var(--muted);
 }
 .health-page-titlebar p.connection-lost {
   color: var(--health-stale);
@@ -733,8 +706,50 @@
 }
 .discovery-actions {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+}
+.discovery-page {
+  max-width: 1040px;
+  width: 100%;
+  margin-inline: auto;
+}
+.discovery-list {
+  padding: 0;
+  margin: 12px 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.discovery-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 10px 12px;
+}
+.discovery-row + .discovery-row {
+  border-top: 1px solid var(--border);
+}
+.discovery-identity {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.discovery-identity span,
+.discovery-empty,
+.discovery-message {
+  color: var(--muted);
+  font-size: 13px;
+}
+.discovery-message:empty {
+  margin: 0;
 }
 .discovery-heading-actions,
 .discovery-pagination {
@@ -745,16 +760,13 @@
 }
 .discovery-toolbar {
   display: flex;
-  align-items: end;
   flex-wrap: wrap;
-  gap: 12px;
-  margin: 16px 28px -8px;
+  gap: 8px;
+  margin-top: 12px;
 }
-.discovery-toolbar label {
-  display: grid;
-  gap: 4px;
-  color: var(--muted);
-  font-size: 13px;
+.discovery-toolbar input {
+  flex: 1;
+  min-width: 0;
 }
 .discovery-toolbar input,
 .discovery-toolbar select {
@@ -766,13 +778,8 @@
   color: var(--text);
   font: inherit;
 }
-.discovery-toolbar > span {
-  padding-bottom: 12px;
-  color: var(--muted);
-  font-size: 13px;
-}
 .discovery-pagination {
-  margin: -8px 28px 24px;
+  margin: 12px 0;
 }
 .discovery-pagination span {
   min-width: 72px;
@@ -787,15 +794,10 @@
   margin: 12px 0;
   color: var(--muted);
 }
-.discovery-evidence {
-  display: block;
-  color: var(--muted);
-  font-size: 0.82em;
-}
 .discovery-spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid var(--line);
+  border: 2px solid var(--border);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: discovery-spin 0.8s linear infinite;
@@ -809,20 +811,8 @@
   .discovery-heading-actions button {
     flex: 1;
   }
-  .discovery-toolbar {
-    align-items: stretch;
-    margin: 12px;
-  }
-  .discovery-toolbar label,
-  .discovery-toolbar input,
-  .discovery-toolbar select {
-    width: 100%;
-  }
-  .discovery-toolbar > span {
-    padding: 0 0 8px;
-  }
-  .discovery-pagination {
-    margin: 0 12px 20px;
+  .discovery-identity {
+    flex-basis: 100%;
   }
   .health-inventory table {
     display: none;
@@ -851,13 +841,19 @@
     padding: 0 16px;
   }
   .health-attention {
-    padding: 8px 16px;
+    padding: 0 16px;
   }
   .health-map-tools {
-    justify-content: flex-start;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    justify-content: stretch;
   }
   .health-map-tools .health-search {
-    flex-basis: 100%;
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .health-map-tools > .health-filter select {
+    min-width: 0;
   }
 }
 

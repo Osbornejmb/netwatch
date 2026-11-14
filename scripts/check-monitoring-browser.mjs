@@ -21,7 +21,7 @@ const append = (id, status, time = Date.now()) => store.append([{ deviceId: id, 
 for (let i = 30; i > 0; i--) append('r', i % 2 ? 'up' : 'down', Date.now() - i * 1000)
 append('r', 'up'); append('s', 'up')
 let staleAfterMs = 90000
-const server = createHost(store, { port: 0, collector: { snapshot: () => ({ state: 'disabled', freshness: { staleAfterMs } }) } })
+const server = createHost(store, { port: 0, dist: process.env.NETWATCH_TEST_DIST, collector: { snapshot: () => ({ state: 'disabled', freshness: { staleAfterMs } }) } })
 server.listen(0, '127.0.0.1'); await once(server, 'listening')
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] })
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
@@ -57,7 +57,9 @@ try {
   await page.screenshot({ path: 'docs/screenshots/monitoring-desktop.png' })
   // Preserve observations and let the UI clock age them without a successful response.
   staleAfterMs = 1000; await refresh()
-  await page.getByText(/Updated /).first().waitFor()
+  await page.getByRole('button', { name: 'Monitoring information' }).focus()
+  await page.getByRole('tooltip').getByText(/Updated /).waitFor()
+  await page.keyboard.press('Escape')
   await page.route('**/api/v1/snapshot', route => route.abort())
   await refresh(); await page.getByText(/Connection lost/).first().waitFor()
   await status('r', 'stale'); await status('s', 'stale')

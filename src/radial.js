@@ -1,6 +1,7 @@
 import { NODE_MAX_WIDTH as CARD_WIDTH, NODE_HEIGHT as CARD_HEIGHT } from './nodes/dimensions.js'
-const COLUMN_GAP = 32
-const ROW_GAP = 48
+import { crosses } from './nodes/edgeRoute.js'
+const COLUMN_GAP = 20
+const ROW_GAP = 24
 const compareIds = (a, b) => a < b ? -1 : a > b ? 1 : 0
 
 function layoutLevels(nodes, edges, centerId) {
@@ -50,7 +51,7 @@ function packLayout(nodes, layouts) {
   })
   if (!components.length) return []
   // Pack disconnected components without drawing invented connecting links.
-  const gap = 64
+  const gap = 32
   const rowWidth = Math.max(...components.map(c => c.width), Math.sqrt(components.reduce((sum, c) => sum + (c.width + gap) * (c.height + gap), 0)))
   const positions = new Map()
   let x = 0, y = 0, rowHeight = 0
@@ -108,8 +109,40 @@ function clearRingRadius(directions, positions, minimum) {
 }
 
 export function radialLayout(nodes, edges, centerId = '') {
+  const gateways = new Map()
+  for (const edge of edges) {
+    if (edge.label !== 'Gateway route') continue
+    if (!gateways.has(edge.target)) gateways.set(edge.target, new Set())
+    gateways.get(edge.target).add(edge.source)
+  }
   const layouts = layoutLevels(nodes, edges, centerId).map(levels => {
     const root = levels[0][0]
+    const clients = gateways.get(root)
+    if (!centerId && levels.length === 2 && levels[1].length > 4 &&
+        levels[1].every(id => clients?.has(id))) {
+      const peers = levels[1]
+      const half = Math.max(1, Math.ceil(Math.sqrt(peers.length * (CARD_HEIGHT + ROW_GAP) / (CARD_WIDTH + COLUMN_GAP)) / 2))
+      const columns = 2 * half + 1
+      const slots = []
+      const rows = Math.ceil((peers.length + 1) / columns)
+      for (let row = -Math.floor(rows / 2); row <= Math.floor(rows / 2); row++) {
+        for (let column = -half; column <= half; column++) {
+          if (row || column) slots.push({ x: (column + (row % 2) / 2) * (CARD_WIDTH + COLUMN_GAP), y: row * (CARD_HEIGHT + ROW_GAP) })
+        }
+      }
+      slots.sort((a, b) => Math.hypot(a.x, a.y) - Math.hypot(b.x, b.y))
+      const origin = { x: CARD_WIDTH / 2, y: CARD_HEIGHT / 2 }
+      const center = slot => ({ x: slot.x + origin.x, y: slot.y + origin.y })
+      const box = slot => ({ ...slot, width: CARD_WIDTH, height: CARD_HEIGHT })
+      const chosen = []
+      for (const slot of slots.slice(0, peers.length + Math.min(half, 2))) {
+        if (chosen.length === peers.length) break
+        if (chosen.every(peer => !crosses(origin, center(slot), box(peer)) &&
+            !crosses(origin, center(peer), box(slot)))) chosen.push(slot)
+      }
+      const remaining = slots.filter(slot => !chosen.includes(slot))
+      return new Map([[root, { x: 0, y: 0 }], ...peers.map((id, i) => [id, chosen[i] ?? remaining[i - chosen.length]])])
+    }
     const positions = new Map([[root, { x: -CARD_WIDTH / 2, y: -CARD_HEIGHT / 2 }]])
     let radius = 0
     for (let depth = 1; depth < levels.length; depth++) {
@@ -127,13 +160,6 @@ export function radialLayout(nodes, edges, centerId = '') {
     return positions
   })
   return packLayout(nodes, layouts)
-}
-
-export function radialHandles(source, target) {
-  const dx = target.x - source.x, dy = target.y - source.y
-  const side = Math.abs(dx) / CARD_WIDTH > Math.abs(dy) / CARD_HEIGHT ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'bottom' : 'top')
-  const opposite = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' }
-  return { sourceHandle: `radial-source-${side}`, targetHandle: `radial-target-${opposite[side]}` }
 }
 
 // Direct peers only; both incoming and outgoing configured links count.

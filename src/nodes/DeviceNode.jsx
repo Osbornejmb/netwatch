@@ -1,6 +1,7 @@
 import { Handle, Position } from '@xyflow/react'
-import { CircleHelp, Router, Network } from 'lucide-react'
+import { Router, Network } from 'lucide-react'
 import { Fragment } from 'react'
+import InfoTooltip from '../InfoTooltip'
 import { nodeDimensions } from './dimensions'
 
 export function NodeHandles() {
@@ -12,7 +13,7 @@ export default function DeviceNode({ data, selected, kind }) {
   return <div style={nodeDimensions} className={`device-node ${kind}-node${selected ? ' selected' : ''}`}>
     <NodeHandles/>
     <div className="device-icon"><Icon size={20} aria-hidden="true"/></div>
-    <div className="device-copy"><strong title={data.label}>{data.label}</strong><span title={data.ip}>{data.ip || 'No address'}</span></div>
-    <CircleHelp size={14} role="img" aria-label="Not monitored" className="node-status"/>
+    <div className="device-copy"><strong className={data.ip && data.label === data.ip ? 'device-ip-label' : undefined}>{data.label}</strong></div>
+    <InfoTooltip label={`Information for ${data.label}`}><strong>{data.label}</strong><span>{data.ip || 'No address'}</span>{data.description && <span>{data.description}</span>}</InfoTooltip>
   </div>
 }

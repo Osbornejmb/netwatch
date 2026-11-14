@@ -13,21 +13,17 @@ test('placement skips occupied and overlapping cells and reuses gaps', () => {
   for (const a of placed) for (const b of placed) if (a !== b) assert.ok(Math.abs(a.position.x - b.position.x) >= NODE_WIDTH || Math.abs(a.position.y - b.position.y) >= NODE_HEIGHT)
 })
 
-// Wide, short cards should use their bottom/top edges for shallow diagonals.
-test('side handles account for compact card proportions', async () => {
-  const { radialHandles } = await import('../src/radial.js')
-  assert.deepEqual(radialHandles({ x: 0, y: 0 }, { x: 200, y: 190 }), { sourceHandle: 'radial-source-bottom', targetHandle: 'radial-target-top' })
-})
-
-test('dragging is not tethered to an anchor but still refuses collisions and invalid positions', async () => {
-  const { constrainDrag } = await import('../src/nodes/placement.js')
-  const nodes = [{ id: 'a', position: { x: 0, y: 0 } }, { id: 'b', position: { x: 0, y: 104 } }]
-  assert.deepEqual(constrainDrag('a', { x: -10000, y: -10000 }, nodes), { x: -10000, y: -10000 })
-  assert.equal(constrainDrag('a', { x: 0, y: 74 }, nodes), null)
-  assert.equal(constrainDrag('b', { x: 0, y: 74 }, nodes, { a: { x: 0, y: 30 } }), null)
-  assert.equal(constrainDrag('missing', { x: 0, y: 0 }, nodes), null)
-  assert.equal(constrainDrag('a', { x: NaN, y: 0 }, nodes), null)
-  assert.deepEqual(nodes[0].position, { x: 0, y: 0 })
+test('dragging pushes intervening cards and chains in the direction of travel', async () => {
+  const { pushNodes } = await import('../src/nodes/placement.js')
+  const nodes = [0, 104, 208].map((y, i) => ({ id: String(i), position: { x: 0, y } }))
+  assert.deepEqual(pushNodes('0', { x: 0, y: 200 }, nodes), {
+    0: { x: 0, y: 200 }, 1: { x: 0, y: 264 }, 2: { x: 0, y: 328 }
+  })
+  assert.deepEqual(pushNodes('2', { x: 0, y: 16 }, nodes), {
+    0: { x: 0, y: -112 }, 1: { x: 0, y: -48 }, 2: { x: 0, y: 16 }
+  })
+  assert.deepEqual(pushNodes('0', { x: 0, y: NaN }, nodes), {})
+  assert.deepEqual(nodes.map(node => node.position.y), [0, 104, 208])
 })
 
 test('reach limits use connected peers, honor existing long layouts and prevent repeated drag drift', async () => {
