@@ -1,5 +1,10 @@
 # Working checkpoint
 
+## Current status (2026-11-14): discovery scan feedback and removal
+
+- The Discovered devices view now polls host health while Scan now runs and announces neighbor-table, active ICMP progress, and saving phases. Ignore is explained as retaining a reviewed candidate while hiding Add to map; Remove deletes only the discovery row and leaves any saved map device untouched.
+- Added remove API/store behavior, in-progress snapshot assertions, and browser-check coverage for scan feedback/removal. Focused discovery tests pass. Browser visual/keyboard check remains unrun because Playwright is unavailable in this environment; no network scan was performed.
+
 ## Current status (2026-11-14): opt-in local discovery
 
 - Added opt-in Windows ARP discovery and optional bounded ICMP sweep over attached private IPv4 networks. Active probes share a host-wide eight-permit gate with monitoring ICMP. Discovery stays off by default and remains separate until explicit revision-checked Add to map; new devices remain monitoring-disabled. Schema v5 includes retained discovery rows in backup/restore.

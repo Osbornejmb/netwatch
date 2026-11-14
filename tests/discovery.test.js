@@ -29,6 +29,11 @@ test('probe gate serializes monitoring and discovery tasks and releases permits 
  const tasks=[1,2,3].map(()=>gate(async()=>{active++;peak=Math.max(peak,active);await new Promise(r=>setTimeout(r,4));active--}))
  await Promise.all(tasks);assert.equal(peak,1)
 })
+test('scan snapshot exposes an in-progress phase and clears it at completion',async t=>{
+ const dir=mkdtempSync(join(tmpdir(),'nw-discovery-progress-')),store=openStore(join(dir,'db'));t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true})})
+ let release;const collector=createDiscovery(store,{enabled:true,platform:'win32',interfaces:()=>({a:[{family:'IPv4',address:'192.168.1.2',netmask:'255.255.255.0'}]}),runner:()=>new Promise(resolve=>{release=()=>resolve('')})})
+ const run=collector.runOnce();await new Promise(resolve=>setImmediate(resolve));assert.equal(collector.snapshot().phase,'neighbors');release();await run;assert.equal(collector.snapshot().phase,'idle');await collector.stop()
+})
 test('neighbor parser bounds untrusted output and accepts only valid IPv4/MAC pairs',()=>{
  assert.deepEqual(parseNeighbors(' 192.168.1.9 aa-bb-cc-dd-ee-ff dynamic\n 999.1.1.1 aa-bb-cc-dd-ee-ff dynamic\n 192.168.1.3 nope dynamic').map(x=>x.ip),['192.168.1.9'])
  assert.throws(()=>parseNeighbors('x'.repeat(70000)),/invalid_output/)
@@ -59,4 +64,6 @@ test('discovery API paginates, rate limits scan requests and adds without enabli
  const id=page.devices[0].id;assert.equal((await fetch(`${base}/discovered/${id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:99})})).status,409)
  assert.equal((await fetch(`${base}/discovered/${id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:0})})).status,200)
  assert.deepEqual(store.read().monitoring,{[store.read().topology.nodes[0].id]:false});assert.equal(store.discovered().devices[0].status,'added')
+ assert.equal((await fetch(`${base}/discovered/${id}/remove`,{method:'POST',headers,body:'{}'})).status,200);assert.equal(store.discovered().devices.length,1)
+ const remaining=store.discovered({after:page.nextAfter-1,limit:1}).devices[0];assert.equal((await fetch(`${base}/discovered/${remaining.id}/remove`,{method:'POST',headers,body:'{}'})).status,200);assert.equal(store.discovered().devices.length,0);assert.equal(store.read().topology.nodes.length,1)
 })
