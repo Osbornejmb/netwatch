@@ -35,11 +35,12 @@ export function admitRequest(req, origin, authorities, remoteAddress) {
   }
   const scheme = origin.slice(0, origin.indexOf('://') + 3)
   if (
-    req.headers.origin &&
+    (req.headers.origin || (source === 'remote' && req.headers.origin !== undefined)) &&
     !authorities.has(req.headers.origin.startsWith(scheme) && req.headers.origin.slice(scheme.length))
   )
     throw invalid('Unexpected origin.', 403)
-  if (req.headers['sec-fetch-site'] && !['same-origin', 'none'].includes(req.headers['sec-fetch-site']))
+  const fetchSite = req.headers['sec-fetch-site']
+  if ((fetchSite || (source === 'remote' && fetchSite !== undefined)) && !['same-origin', 'none'].includes(fetchSite))
     throw invalid('Cross-site requests are disabled.', 403)
   return source
 }
@@ -90,12 +91,17 @@ export function createLanListeners({
       const server = createServer(authorities)
       listeners.set(address, server)
       server.on('error', () => {
+        if (stopped || listeners.get(address) !== server) return
         listeners.delete(address)
+        if (server.listening) close(server)
         log('NetWatch LAN listener failed: ' + address)
-        retry ??= setTimeout(() => {
-          retry = undefined
-          refresh()
-        }, interval)
+        retry ??= setTimeout(
+          () => {
+            retry = undefined
+            refresh()
+          },
+          Math.min(interval, 5000),
+        )
         retry.unref()
       })
       server.listen(port, address, () => log('NetWatch LAN listener added: ' + address))

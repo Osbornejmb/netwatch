@@ -1,5 +1,11 @@
 # Working checkpoint
 
+## Current status (2026-11-15) — remote access
+
+- Added opt-in private-network listeners, per-route access checks, viewer and admin sessions, CSRF checks, and direct HTTPS. Loopback remains password-free. The Windows launcher configures access locally and shows active sessions and the last 50 audit records.
+- Remote discovery additions start with checks off. Local Add to map preserves its existing per-device opt-in. Static GET fallback preserves the legacy paths and errors.
+- Windows automated tests, WinForms compilation with the installed Framework compiler, and Chrome checks against isolated loopback fixtures cover the local workflow and both viewer sign-in modes. Linux runtime verification and second-PC, firewall and native-dialog checks remain pending. See [Remote access](REMOTE-ACCESS.md) for the checklist.
+
 ## Current status (2026-11-15) — sampled history and conditional polling
 
 - Refactored ordered migrations before adding schema v6. The latest observation persists independently of one-minute samples. Status, outcome, reason and outage transitions are always stored, with 5,000-row device and 1,000,000-row network caps. Resolved outages keep their 30-day and 10,000-record bounds.

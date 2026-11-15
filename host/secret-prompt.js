@@ -1,6 +1,6 @@
 import { emitKeypressEvents } from 'node:readline'
 
-export async function secret(question, accepted = /^[\x20-\x7e]+$/) {
+export async function secret(question, accepted = /^[\x20-\x7e]+$/, maxLength = 128) {
   if (!process.stdin.isTTY) throw new Error('Use an interactive terminal for password entry.')
   process.stdout.write(question)
   emitKeypressEvents(process.stdin)
@@ -20,7 +20,7 @@ export async function secret(question, accepted = /^[\x20-\x7e]+$/) {
       if (k?.ctrl && k.name === 'c') return finish(new Error('Cancelled'))
       if (k?.name === 'return') return finish()
       if (k?.name === 'backspace') value = value.slice(0, -1)
-      else if (str && accepted.test(str) && value.length + str.length <= 128) value += str
+      else if (str && accepted.test(str) && value.length + str.length <= maxLength) value += str
     }
     process.stdin.on('keypress', key)
   })

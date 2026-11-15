@@ -1,4 +1,3 @@
-const maxRows = 5000
 const maxAge = 30 * 24 * 60 * 60 * 1000
 
 export function createAudit(db, now = Date.now) {

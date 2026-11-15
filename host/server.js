@@ -171,7 +171,7 @@ export function createHost(
         const match = pattern.exec(url.pathname)
         if (!match) continue
         if (source === 'remote' && access !== 'public') {
-          if (access === 'local') throw invalid('Change this on the NetWatch PC.', 403)
+          if (access !== 'viewer' && access !== 'admin') throw invalid('Change this on the NetWatch PC.', 403)
           if (!role) throw invalid('Sign in to NetWatch.', 401)
           if (access === 'admin' && role !== 'admin') {
             if (auditAction) audit?.record('viewer_write_blocked', { source, ip, role, detail: auditAction })

@@ -183,8 +183,10 @@ export function createSessions(db, { lan, now = Date.now, audit } = {}) {
           hash,
         )
       }
-      failures.delete(ip)
-      global = empty
+      if (!open) {
+        failures.delete(ip)
+        global = empty
+      }
       return issue(role, ip, res, session)
     } finally {
       busy = false

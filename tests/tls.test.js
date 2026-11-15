@@ -26,6 +26,7 @@ test('TLS requires a valid pair, rejects HTTP origins, and uses HTTPS-only sessi
   const bad = join(dir, 'bad.pem')
   writeFileSync(bad, 'invalid')
   assert.throws(() => readTlsOptions(cert, bad), /Unable to load/)
+  assert.throws(() => readTlsOptions(cert, key, dir), /outside the static build directory/)
   const tls = readTlsOptions(cert, key)
   assert.equal(tls.minVersion, 'TLSv1.2')
 

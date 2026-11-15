@@ -10,7 +10,7 @@ import { openStore } from './store.js'
 export async function manageAuth(
   db,
   [command, mode, ...extra],
-  { prompt = (question) => secret(question, /^[^\p{C}]+$/u), print = console.log } = {},
+  { prompt = (question) => secret(question, /^[^\p{C}]+$/u, 129), print = console.log } = {},
 ) {
   const passwordCommand = command === 'set-admin-password' || command === 'set-viewer-password'
   if (

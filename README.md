@@ -68,7 +68,7 @@ The launcher stores data under `%LOCALAPPDATA%\NetWatch\data\netwatch.sqlite`; i
 
 ## Start and stop
 
-Trusted-LAN browser access is optional. Plain HTTP exposes passwords and session data to anyone who can intercept LAN traffic. Configure direct HTTPS before signing in from another PC on a network you do not fully trust. See [Remote access](docs/REMOTE-ACCESS.md).
+For another PC to open the dashboard, enable **Allow other PCs on this network** in the Windows launcher, set an admin password under **Remote access**, choose a viewer mode, and start the host. Use a URL shown by the launcher. Plain HTTP exposes passwords and session data to anyone who can intercept LAN traffic. Configure direct HTTPS before signing in from another PC on a network you do not fully trust. See [Remote access](docs/REMOTE-ACCESS.md).
 
 Closing the browser or hiding the control window keeps monitoring running. **Stop** stops the host; **Quit** stops it and exits the tray app. The PC must remain awake, connected and signed in. Automatic boot startup and unattended Windows service operation are not implemented.
 
@@ -83,7 +83,7 @@ This enables the collector for devices you separately authorize; it does not add
 
 ## Development and verification
 
-Direct host API clients use the per-launch write token for inventory and discovery changes. See [Host API](docs/HOST-API.md).
+Loopback API writes use the per-launch token. Remote admin writes use their session CSRF token. See [Host API](docs/HOST-API.md).
 
 NetWatch uses the experimental `node:sqlite` API in Node.js 22. Before upgrading Node, verify the host and its migrations with the test suite against the target Node version.
 
@@ -97,7 +97,7 @@ The Vite development UI is browser-only and does not run the monitoring host. Us
 
 ## Remaining work
 
-Local incidents/notifications (#11), broader Windows release/capacity/accessibility validation (#16), SNMP/LLDP/interface/redundancy work (#7/#8/#9), authentication (#10), and secured remote access/unattended service packaging (#12) remain planned. The current host is local-only; other PCs cannot access its dashboard. Do not expose the development server or bypass the host's loopback protections.
+Authentication and role enforcement (#10) and opt-in private-network access with optional direct HTTPS (#12) are implemented. Per-user accounts, SSO, automatic certificate provisioning, unattended Windows service packaging and second-PC release verification remain open. Local outages and SNMP interfaces are available. External notifications, LLDP and broader redundancy work remain planned.
 
 See [ROADMAP.md](docs/ROADMAP.md), [Windows launcher](docs/WINDOWS-LAUNCHER.md), [monitoring policy](docs/ICMP-COLLECTOR.md), and [WORKLOG.md](docs/WORKLOG.md) for details and evidence.
 

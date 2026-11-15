@@ -198,3 +198,13 @@ test('discovery adds with checks enabled only from loopback', async (t) => {
   for (const action of ['discovery_add', 'discovery_remove', 'discovery_clear', 'discovery_scan'])
     assert.ok(audit.read().entries.some((entry) => entry.action === action && entry.source === 'remote'))
 })
+
+test('open viewer sign-in does not reset password backoff', async (t) => {
+  const { login, clock } = await fixture(t)
+  const bad = { role: 'admin', password: 'invalid password' }
+  assert.equal((await login(bad)).status, 401)
+  clock(1000)
+  assert.equal((await login({ role: 'viewer' })).status, 200)
+  assert.equal((await login(bad)).status, 401)
+  assert.equal((await login(bad)).headers.get('retry-after'), '2')
+})

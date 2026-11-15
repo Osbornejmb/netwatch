@@ -23,6 +23,8 @@ test('LAN admission rejects public socket addresses, foreign authorities, and cr
     ['192.168.1.11', { host: host + '@attacker.test' }],
     ['192.168.1.11', { origin: 'http://attacker.test:4317' }],
     ['192.168.1.11', { 'sec-fetch-site': 'cross-site' }],
+    ['192.168.1.11', { origin: '' }],
+    ['192.168.1.11', { 'sec-fetch-site': '' }],
   ]) assert.throws(() => admit(ip, headers), { status: 403 })
 })
 
@@ -61,4 +63,39 @@ test('LAN listeners bind only private external IPv4 interfaces and remove stale 
     await lan.stop()
   }
   assert.deepEqual(lan.urls(), [])
+})
+
+test('failed binds are retried against the current interface list', async () => {
+  let ip = '192.168.1.2'
+  const attempts = []
+  let bound
+  const listening = new Promise((resolve) => { bound = resolve })
+  const createServer = () => Object.assign(new EventEmitter(), {
+    listen(_port, address, callback) {
+      attempts.push(address)
+      if (attempts.length === 1) {
+        ip = '192.168.1.3'
+        queueMicrotask(() => this.emit('error', new Error('address changed')))
+        return
+      }
+      this.listening = true
+      callback()
+      bound()
+    },
+    close(callback) { this.listening = false; callback() },
+    closeAllConnections() {},
+  })
+  const lan = createLanListeners({ port: 4317, names: '', interfaces: () => ({ eth: [{ address: ip }] }), interval: 15, log() {}, createServer })
+  let deadline
+  try {
+    lan.start()
+    await Promise.race([listening, new Promise((_, reject) => {
+      deadline = setTimeout(() => reject(new Error('No retry')), 1000)
+    })])
+    assert.deepEqual(attempts, ['192.168.1.2', '192.168.1.3'])
+    assert.deepEqual(lan.urls(), ['http://192.168.1.3:4317'])
+  } finally {
+    clearTimeout(deadline)
+    await lan.stop()
+  }
 })
