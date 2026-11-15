@@ -124,3 +124,36 @@ test('discovery actions find later pages and leave the map intact if a record is
  assert.equal(store.read().revision,1)
  assert.deepEqual(store.read().topology.nodes.map(node=>node.data.ip),[later.ip])
 })
+test('Windows ARP parsing accepts German, French, Spanish and mixed type labels',()=>{
+ const locales=[
+  ['Schnittstelle: 192.0.2.1 --- 0x3\n  Internetadresse       Physische Adresse     Typ','dynamisch','statisch','ungültig'],
+  ['Interface : 192.0.2.1 --- 0x3\n  Adresse Internet      Adresse physique     Type','dynamique','statique','incomplète'],
+  ['Interfaz: 192.0.2.1 --- 0x3\n  Dirección de Internet Dirección física     Tipo','dinámico','estático','no válido'],
+ ]
+ const fixtures=locales.map(([heading,dynamic,stat,invalid],index)=>[
+  heading,
+  '  192.0.2.'+(2*index+2)+'    AA-BB-CC-DD-EE-FF     '+dynamic,
+  '  192.0.2.'+(2*index+3)+'    aa:bb:cc:dd:ee:fd     '+stat,
+  '  192.0.2.50    aa:bb:cc:dd:ee:fc     '+invalid,
+  '  192.0.2.51    aa:bb:cc:dd:ee:fb',
+  '  192.0.2.52    ff-ff-ff-ff-ff-ff     '+stat,
+  '  192.0.2.53    01-00-5e-00-00-01     '+stat,
+ ].join('\r\n'))
+ for (const [index,fixture] of fixtures.entries())
+  assert.deepEqual(parseNeighbors(fixture,1).map(({ip,mac})=>[ip,mac]),[
+   ['192.0.2.'+(2*index+2),'aa:bb:cc:dd:ee:ff'],['192.0.2.'+(2*index+3),'aa:bb:cc:dd:ee:fd'],
+  ])
+ assert.equal(parseNeighbors(fixtures.join('\n')+'\n192.0.2.60 aa-bb-cc-dd-ee-fb invalid').length,6)
+})
+
+test('localized route headings leave numeric default gateway selection unchanged',()=>{
+ const interfaces={local:[{family:'IPv4',address:'192.168.4.5',netmask:'255.255.255.0'}]}
+ const routes=[
+  'Tabla de enrutamiento IPv4', 'Rutas activas:',
+  'Destino de red   Máscara de red   Puerta de enlace   Interfaz   Métrica',
+  '0.0.0.0  0.0.0.0  192.168.4.1   192.168.4.5  25',
+  '0.0.0.0  0.0.0.0  192.168.4.2   192.168.4.5  5',
+  '192.168.4.0 255.255.255.0 En vínculo 192.168.4.5 281',
+ ].join('\r\n')
+ assert.deepEqual([...parseDefaultGateways(routes,interfaces)],[['192.168.4.5','192.168.4.2']])
+})

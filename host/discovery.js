@@ -90,12 +90,21 @@ export function parseNeighbors(output, now = Date.now()) {
   if (typeof output !== 'string' || Buffer.byteLength(output) > 65536) throw Error('invalid_output')
   const found = []
   for (const line of output.split(/\r?\n/)) {
-    const m = line.match(/^\s*(\d{1,3}(?:\.\d{1,3}){3})\s+([\da-f]{2}(?:-[\da-f]{2}){5})\s+(?:dynamic|static)\s*$/i)
+    const m = line.match(/^\s*(\d{1,3}(?:\.\d{1,3}){3})\s+([\da-f]{2}([:-])[\da-f]{2}(?:\3[\da-f]{2}){4})\s+(\S.*)$/i)
     if (!m) continue
+    const type = m[4].trim().normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+    const mac = m[2].toLowerCase().replaceAll('-', ':')
+    if (
+      /^(?:invalid|incomplete|ungultig|unvollstandig|invalide|non valide|incomplet(?:e|o|a)?|invalido|no valido)$/.test(
+        type,
+      )
+    )
+      continue
+    if (mac === 'ff:ff:ff:ff:ff:ff' || mac.startsWith('01:00:5e:')) continue
     try {
       found.push({
         ip: normalizeAddress(m[1]),
-        mac: m[2].toLowerCase().replaceAll('-', ':'),
+        mac,
         source: 'neighbor',
         seenAt: now,
       })
