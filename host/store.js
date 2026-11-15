@@ -57,17 +57,10 @@ export function inventory(value) {
     if (monitoring[n.id] === true && !n.data.ip) throw invalid('Monitoring requires a management address.')
   return { topology, monitoring: Object.fromEntries(topology.nodes.map((n) => [n.id, monitoring[n.id] === true])) }
 }
-export function openStore(path, { now = () => Date.now(), migrate, migrateV2, migrateV3, migrateV4, migrateV5 } = {}) {
-  const db = new DatabaseSync(path)
-  db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=3000;')
-  const version = db.prepare('PRAGMA user_version').get().user_version
-  if (version > 5) {
-    db.close()
-    throw new Error('Database schema is newer than this host. Use a compatible host; do not delete the database.')
-  }
-  try {
-    if (!version) {
-      db.exec('BEGIN IMMEDIATE')
+const MIGRATIONS = [
+  {
+    version: 1,
+    up(db, now) {
       db.exec(`CREATE TABLE inventory (singleton INTEGER PRIMARY KEY CHECK(singleton=1), revision INTEGER NOT NULL, updated_at TEXT NOT NULL, payload TEXT NOT NULL);
         CREATE TABLE checks (seq INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('up','down')), checked_at INTEGER NOT NULL);
         CREATE INDEX checks_device_time ON checks(device_id, seq);
@@ -76,20 +69,12 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
         new Date(now()).toISOString(),
         JSON.stringify({ topology: { schemaVersion: 1, nodes: [], edges: [] }, monitoring: {} }),
       )
-      migrate?.(db)
-      db.exec('PRAGMA user_version=1; COMMIT')
-    }
-  } catch (e) {
-    try {
-      db.exec('ROLLBACK')
-    } catch {}
-    db.close()
-    throw e
-  }
-  if (version < 2) {
-    try {
-      db.exec(`BEGIN IMMEDIATE;
-        ALTER TABLE checks RENAME TO checks_v1;
+    },
+  },
+  {
+    version: 2,
+    up(db) {
+      db.exec(`ALTER TABLE checks RENAME TO checks_v1;
         CREATE TABLE checks (seq INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT NOT NULL,
           status TEXT NOT NULL CHECK(status IN ('up','down','unknown')), checked_at INTEGER NOT NULL,
           outcome TEXT NOT NULL CHECK(outcome IN ('reachable','unreachable')), reason TEXT NOT NULL,
@@ -100,65 +85,53 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
         DROP TABLE checks_v1;
         CREATE INDEX checks_device_time ON checks(device_id, seq);
         CREATE INDEX checks_time ON checks(checked_at);`)
-      migrateV2?.(db)
-      db.exec('PRAGMA user_version=2; COMMIT')
-    } catch (error) {
-      try {
-        db.exec('ROLLBACK')
-      } catch {}
-      db.close()
-      throw error
-    }
-  }
-  if (version < 3) {
-    try {
-      db.exec(`BEGIN IMMEDIATE;
-        CREATE TABLE incidents (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT NOT NULL,
+    },
+  },
+  {
+    version: 3,
+    up(db) {
+      db.exec(`CREATE TABLE incidents (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT NOT NULL,
           opened_at INTEGER NOT NULL, resolved_at INTEGER CHECK(resolved_at IS NULL OR resolved_at >= opened_at));
         CREATE UNIQUE INDEX incidents_active ON incidents(device_id) WHERE resolved_at IS NULL;
         CREATE INDEX incidents_device ON incidents(device_id,id);`)
-      migrateV3?.(db)
-      db.exec('PRAGMA user_version=3; COMMIT')
-    } catch (error) {
-      try {
-        db.exec('ROLLBACK')
-      } catch {}
-      db.close()
-      throw error
-    }
-  }
-  if (version < 4) {
-    try {
+    },
+  },
+  {
+    version: 4,
+    up(db) {
       db.exec(
-        'BEGIN IMMEDIATE; CREATE TABLE snmp_targets(device_id TEXT PRIMARY KEY,authorization TEXT NOT NULL); CREATE TABLE interface_samples(device_id TEXT PRIMARY KEY,checked_at INTEGER NOT NULL,payload TEXT NOT NULL);',
+        'CREATE TABLE snmp_targets(device_id TEXT PRIMARY KEY,authorization TEXT NOT NULL); CREATE TABLE interface_samples(device_id TEXT PRIMARY KEY,checked_at INTEGER NOT NULL,payload TEXT NOT NULL);',
       )
-      migrateV4?.(db)
-      db.exec('PRAGMA user_version=4; COMMIT')
-    } catch (error) {
-      try {
-        db.exec('ROLLBACK')
-      } catch {}
-      db.close()
-      throw error
-    }
-  }
-  if (version < 5) {
-    try {
+    },
+  },
+  {
+    version: 5,
+    up(db) {
       db.exec(
-        "BEGIN IMMEDIATE; CREATE TABLE discovered_devices(id TEXT PRIMARY KEY,ip TEXT NOT NULL,mac TEXT,hostname TEXT,source TEXT NOT NULL,first_seen INTEGER NOT NULL,last_seen INTEGER NOT NULL,status TEXT NOT NULL CHECK(status IN ('new','changed','ignored','added','gone')),saved_device_id TEXT,misses INTEGER NOT NULL DEFAULT 0);",
+        "CREATE TABLE discovered_devices(id TEXT PRIMARY KEY,ip TEXT NOT NULL,mac TEXT,hostname TEXT,source TEXT NOT NULL,first_seen INTEGER NOT NULL,last_seen INTEGER NOT NULL,status TEXT NOT NULL CHECK(status IN ('new','changed','ignored','added','gone')),saved_device_id TEXT,misses INTEGER NOT NULL DEFAULT 0);",
       )
-      migrateV5?.(db)
-      db.exec('PRAGMA user_version=5; COMMIT')
-    } catch (error) {
-      try {
-        db.exec('ROLLBACK')
-      } catch {}
-      db.close()
-      throw error
-    }
+    },
+  },
+]
+
+export function openStore(path, { now = () => Date.now(), migrate, migrateV2, migrateV3, migrateV4, migrateV5 } = {}) {
+  const db = new DatabaseSync(path)
+  db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=3000;')
+  const version = db.prepare('PRAGMA user_version').get().user_version
+  if (version > 5) {
+    db.close()
+    throw new Error('Database schema is newer than this host. Use a compatible host; do not delete the database.')
   }
-  // Additive, idempotent index migration; no stored check row shape changes.
+  const hooks = [migrate, migrateV2, migrateV3, migrateV4, migrateV5]
   try {
+    for (const migration of MIGRATIONS) {
+      if (migration.version <= version) continue
+      db.exec('BEGIN IMMEDIATE')
+      migration.up(db, now)
+      hooks[migration.version - 1]?.(db)
+      db.exec('PRAGMA user_version=' + migration.version + '; COMMIT')
+    }
+    // Older databases can lack this index even if their schema version is current.
     db.exec(
       'BEGIN IMMEDIATE; CREATE INDEX IF NOT EXISTS checks_device_latest ON checks(device_id,checked_at DESC,seq DESC); COMMIT',
     )

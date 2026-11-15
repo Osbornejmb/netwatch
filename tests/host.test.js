@@ -110,3 +110,39 @@ test('loopback API enforces origin, host, write intent, payload bounds, error sh
  const chunked=await new Promise((resolve,reject)=>{const req=http.request(base+'/api/v1/topology',{method:'PUT',headers:{'Content-Type':'application/json','X-NetWatch-Write':token,'Transfer-Encoding':'chunked'}},res=>{res.resume();resolve(res.statusCode)});req.on('error',reject);req.end(' '.repeat(MAX_BODY+1))});assert.equal(chunked,413)
  assert.equal((await fetch(base+'/api/v1/checks',{method:'POST'})).status,404)
 })
+test('ordered migrations upgrade v1 through v5 and preserve existing data', async t => {
+ const time=Date.now()
+ for(let version=1;version<=5;version++){
+  await t.test('version '+version, sub=>{
+   const dir=mkdtempSync(join(tmpdir(),'netwatch-migration-')),path=join(dir,'db')
+   sub.after(()=>rmSync(dir,{recursive:true,force:true}))
+   if(version<5){
+    const stop=Error('fixture version reached')
+    assert.throws(()=>openStore(path,{['migrateV'+(version+1)]:()=>{throw stop}}),{message:stop.message})
+   }else openStore(path).close()
+   const db=new DatabaseSync(path)
+   try{
+    assert.equal(db.prepare('PRAGMA user_version').get().user_version,version)
+    db.prepare('UPDATE inventory SET revision=3,payload=?').run(JSON.stringify({topology,monitoring:{r1:true,s1:false}}))
+    if(version===1)db.prepare("INSERT INTO checks VALUES(31,'r1','up',?)").run(time)
+    else db.prepare("INSERT INTO checks VALUES(31,'r1','up',?,'reachable','fixture',4)").run(time)
+    if(version>=3)db.prepare("INSERT INTO incidents VALUES(2,'r1',?,?)").run(time-100,time)
+    if(version>=4)db.exec("INSERT INTO snmp_targets VALUES('r1','00000000-0000-0000-0000-000000000001')")
+    if(version>=5)db.prepare("INSERT INTO discovered_devices VALUES('fixture','192.0.2.2',NULL,NULL,'neighbor',?,?,'new',NULL,0)").run(time,time)
+   }finally{db.close()}
+   const migrated=openStore(path)
+   try{
+    assert.equal(migrated.db.prepare('PRAGMA user_version').get().user_version,5)
+    assert.equal(migrated.revision(),3)
+    assert.deepEqual(migrated.read().topology,topology)
+    const [row]=migrated.history('r1').checks
+    assert.equal(row.id,31)
+    assert.equal(row.reason,version===1?'legacy':'fixture')
+    if(version>=3)assert.equal(migrated.incidents('r1').incidents[0].id,2)
+    if(version>=4)assert.equal(migrated.interfaces('r1').configured,true)
+    if(version>=5)assert.equal(migrated.discovered().devices[0].id,'fixture')
+    assert.ok(migrated.db.prepare("SELECT name FROM sqlite_master WHERE name='checks_device_latest'").get())
+   }finally{migrated.close()}
+  })
+ }
+})
