@@ -1,3 +1,4 @@
+import { fetchWriteToken, writeTokenFixture } from './fixtures/write-token.js'
 import test from 'node:test'
 import http from 'node:http'
 import assert from 'node:assert/strict'
@@ -87,14 +88,15 @@ test('offline backup/restore validates data, advances revision and rejects corru
  const release=lock(path);assert.throws(()=>backupDatabase(path,join(dir,'other')),/in use/);release();assert.throws(()=>backupDatabase(path,backup),/already exists/)
 })
 test('loopback API enforces origin, host, write intent, payload bounds, error shapes and pagination',async t=>{
- const {store}=fixture(t);const server=createHost(store,{port:0});await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port
+ const {store,dir}=fixture(t);const dist=writeTokenFixture(dir);const server=createHost(store,{port:0});await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port
  // Production authority is fixed; use a configurable test port once allocated.
- await new Promise(r=>server.close(r));const api=createHost(store,{port});await new Promise(r=>api.listen(port,'127.0.0.1',r));t.after(()=>new Promise(r=>api.close(r)));const base=`http://127.0.0.1:${port}`
+ await new Promise(r=>server.close(r));const api=createHost(store,{port,dist});await new Promise(r=>api.listen(port,'127.0.0.1',r));t.after(()=>new Promise(r=>api.close(r)));const base=`http://127.0.0.1:${port}`
  assert.equal((await fetch(base+'/api/v1/health')).status,200)
  assert.equal((await fetch(base+'/api/v1/topology',{headers:{Origin:'http://evil.test'}})).status,403)
  assert.equal((await fetch(base+'/api/v1/topology',{headers:{'Sec-Fetch-Site':'cross-site'}})).status,403)
  assert.equal(await new Promise((resolve,reject)=>{http.get(base+'/api/v1/topology',{headers:{Host:'evil.test'}},res=>{res.resume();resolve(res.statusCode)}).on('error',reject)}),403)
- const put=(body,headers={})=>fetch(base+'/api/v1/topology',{method:'PUT',headers:{'Content-Type':'application/json','X-NetWatch-Write':'1',...headers},body})
+ const token=await fetchWriteToken(base)
+ const put=(body,headers={})=>fetch(base+'/api/v1/topology',{method:'PUT',headers:{'Content-Type':'application/json','X-NetWatch-Write':token,...headers},body})
  assert.equal((await put(JSON.stringify({...input(),baseRevision:0}),{'X-NetWatch-Write':''})).status,403)
  assert.equal((await put('{')).status,400)
  assert.equal((await put('null')).status,400)
@@ -105,6 +107,6 @@ test('loopback API enforces origin, host, write intent, payload bounds, error sh
  assert.equal((await fetch(base+'/api/v1/devices/r1/checks')).status,200)
  assert.equal((await fetch(base+'/api/v1/snapshot')).status,200)
  const large=await put(' '.repeat(MAX_BODY+1));assert.equal(large.status,413)
- const chunked=await new Promise((resolve,reject)=>{const req=http.request(base+'/api/v1/topology',{method:'PUT',headers:{'Content-Type':'application/json','X-NetWatch-Write':'1','Transfer-Encoding':'chunked'}},res=>{res.resume();resolve(res.statusCode)});req.on('error',reject);req.end(' '.repeat(MAX_BODY+1))});assert.equal(chunked,413)
+ const chunked=await new Promise((resolve,reject)=>{const req=http.request(base+'/api/v1/topology',{method:'PUT',headers:{'Content-Type':'application/json','X-NetWatch-Write':token,'Transfer-Encoding':'chunked'}},res=>{res.resume();resolve(res.statusCode)});req.on('error',reject);req.end(' '.repeat(MAX_BODY+1))});assert.equal(chunked,413)
  assert.equal((await fetch(base+'/api/v1/checks',{method:'POST'})).status,404)
 })

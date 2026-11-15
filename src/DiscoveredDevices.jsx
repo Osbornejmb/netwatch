@@ -2,6 +2,7 @@ import ConfirmDialog from './ConfirmDialog'
 import { useEffect, useState } from 'react'
 import InfoTooltip from './InfoTooltip'
 import { guessDeviceType } from './discoveryType.js'
+import { writeHeaders } from './monitoring.js'
 
 const statusLabel = { new: 'New', changed: 'Changed', added: 'Added', gone: 'Not seen' }
 const seenAt = (value) =>
@@ -60,7 +61,7 @@ export default function DiscoveredDevices() {
       }
       const r = await fetch(`/api/v1/discovered/${encodeURIComponent(device.id)}/${kind}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-NetWatch-Write': '1' },
+        headers: { 'Content-Type': 'application/json', ...writeHeaders() },
         body: JSON.stringify(body),
       })
       if (!r.ok) throw Error()
@@ -87,7 +88,7 @@ export default function DiscoveredDevices() {
     setBusy(true)
     setMessage('')
     try {
-      const r = await fetch('/api/v1/discovered/clear', { method: 'POST', headers: { 'X-NetWatch-Write': '1' } })
+      const r = await fetch('/api/v1/discovered/clear', { method: 'POST', headers: writeHeaders() })
       if (!r.ok) throw Error()
       setPages([])
       await refresh(0)
@@ -103,7 +104,7 @@ export default function DiscoveredDevices() {
     setScanning(true)
     setMessage('')
     try {
-      const r = await fetch('/api/v1/discovered/scan-now', { method: 'POST', headers: { 'X-NetWatch-Write': '1' } })
+      const r = await fetch('/api/v1/discovered/scan-now', { method: 'POST', headers: writeHeaders() })
       if (!r.ok) throw Error()
       const result = await r.json()
       if (result.state === 'disabled' || result.state === 'unsupported') throw Error()

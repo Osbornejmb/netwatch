@@ -1,4 +1,5 @@
 import http from 'node:http'
+import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { resolve, extname, relative, isAbsolute } from 'node:path'
 import { invalid, MAX_BODY } from './store.js'
@@ -59,6 +60,8 @@ export function createHost(
   store,
   { port = readPort(), dist = resolve('dist'), collector, interfaces, discovery } = {},
 ) {
+  const writeToken = randomBytes(32).toString('hex')
+  const expectedToken = Buffer.from(writeToken, 'hex')
   const routes = [
     { method: 'GET', pattern: /^\/api\/v1\/health$/, handler: health },
     { method: 'GET', pattern: /^\/api\/v1\/topology$/, handler: readTopology },
@@ -125,11 +128,16 @@ export function createHost(
         if (req.method !== method) continue
         const match = pattern.exec(url.pathname)
         if (!match) continue
-        // PUT topology has historically checked its media type before the write header.
-        if (method === 'PUT') requireJson(req)
-        if (requiresWrite && req.headers['x-netwatch-write'] !== '1')
-          throw invalid('Explicit write header required.', 403)
-        if (method !== 'PUT' && bodyType === 'json') requireJson(req)
+        if (requiresWrite) {
+          const token = req.headers['x-netwatch-write']
+          if (
+            typeof token !== 'string' ||
+            !/^[0-9a-f]{64}$/.test(token) ||
+            !timingSafeEqual(Buffer.from(token, 'hex'), expectedToken)
+          )
+            throw invalid('Valid write token required. Reload NetWatch and try again.', 403)
+        }
+        if (bodyType === 'json') requireJson(req)
         const body = await parseBody(req, bodyType)
         const id = match[1] === undefined ? undefined : decodePath(match[1])
         return send(200, await handler({ store, collector, interfaces, discovery, url, id, body }))
@@ -145,8 +153,16 @@ export function createHost(
         throw invalid('Build not found. Run npm run build.', 404)
       }
       const staticPath = relative(dist, file).replaceAll('\\', '/')
+      const index = staticPath === 'index.html'
+      if (index)
+        data = data
+          .toString('utf8')
+          .replace(
+            /<head(?:\s[^>]*)?>/i,
+            (head) => head + '<meta name="netwatch-write-token" content="' + writeToken + '">',
+          )
       res.writeHead(200, {
-        ...(staticPath === 'index.html' ? { 'Cache-Control': 'no-cache' } : {}),
+        ...(index ? { 'Cache-Control': 'no-store' } : {}),
         ...(/^assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[^/]+$/.test(staticPath)
           ? { 'Cache-Control': 'public, max-age=31536000, immutable' }
           : {}),

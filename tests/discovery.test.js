@@ -1,3 +1,4 @@
+import { fetchWriteToken, writeTokenFixture } from './fixtures/write-token.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { localSubnets, parseNeighbors, parseDefaultGateways, createDiscovery } from '../host/discovery.js'
@@ -72,8 +73,8 @@ test('discovery API paginates, rate limits scan requests and adds with monitorin
  const dir=mkdtempSync(join(tmpdir(),'nw-discovery-api-')),store=openStore(join(dir,'db'));t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true})})
  store.write({source:'inventory',topology:{schemaVersion:1,nodes:[{id:'gateway',type:'router',position:{x:0,y:0},data:{label:'Main router',ip:'192.168.1.1'}}],edges:[]},monitoring:{}},0)
  store.recordDiscovery([{ip:'192.168.1.5',mac:'aa:bb:cc:dd:ee:ff',source:'neighbor'},{ip:'192.168.1.6',mac:null,source:'neighbor'}])
- const server=createHost(store,{port:0,discovery:{runOnce:async()=>{},snapshot:()=>({state:'idle'}),gatewayFor:async ip=>ip.endsWith('.5')?'192.168.1.1':'192.168.1.254'}});server.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)))
- const base=`http://127.0.0.1:${server.address().port}/api/v1`,headers={'X-NetWatch-Write':'1','Content-Type':'application/json'}
+ const server=createHost(store,{port:0,dist:writeTokenFixture(dir),discovery:{runOnce:async()=>{},snapshot:()=>({state:'idle'}),gatewayFor:async ip=>ip.endsWith('.5')?'192.168.1.1':'192.168.1.254'}});server.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)))
+ const base=`http://127.0.0.1:${server.address().port}/api/v1`,headers={'X-NetWatch-Write':await fetchWriteToken(base),'Content-Type':'application/json'}
  const page=await fetch(`${base}/discovered?limit=1`).then(r=>r.json());assert.equal(page.devices.length,1);assert.ok(page.nextAfter)
  assert.equal((await fetch(`${base}/discovered/scan-now`,{method:'POST',headers})).status,200);assert.equal((await fetch(`${base}/discovered/scan-now`,{method:'POST',headers})).status,429)
  const id=page.devices[0].id;assert.equal((await fetch(`${base}/discovered/${id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:99})})).status,409)
@@ -90,8 +91,8 @@ test('an already-added gateway can be corrected and existing clients can be link
  store.write({source:'inventory',topology:{schemaVersion:1,nodes:[{id:'gateway',type:'switch',position:{x:0,y:0},data:{label:'Router',ip:'192.168.100.1'}},{id:'client',type:'switch',position:{x:0,y:0},data:{label:'PC',ip:'192.168.100.20'}}],edges:[]},monitoring:{}},0)
  store.recordDiscovery([{ip:'192.168.100.1',mac:null,source:'neighbor'},{ip:'192.168.100.20',mac:null,source:'neighbor'}])
  const rows=store.discovered().devices;store.discoveryAction(rows[0].id,'added','gateway');store.discoveryAction(rows[1].id,'added','client')
- const server=createHost(store,{port:0,discovery:{gatewayFor:async()=> '192.168.100.1'}});server.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)))
- const base=`http://127.0.0.1:${server.address().port}/api/v1`,headers={'X-NetWatch-Write':'1','Content-Type':'application/json'}
+ const server=createHost(store,{port:0,dist:writeTokenFixture(dir),discovery:{gatewayFor:async()=> '192.168.100.1'}});server.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)))
+ const base=`http://127.0.0.1:${server.address().port}/api/v1`,headers={'X-NetWatch-Write':await fetchWriteToken(base),'Content-Type':'application/json'}
  const promote=await fetch(`${base}/discovered/${rows[0].id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:1})}).then(r=>r.json())
  assert.equal(promote.promotedRouter,true);assert.equal(promote.topology.nodes.find(node=>node.id==='gateway').type,'router');assert.equal(promote.topology.nodes.length,2)
  const linked=await fetch(`${base}/discovered/${rows[1].id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:promote.revision})}).then(r=>r.json())
@@ -105,15 +106,16 @@ test('discovery actions find later pages and leave the map intact if a record is
  t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true})})
  store.recordDiscovery(Array.from({length:202},(_,i)=>({ip:`192.168.1.${i+1}`,source:'neighbor'})))
  const {nextAfter}=store.discovered({limit:200}),[later,removed]=store.discovered({after:nextAfter}).devices
- const server=createHost(store,{port:0,discovery:{gatewayFor:async ip=>{
+ const server=createHost(store,{port:0,dist:writeTokenFixture(dir),discovery:{gatewayFor:async ip=>{
   if(ip===removed.ip)store.removeDiscovery(removed.id)
   return null
  }}})
  server.listen(0,'127.0.0.1')
  await new Promise(resolve=>server.once('listening',resolve))
  t.after(()=>new Promise(resolve=>server.close(resolve)))
+ const token=await fetchWriteToken('http://127.0.0.1:'+server.address().port)
  const add=(id,baseRevision)=>fetch(`http://127.0.0.1:${server.address().port}/api/v1/discovered/${id}/add-to-map`,{
-  method:'POST',headers:{'X-NetWatch-Write':'1','Content-Type':'application/json'},body:JSON.stringify({baseRevision})
+  method:'POST',headers:{'X-NetWatch-Write':token,'Content-Type':'application/json'},body:JSON.stringify({baseRevision})
  })
  assert.equal((await add(later.id,0)).status,200)
  assert.equal(store.discovered({after:nextAfter}).devices[0].status,'added')

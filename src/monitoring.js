@@ -1,11 +1,16 @@
 import { validateTopology } from './topology.js'
 
+export function writeHeaders() {
+  const token = globalThis.document?.querySelector('meta[name="netwatch-write-token"]')?.content
+  return token ? { 'X-NetWatch-Write': token } : {}
+}
+
 export async function hostRequest(path, { signal, body } = {}) {
   const response = await fetch(`/api/v1/${path}`, {
     signal,
     cache: 'no-store',
     method: body ? 'PUT' : 'GET',
-    headers: body ? { 'Content-Type': 'application/json', 'X-NetWatch-Write': '1' } : {},
+    headers: body ? { 'Content-Type': 'application/json', ...writeHeaders() } : {},
     body: body ? JSON.stringify(body) : undefined,
   })
   const value = await response.json()

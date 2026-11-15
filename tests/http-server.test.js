@@ -8,13 +8,14 @@ import test from 'node:test'
 import { loopbackUrl, readPort } from '../host/port.js'
 import { createHost } from '../host/server.js'
 import { MAX_BODY, openStore } from '../host/store.js'
+import { fetchWriteToken, writeTokenFixture } from './fixtures/write-token.js'
 
 async function fixture(t) {
   const dir = mkdtempSync(join(tmpdir(), 'netwatch-http-'))
   const store = openStore(join(dir, 'db'))
   const dist = join(dir, 'dist')
   mkdirSync(join(dist, 'assets'), { recursive: true })
-  writeFileSync(join(dist, 'index.html'), '<!doctype html><html></html>')
+  writeTokenFixture(dist)
   writeFileSync(join(dist, 'assets', 'index-aBCdef_1.js'), '')
   writeFileSync(join(dist, 'assets', 'config.json'), '{}')
   writeFileSync(join(dist, 'font.woff2'), '')
@@ -60,8 +61,8 @@ test('malformed IDs and static paths return 400 and loopback aliases get a 403 w
 test('index and fingerprinted assets use their respective cache policies and safe MIME types', async (t) => {
   const base = await fixture(t)
   for (const [path, cache, type] of [
-    ['/', 'no-cache', 'text/html'],
-    ['/index.html', 'no-cache', 'text/html'],
+    ['/', 'no-store', 'text/html'],
+    ['/index.html', 'no-store', 'text/html'],
     ['/assets/index-aBCdef_1.js', 'public, max-age=31536000, immutable', 'text/javascript'],
     ['/assets/config.json', null, 'application/json'],
     ['/font.woff2', null, 'font/woff2'],
@@ -79,7 +80,7 @@ test('an oversized streaming body gets a 413 and a closed connection before the 
   const base = await fixture(t)
   const req = http.request(base + '/api/v1/topology', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'X-NetWatch-Write': '1' },
+    headers: { 'Content-Type': 'application/json', 'X-NetWatch-Write': await fetchWriteToken(base) },
   })
   t.after(() => req.destroy())
   const responseReady = once(req, 'response', { signal: AbortSignal.timeout(5000) })
@@ -90,4 +91,31 @@ test('an oversized streaming body gets a 413 and a closed connection before the 
   assert.equal(response.headers.connection, 'close')
   response.resume()
   await once(req, 'close', { signal: AbortSignal.timeout(5000) })
+})
+
+test('the write token is injected per launch and is accepted only by its own host', async (t) => {
+  const first = await fixture(t)
+  const second = await fixture(t)
+  const old = await fetchWriteToken(first)
+  const token = await fetchWriteToken(second)
+  assert.ok(old !== token)
+  for (const headers of [{ Origin: 'http://example.test' }, { 'Sec-Fetch-Site': 'cross-site' }]) {
+    const response = await fetch(second, { headers })
+    assert.equal(response.status, 403)
+    assert.equal((await response.text()).includes(token), false)
+  }
+  const legacyWrite = await fetch(second + '/api/v1/topology', { method: 'PUT', headers: { 'X-NetWatch-Write': '1' } })
+  assert.equal(legacyWrite.status, 403)
+  const wrongMime = await fetch(second + '/api/v1/topology', { method: 'PUT', headers: { 'X-NetWatch-Write': token } })
+  assert.equal(wrongMime.status, 415)
+  for (const wrong of ['', '1', old, token + '0']) {
+    const response = await fetch(second + '/api/v1/discovered/clear', {
+      method: 'POST', headers: { 'X-NetWatch-Write': wrong },
+    })
+    assert.equal(response.status, 403)
+  }
+  const response = await fetch(second + '/api/v1/discovered/clear', {
+    method: 'POST', headers: { 'X-NetWatch-Write': token },
+  })
+  assert.equal(response.status, 200)
 })

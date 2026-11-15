@@ -4,6 +4,8 @@ The owner's priority is a clear dashboard showing genuine device up/down behavio
 
 ## First usable release
 
+The local host uses per-launch write tokens, helper cache checksums and a configurable loopback port. Account authentication and remote access remain tracked by #10 and #12.
+
 M1 + M2 deliver the local monitoring MVP. SNMP/LLDP, BGP collection, and remote access are not prerequisites for seeing real up/down status. BGP session monitoring is not currently in scope; ping results cannot establish BGP health.
 
 **Critical path:** #13 → #1 → #4 → #5 → #28 → #6 → #11 → #16. Local tray/desktop controls (#28) are brought forward before live dashboard integration. Inventory editing (#2), recovery (#3), and map evidence (#15) must also be complete before the release gate #16. Authentication #10 can be brought forward after #4/#6 if remote access becomes urgent, without waiting for SNMP.

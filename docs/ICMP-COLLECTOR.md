@@ -2,6 +2,9 @@
 
 The host has an opt-in Windows ICMP collector. Dashboard observation integration is implemented locally for issue #6. Separately, opt-in local discovery may use the same bounded probe runner for a directly attached private IPv4 subnet. Discovery results are review-only; only the explicit Add to map action saves a device and enables its normal checks. See DISCOVERY.md.
 
+
+The Windows helper cache uses source-hash filenames and a SHA-256 sidecar for each compiled executable. A missing or mismatched sidecar triggers a rebuild on the next preparation. The sidecar detects cache changes when it remains intact.
+
 ## Enable deliberately
 
 Requires Windows 10/11, Node 22.13+, the Windows .NET Framework v4 runtime/compiler, and OS permission to send ICMP. No administrator elevation or PowerShell execution-policy change is requested. The framework compiler must be present and permitted by application control. On a non-Windows host the enabled collector reports `unsupported`; it never substitutes another platform's ping command.

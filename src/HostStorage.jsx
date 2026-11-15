@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
 import useModal from './useModal'
 import { validateTopology } from './topology'
+import { writeHeaders } from './monitoring.js'
 
 async function request(method = 'GET', body) {
   const response = await fetch('/api/v1/topology', {
     method,
-    headers: body ? { 'Content-Type': 'application/json', 'X-NetWatch-Write': '1' } : {},
+    headers: body ? { 'Content-Type': 'application/json', ...writeHeaders() } : {},
     body: body ? JSON.stringify(body) : undefined,
   })
   const result = await response.json()

@@ -79,6 +79,8 @@ This enables the collector for devices you separately authorize; it does not add
 
 ## Development and verification
 
+Direct host API clients use the per-launch write token for inventory and discovery changes. See [Host API](docs/HOST-API.md).
+
 NetWatch uses the experimental `node:sqlite` API in Node.js 22. Before upgrading Node, verify the host and its migrations with the test suite against the target Node version.
 
 ```powershell

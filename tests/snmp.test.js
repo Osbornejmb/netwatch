@@ -136,6 +136,24 @@ test('Windows DPAPI round-trip protects secrets and binds credentials to explici
  await vault.stop();vault.remove('a');await assert.rejects(vault.load(target),/Credentials unavailable/)
 })
 
+test('vault load rejects a decrypted profile bound to another device, enrollment, address or type', async t=>{
+ const directory=mkdtempSync(join(tmpdir(),'nw-credential-binding-'));t.after(()=>rmSync(directory,{recursive:true,force:true}))
+ const target={deviceId:'bound-router',authorization:randomUUID(),address:'192.0.2.1',type:'router'}
+ let profile={version:1,...target,user}
+ const vault=createCredentialVault(directory,{platform:'win32',prepare:async()=> 'mock-helper',execute(_exe,[operation],options,done){
+  assert.equal(options.shell,false)
+  return {stdin:{on(){},end(input){
+   const output=operation==='protect'?input:Buffer.from(JSON.stringify(profile)).toString('base64')
+   queueMicrotask(()=>done(null,output))
+  }}}
+ }})
+ await vault.save(profile);assert.deepEqual(await vault.load(target),user)
+ for(const variant of [{deviceId:'other-device'},{authorization:randomUUID()},{address:'192.0.2.2'},{type:'switch'}]){
+  profile={version:1,...target,...variant,user}
+  await assert.rejects(vault.load(target),/Credentials unavailable/)
+ }
+})
+
 test('encrypted SNMPv3 authPriv exchanges work over isolated loopback UDP and wrong credentials fail closed',async t=>{
  let socket
  const agent=snmp.createAgent({address:'127.0.0.1',accessControlModelType:snmp.AccessControlModelType.Simple,dgramModule:{createSocket:()=>{socket=dgram.createSocket('udp4');const bind=socket.bind.bind(socket);socket.bind=()=>bind(0,'127.0.0.1');return socket}}},()=>{})

@@ -1,5 +1,12 @@
 # Working checkpoint
 
+## Current status (2026-11-15)
+
+- Added the MIT license and a documentation index. Readme screenshots use an isolated fixture. Check scripts write generated evidence to ignored workspace paths, and CI collects scoped artifacts.
+- Added lint, formatting, audit and headless Ubuntu browser jobs. Host and frontend formatting passed with identical test output before and after.
+- Split host request routes, preserved the loopback origin checks, added configurable `NETWATCH_PORT` and bounded streamed request handling, and documented the HTTP and caching behavior.
+- Host writes require a per-launch token supplied by the same-origin index. The Windows helper cache verifies executable checksums. DPAPI continues to use CurrentUser scope with application entropy, and tests cover decrypted profile bindings.
+
 ## Current status (2026-11-14): link discovered devices to known gateways
 
 - Add to map reads the local Windows default route, classifies the matching gateway as a router, and creates a `Gateway route` map edge for clients when the gateway matches a saved router. New entries start with normal monitoring checks on; ICMP authorization remains separately off. Already-added entries can be updated without duplicates, and the UI explains gateway links are routing hints rather than confirmed cable paths.
