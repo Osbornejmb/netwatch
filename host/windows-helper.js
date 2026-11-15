@@ -46,7 +46,12 @@ export function prepareWindowsHelper({
         ...(kind === 'secrets' ? ['/reference:System.Security.dll'] : []),
         source,
       ],
-      { shell: false, windowsHide: true, timeout: ICMP_POLICY.processTimeoutMs, maxBuffer: 4096 },
+      {
+        shell: false,
+        windowsHide: true,
+        timeout: kind === 'secrets' ? 15000 : ICMP_POLICY.processTimeoutMs,
+        maxBuffer: 4096,
+      },
       (error) => {
         try {
           if (error) throw new Error('Windows ICMP helper compiler is unavailable or blocked.')

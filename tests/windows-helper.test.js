@@ -29,11 +29,13 @@ test('helper preparation rebuilds missing or modified cached executables and ver
     },
   }
   let builds = 0
-  const prepare = () => prepareWindowsHelper({
+  const prepare = (kind = 'ping') => prepareWindowsHelper({
+    kind,
     directory,
     fs,
     execute(_compiler, args, options, done) {
       assert.equal(options.shell, false)
+      assert.equal(options.timeout, kind === 'secrets' ? 15000 : 4000)
       const out = args.find((arg) => arg.startsWith('/out:')).slice(5)
       files.set(out, Buffer.from('built binary ' + ++builds))
       queueMicrotask(() => done(null))
@@ -53,4 +55,5 @@ test('helper preparation rebuilds missing or modified cached executables and ver
   assert.equal(builds, 3)
   assert.equal(files.get(sidecar).toString().trim(), checksum(files.get(file)))
   assert.equal(files.size, 2)
+  assert.match(basename(await prepare('secrets')), /^secrets-.*.exe$/)
 })
