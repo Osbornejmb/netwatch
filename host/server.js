@@ -91,7 +91,7 @@ export function createRoutes(discovery) {
     },
     {
       method: 'POST',
-      pattern: /^\/api\/v1\/discovered\/([^/]+)\/add-to-map$/,
+      pattern: /^\/api\/v1\/discovered(?:\/([^/]+))?\/add-to-map$/,
       handler: addDiscoveredToMap,
       auditAction: 'discovery_add',
       access: 'admin',

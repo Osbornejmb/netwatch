@@ -157,3 +157,121 @@ test('localized route headings leave numeric default gateway selection unchanged
  ].join('\r\n')
  assert.deepEqual([...parseDefaultGateways(routes,interfaces)],[['192.168.4.5','192.168.4.2']])
 })
+
+test('discovery reports a default gateway even when the neighbor table is empty',async t=>{
+ const store=openStore(':memory:')
+ t.after(()=>store.close())
+ const discovery=createDiscovery(store,{
+  enabled:true,platform:'win32',
+  interfaces:()=>({wifi:[{family:'IPv4',address:'192.168.0.116',netmask:'255.255.255.0'}]}),
+  runner:async()=>'',gatewayRunner:async()=> '0.0.0.0 0.0.0.0 192.168.0.1 192.168.0.116 25',
+  nameLookup:async()=>[],
+ })
+ await discovery.runOnce()
+ assert.deepEqual(store.discovered().devices.map(({ip,source})=>[ip,source]),[['192.168.0.1','gateway']])
+})
+
+test('a previously scanned gateway is recognized at another local address by its MAC',async t=>{
+ const store=openStore(':memory:')
+ t.after(()=>store.close())
+ let localIp='192.168.0.116', gateway='192.168.0.1'
+ let neighbors='192.168.0.1 02-00-00-00-00-01 dynamic'
+ const discovery=createDiscovery(store,{
+  enabled:true,platform:'win32',
+  interfaces:()=>({wifi:[{family:'IPv4',address:localIp,netmask:'255.255.255.0'}]}),
+  runner:async()=>neighbors,gatewayRunner:async()=>`0.0.0.0 0.0.0.0 ${gateway} ${localIp} 25`,
+  nameLookup:async()=>[],
+ })
+ await discovery.runOnce()
+ neighbors=''
+ await discovery.runOnce()
+ localIp='192.168.100.2';gateway='192.168.100.1'
+ neighbors='192.168.100.4 02-00-00-00-00-01 dynamic\n192.168.100.5 02-00-00-00-00-02 dynamic'
+ await discovery.runOnce()
+ const sources=new Map(store.discovered().devices.map(({ip,source})=>[ip,source]))
+ assert.equal(sources.get('192.168.100.1'),'gateway')
+ assert.equal(sources.get('192.168.100.4'),'gateway-mac')
+ assert.equal(sources.get('192.168.100.5'),'neighbor')
+ const alias=store.discovered().devices.find(device=>device.ip==='192.168.100.4')
+ const {addDiscoveredToMap}=await import('../host/routes/discovered.js')
+ const saved=await addDiscoveredToMap({store,discovery,id:alias.id,body:{baseRevision:0}})
+ assert.equal(saved.topology.nodes[0].type,'router')
+})
+
+test('active discovery saves a two-hop route between saved routers only with both replies',async t=>{
+ const store=openStore(':memory:')
+ t.after(()=>store.close())
+ const routers=[['tenda','192.168.0.1'],['main','192.168.100.1'],['public','8.8.8.8']]
+ const nodes=routers.map(([id,ip])=>({id,type:'router',position:{x:0,y:0},data:{label:id,ip}}))
+ store.write({source:'inventory',topology:{schemaVersion:1,nodes,edges:[]},monitoring:{main:true}},0)
+ const calls=[]
+ let firstHop='1   *  *  *  Request timed out.'
+ const discovery=createDiscovery(store,{
+  enabled:true,active:true,platform:'win32',
+  interfaces:()=>({wifi:[{family:'IPv4',address:'192.168.0.2',netmask:'255.255.255.252'}]}),
+  runner:async()=>'',gatewayRunner:async()=> '0.0.0.0 0.0.0.0 192.168.0.1 192.168.0.2 25',
+  nameLookup:async()=>[],
+  traceRunner:async ip=>{calls.push(ip);return `${firstHop}\r\n   2  2 ms  3 ms  2 ms  ${ip}\r\n`},
+ })
+ await discovery.runOnce()
+ assert.equal(store.read().revision,1)
+ firstHop='1   <1 ms   *   1 ms   192.168.0.1'
+ await discovery.runOnce()
+ const {revision,monitoring,topology}=store.read()
+ assert.equal(revision,2)
+ assert.deepEqual(monitoring,{tenda:false,main:true,public:false})
+ assert.deepEqual(topology.edges.map(({source,target,label})=>[source,target,label]),[
+  ['tenda','main','Observed upstream route'],
+ ])
+ assert.equal(discovery.snapshot().upstreamLinks,1)
+ await discovery.runOnce()
+ assert.equal(store.read().revision,2)
+ assert.equal(discovery.snapshot().upstreamLinks,0)
+ assert.deepEqual(calls,['192.168.100.1','192.168.100.1'])
+})
+
+test('bulk discovery adds every current page once, reuses map entries and links clients to the router',async t=>{
+ const store=openStore(':memory:')
+ t.after(()=>store.close())
+ store.write({source:'inventory',topology:{schemaVersion:1,nodes:[
+  {id:'existing',type:'switch',position:{x:0,y:0},data:{label:'Existing',ip:'192.168.0.2'}},
+ ],edges:[]},monitoring:{}},0)
+ const rows=Array.from({length:202},(_,i)=>({ip:`192.168.0.${i+2}`,source:'neighbor'}))
+ store.recordDiscovery([{ip:'192.168.0.250'},...rows])
+ store.recordDiscovery([...rows,{ip:'192.168.0.1',source:'gateway'}])
+ const dir=mkdtempSync(join(tmpdir(),'nw-discovery-bulk-'))
+ t.after(()=>rmSync(dir,{recursive:true,force:true}))
+ const server=createHost(store,{port:0,dist:writeTokenFixture(dir),discovery:{gatewayLookup:async()=>()=> '192.168.0.1'}})
+ server.listen(0,'127.0.0.1')
+ await new Promise(resolve=>server.once('listening',resolve))
+ t.after(()=>new Promise(resolve=>server.close(resolve)))
+ const base=`http://127.0.0.1:${server.address().port}/api/v1`
+ const token=await fetchWriteToken(base)
+ const add=(baseRevision,pendingVersion)=>fetch(`${base}/discovered/add-to-map`,{
+  method:'POST',headers:{'X-NetWatch-Write':token,'Content-Type':'application/json'},
+  body:JSON.stringify({baseRevision,pendingVersion}),
+ })
+ const result=await fetch(`${base}/discovered?limit=1`).then(r=>r.json())
+ assert.equal(result.pendingCount,203)
+ store.recordDiscovery([...rows,{ip:'192.168.0.253'}])
+ const pending=await fetch(`${base}/discovered?limit=1`).then(r=>r.json())
+ assert.equal(pending.pendingCount,203)
+ assert.equal((await add(1,result.pendingVersion)).status,409)
+ assert.equal(store.revision(),1)
+ store.recordDiscovery([...rows,{ip:'192.168.0.1',source:'gateway'}])
+ const changed=[{...rows[0],mac:'02:00:00:00:00:03'},...rows.slice(1)]
+ store.recordDiscovery([...changed,{ip:'192.168.0.1',source:'gateway'}])
+ assert.equal((await add(1,result.pendingVersion)).status,409)
+ const reviewed=await fetch(`${base}/discovered?limit=1`).then(r=>r.json())
+ assert.deepEqual(await (await add(1,reviewed.pendingVersion)).json(),{addedCount:202,existingCount:1})
+ const {revision,topology,monitoring}=store.read()
+ assert.equal(revision,2)
+ assert.equal(topology.nodes.length,203)
+ assert.equal(topology.nodes.find(node=>node.data.ip==='192.168.0.1').type,'router')
+ assert.equal(topology.edges.length,202)
+ assert.equal(monitoring.existing,false)
+ assert.equal((await add(1,result.pendingVersion)).status,409)
+ const empty=await fetch(`${base}/discovered?limit=1`).then(r=>r.json())
+ assert.deepEqual(await (await add(2,empty.pendingVersion)).json(),{addedCount:0,existingCount:0})
+ assert.equal(store.revision(),2)
+})

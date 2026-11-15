@@ -760,6 +760,9 @@
   justify-content: flex-end;
   gap: 8px;
 }
+.discovery-heading-actions {
+  flex-wrap: wrap;
+}
 .discovery-toolbar {
   display: flex;
   flex-wrap: wrap;

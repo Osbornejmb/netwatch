@@ -1,9 +1,15 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
+import { connectionKey } from '../../src/connections.js'
 import { invalid } from '../store.js'
 import { queryNumber } from './query.js'
 
 export function listDiscovered({ store, url }) {
-  return store.discovered({ after: queryNumber(url, 'after', 0), limit: queryNumber(url, 'limit', 100) })
+  const pending = store.pendingDiscovery()
+  return {
+    ...store.discovered({ after: queryNumber(url, 'after', 0), limit: queryNumber(url, 'limit', 100) }),
+    pendingCount: pending.length,
+    pendingVersion: pendingVersion(pending),
+  }
 }
 
 export function scanNow(discovery) {
@@ -26,65 +32,82 @@ export function removeDiscovered({ store, id }) {
 }
 
 export async function addDiscoveredToMap({ store, discovery, id, body, source = 'local' }) {
-  const discovered = store.discoveredDevice(id)
-  if (!discovered) throw invalid('Discovered device not found.', 404)
+  const bulk = id === undefined
+  const discovered = bulk ? null : store.discoveredDevice(id)
+  if (!bulk && !discovered) throw invalid('Discovered device not found.', 404)
   if (body?.baseRevision !== store.revision()) throw invalid('Inventory changed.', 409)
-  const gatewayIp = await discovery?.gatewayFor?.(discovered.ip)
-  // The scan or another client can change data while the gateway lookup runs.
-  const item = store.discoveredDevice(id)
-  if (!item) throw invalid('Discovered device not found.', 404)
+  let gatewayFor
+  if (bulk) {
+    gatewayFor = await discovery?.gatewayLookup?.()
+  } else {
+    const gatewayIp = await discovery?.gatewayFor?.(discovered.ip)
+    gatewayFor = () => gatewayIp
+  }
+
+  // Use current records after awaiting Windows, then commit without yielding.
   const current = store.read()
   if (body.baseRevision !== current.revision) throw invalid('Inventory changed.', 409)
-  let deviceId = item.savedDeviceId,
-    node = deviceId && current.topology.nodes.find((candidate) => candidate.id === deviceId),
-    topology = current.topology,
-    promotedRouter = false,
-    monitoring = { ...current.monitoring }
-  if (item.status === 'added' && !node) throw invalid('The saved device is missing from the map.', 409)
-  if (!node) {
-    deviceId = randomUUID()
-    node = {
-      id: deviceId,
-      type: item.ip === gatewayIp ? 'router' : 'switch',
-      position: { x: 0, y: 0 },
-      data: { label: item.hostname || item.ip, ip: item.ip, description: '' },
+  const items = bulk ? store.pendingDiscovery() : [{ id, ...store.discoveredDevice(id) }]
+  if (!bulk && !items[0].ip) throw invalid('Discovered device not found.', 404)
+  if (bulk && pendingVersion(items) !== body.pendingVersion) throw invalid('Scan results changed.', 409)
+
+  const topology = { ...current.topology, nodes: [...current.topology.nodes], edges: [...current.topology.edges] }
+  const monitoring = { ...current.monitoring }
+  const nodesById = new Map(topology.nodes.map((node) => [node.id, node]))
+  const nodesByIp = new Map(topology.nodes.map((node) => [node.data.ip, node]))
+  const links = new Set(topology.edges.map(connectionKey))
+  const updates = []
+  const routes = []
+  let promotedRouter = false,
+    discoveryLink = null,
+    addedCount = 0
+
+  for (const item of items) {
+    const gatewayIp = gatewayFor?.(item.ip)
+    const isRouter = item.ip === gatewayIp || item.source === 'gateway-mac'
+    let node = bulk ? nodesByIp.get(item.ip) : nodesById.get(item.savedDeviceId)
+    if (item.status === 'added' && !node) throw invalid('The saved device is missing from the map.', 409)
+    if (!node) {
+      node = {
+        id: randomUUID(),
+        type: isRouter ? 'router' : 'switch',
+        position: { x: 0, y: 0 },
+        data: { label: item.hostname || item.ip, ip: item.ip, description: '' },
+      }
+      topology.nodes.push(node)
+      nodesByIp.set(item.ip, node)
+      monitoring[node.id] = source === 'local'
+      addedCount++
+    } else if (!bulk && item.ip === gatewayIp && node.type !== 'router') {
+      const index = topology.nodes.indexOf(node)
+      node = { ...node, type: 'router' }
+      topology.nodes[index] = node
+      nodesByIp.set(item.ip, node)
+      promotedRouter = true
     }
-    topology = { ...topology, nodes: [...topology.nodes, node] }
-    monitoring[deviceId] = source === 'local'
-  } else if (item.ip === gatewayIp && node.type !== 'router') {
-    node = { ...node, type: 'router' }
-    topology = {
-      ...topology,
-      nodes: topology.nodes.map((candidate) => (candidate.id === deviceId ? node : candidate)),
-    }
-    promotedRouter = true
+    if (item.status !== 'added') updates.push([item.id, node.id])
+    routes.push([node.id, gatewayIp])
   }
-  const gateway = topology.nodes.find(
-      (candidate) => candidate.type === 'router' && candidate.data.ip === gatewayIp && candidate.id !== deviceId,
-    ),
-    hasLink =
-      gateway &&
-      topology.edges.some(
-        (edge) =>
-          (edge.source === deviceId && edge.target === gateway.id) ||
-          (edge.source === gateway.id && edge.target === deviceId),
-      ),
-    edge =
-      gateway && !hasLink && topology.edges.length < 10000
-        ? { id: randomUUID(), source: deviceId, target: gateway.id, label: 'Gateway route' }
-        : null
-  if (edge) topology = { ...topology, edges: [...topology.edges, edge] }
+
+  for (const [deviceId, gatewayIp] of routes) {
+    const gateway = nodesByIp.get(gatewayIp)
+    if (gateway?.type !== 'router' || gateway.id === deviceId || topology.edges.length >= 10000) continue
+    const key = connectionKey({ source: deviceId, target: gateway.id })
+    if (links.has(key)) continue
+    links.add(key)
+    topology.edges.push({ id: randomUUID(), source: deviceId, target: gateway.id, label: 'Gateway route' })
+    discoveryLink = { label: gateway.data.label || gateway.data.ip }
+  }
+
   const saved =
-    topology === current.topology
-      ? current
-      : store.write(
-          { source: 'inventory', topology, monitoring },
-          current.revision,
-          item.status === 'added' ? undefined : () => store.discoveryAction(id, 'added', deviceId),
-        )
-  return {
-    ...saved,
-    discoveryLink: edge ? { label: gateway.data.label || gateway.data.ip } : null,
-    promotedRouter,
-  }
+    updates.length || promotedRouter || discoveryLink
+      ? store.write({ source: 'inventory', topology, monitoring }, current.revision, () => {
+          for (const [deviceId, nodeId] of updates) store.discoveryAction(deviceId, 'added', nodeId)
+        })
+      : current
+  return bulk ? { addedCount, existingCount: items.length - addedCount } : { ...saved, discoveryLink, promotedRouter }
+}
+
+function pendingVersion(items) {
+  return createHash('sha256').update(JSON.stringify(items)).digest('hex')
 }

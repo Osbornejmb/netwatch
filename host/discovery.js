@@ -1,10 +1,14 @@
 import os from 'node:os'
 import { execFile } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+import { isIPv4 } from 'node:net'
 import { promisify } from 'node:util'
+import { connectionKey } from '../src/connections.js'
 import { normalizeAddress } from '../src/inventory.js'
 import { reverseHints } from './discovery-names.js'
 
 const execute = promisify(execFile)
+const privateIPv4 = (ip) => isIPv4(ip) && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip)
 export const DISCOVERY_POLICY = Object.freeze({
   intervalMs: 300000,
   deadlineMs: 140000,
@@ -112,6 +116,16 @@ export function parseNeighbors(output, now = Date.now()) {
   }
   return found
 }
+
+function observedPair(output, gateways, target) {
+  const hops = new Map()
+  for (const line of output.split(/\r?\n/)) {
+    const match = line.match(/^\s*([12])\s+(?:<?\s*\d+\s*ms|\*)(?:\s+(?:<?\s*\d+\s*ms|\*)){2}\s+([\d.]+)\s*$/i)
+    if (match && isIPv4(match[2])) hops.set(Number(match[1]), match[2])
+  }
+  return hops.get(2) === target ? gateways.get(hops.get(1)) : undefined
+}
+
 export function createDiscovery(
   store,
   {
@@ -129,12 +143,23 @@ export function createDiscovery(
       })
       return r.stdout
     },
-    gatewayRunner = async () => {
+    gatewayRunner = async ({ signal } = {}) => {
       const r = await execute('route.exe', ['print', '-4'], {
         shell: false,
         windowsHide: true,
         timeout: 2000,
         maxBuffer: 32768,
+        signal,
+      })
+      return r.stdout
+    },
+    traceRunner = async (ip, { signal }) => {
+      const r = await execute('tracert.exe', ['-4', '-d', '-h', '2', '-w', '350', ip], {
+        shell: false,
+        windowsHide: true,
+        timeout: 3500,
+        maxBuffer: 8192,
+        signal,
       })
       return r.stdout
     },
@@ -151,6 +176,8 @@ export function createDiscovery(
     stopped = false,
     lastRunAt = null,
     durationMs = 0,
+    upstreamLinks = 0,
+    traceOffset = 0,
     diagnostics = [],
     controller,
     progress = { phase: 'idle', processed: 0, total: 0 }
@@ -158,6 +185,7 @@ export function createDiscovery(
     state: !enabled ? 'disabled' : platform !== 'win32' ? 'unsupported' : activeRun ? 'running' : 'idle',
     lastRunAt,
     durationMs,
+    upstreamLinks,
     ...progress,
     counts: store.discoveryCounts(),
     diagnostics: [...diagnostics],
@@ -169,17 +197,19 @@ export function createDiscovery(
     activeRun = (async () => {
       const start = now()
       diagnostics = []
+      upstreamLinks = 0
       let deadline
       try {
-        const subnets = localSubnets(interfaces(), maxPrefix)
+        const currentInterfaces = interfaces()
+        const subnets = localSubnets(currentInterfaces, maxPrefix)
         if (!subnets.length) throw Error('no_interface')
         const addresses = [...new Set(subnets.flatMap((s) => s.addresses))]
         if (addresses.length > policy.maxHosts) throw Error('sweep_cap')
         const allowed = new Set(addresses),
           cycleDeadline = Math.max(policy.deadlineMs, Math.ceil(addresses.length / policy.concurrency) * 4000 + 25000)
         progress = { phase: 'neighbors', processed: 0, total: addresses.length }
-        const output = await Promise.race([
-          runner({ signal: controller.signal }),
+        const [output, gateways] = await Promise.race([
+          Promise.all([runner({ signal: controller.signal }), readGateways(currentInterfaces, controller.signal)]),
           new Promise((_, reject) => {
             deadline = setTimeout(() => {
               controller.abort()
@@ -192,6 +222,15 @@ export function createDiscovery(
             .filter((r) => allowed.has(r.ip))
             .map((r) => [r.ip, r]),
         )
+        const observedGateways = store.observedGatewayAddresses()
+        const knownByIp = new Map(observedGateways.map(({ ip, mac }) => [ip, mac]))
+        const knownMacs = new Set(knownByIp.values())
+        for (const row of byIp.values()) {
+          if (knownMacs.has(row.mac)) row.source = knownByIp.get(row.ip) === row.mac ? 'gateway' : 'gateway-mac'
+        }
+        for (const ip of gateways.values()) {
+          if (allowed.has(ip)) byIp.set(ip, { ...byIp.get(ip), ip, source: 'gateway', seenAt: now() })
+        }
         if (active) {
           progress = { phase: 'icmp', processed: 0, total: addresses.length }
           let next = 0
@@ -222,6 +261,8 @@ export function createDiscovery(
         )
         for (const row of byIp.values()) if (names.has(row.ip)) row.hostname = names.get(row.ip)
         if (controller.signal.aborted) throw Error('cancelled')
+        if (active && gateways.size) await traceUpstream(gateways, allowed, controller.signal)
+        if (controller.signal.aborted) throw Error('cancelled')
         progress = { phase: 'saving', processed: progress.total, total: progress.total }
         store.recordDiscovery([...byIp.values()])
         lastRunAt = new Date(now()).toISOString()
@@ -247,21 +288,77 @@ export function createDiscovery(
     })()
     return activeRun
   }
-  async function gatewayFor(ip) {
-    if (platform !== 'win32') return null
+  async function traceUpstream(gateways, allowed, signal) {
+    const { topology, monitoring, revision } = store.read()
+    const routers = topology.nodes.filter((node) => node.type === 'router' && privateIPv4(node.data.ip))
+    const gatewayIps = new Set(gateways.values())
+    const local = new Map(routers.filter((node) => gatewayIps.has(node.data.ip)).map((node) => [node.data.ip, node.id]))
+    const remainingEdges = 10000 - topology.edges.length
+    if (!local.size || !remainingEdges) return
+    const links = new Set(topology.edges.map(connectionKey))
+    const pending = routers.filter(
+      (node) =>
+        !allowed.has(node.data.ip) &&
+        [...local.values()].some((source) => !links.has(connectionKey({ source, target: node.id }))),
+    )
+    if (!pending.length) return
+    const total = Math.min(pending.length, remainingEdges, 4)
+    const edges = []
+    progress = { phase: 'routes', processed: 0, total }
+    for (let i = 0; i < total && !signal.aborted; i++) {
+      const target = pending[(traceOffset + i) % pending.length]
+      let output
+      try {
+        output = await probeGate(() => traceRunner(target.data.ip, { signal }), signal)
+      } catch {}
+      if (typeof output === 'string' && Buffer.byteLength(output) <= 8192) {
+        const source = observedPair(output, local, target.data.ip)
+        if (source && !links.has(connectionKey({ source, target: target.id }))) {
+          edges.push({ id: randomUUID(), source, target: target.id, label: 'Observed upstream route' })
+        }
+      }
+      progress = { ...progress, processed: i + 1 }
+    }
+    traceOffset = (traceOffset + total) % pending.length
+    if (signal.aborted || !edges.length || store.revision() !== revision) return
     try {
-      const subnets = localSubnets(interfaces(), maxPrefix),
-        subnet = subnets.find((item) => item.addresses.includes(ip))
-      if (!subnet) return null
-      return parseDefaultGateways(await gatewayRunner(), interfaces()).get(subnet.interfaceAddress) ?? null
+      store.write(
+        { source: 'inventory', topology: { ...topology, edges: [...topology.edges, ...edges] }, monitoring },
+        revision,
+      )
+      upstreamLinks = edges.length
+    } catch (error) {
+      if (error.status !== 409) throw error
+    }
+  }
+  async function readGateways(currentInterfaces, signal) {
+    try {
+      return parseDefaultGateways(await gatewayRunner({ signal }), currentInterfaces)
     } catch {
-      return null
+      return new Map()
+    }
+  }
+  async function gatewayLookup() {
+    if (platform !== 'win32') return () => null
+    try {
+      const currentInterfaces = interfaces()
+      const subnets = localSubnets(currentInterfaces, maxPrefix)
+      const gateways = await readGateways(currentInterfaces)
+      return (ip) => {
+        const subnet = subnets.find((item) => item.addresses.includes(ip))
+        return gateways.get(subnet?.interfaceAddress) ?? null
+      }
+    } catch {
+      return () => null
     }
   }
   return {
     snapshot,
     runOnce,
-    gatewayFor,
+    gatewayLookup,
+    async gatewayFor(ip) {
+      return (await gatewayLookup())(ip)
+    },
     start() {
       if (enabled && platform === 'win32' && !timer && !stopped) {
         void runOnce()
