@@ -43,10 +43,23 @@ function Preview({ action, onClose, onConfirm, busy }) {
             <li key={e.id}>
               {action.topology.nodes.find((n) => n.id === e.source)?.data.label} →{' '}
               {action.topology.nodes.find((n) => n.id === e.target)?.data.label}
+              {e.uplink?.label && ` · ${e.uplink.label}`}
             </li>
           ))}
         </ul>
       </details>
+      {!!action.topology.groups?.length && (
+        <details>
+          <summary>Review redundancy groups</summary>
+          <ul className="host-preview-list">
+            {action.topology.groups.map((group) => (
+              <li key={group.id}>
+                {group.name} · {group.links.length} links
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       <div className="modal-actions">
         <button data-initial-focus className="button secondary" disabled={busy} onClick={onClose}>
           Cancel
@@ -58,7 +71,7 @@ function Preview({ action, onClose, onConfirm, busy }) {
     </dialog>
   )
 }
-export default forwardRef(function HostStorage({ nodes, edges, onLoad, paused, importGeneration }, ref) {
+export default forwardRef(function HostStorage({ nodes, edges, groups, onLoad, paused, importGeneration }, ref) {
   const [host, setHost] = useState(null)
   const [action, setAction] = useState(null)
   const [message, setMessage] = useState('Your draft is separate from the network being monitored.')
@@ -94,7 +107,7 @@ export default forwardRef(function HostStorage({ nodes, edges, onLoad, paused, i
   }
   const preview = (kind, saved = host, settingsOverride = monitoring) => {
     try {
-      const topology = validateTopology(kind === 'load' ? saved.topology : { nodes, edges })
+      const topology = validateTopology(kind === 'load' ? saved.topology : { nodes, edges, groups })
       const unchanged = new Map(saved.topology.nodes.map((n) => [n.id, n]))
       const settings = Object.fromEntries(
         topology.nodes.map((n) => [

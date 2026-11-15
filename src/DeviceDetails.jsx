@@ -163,6 +163,16 @@ export default function DeviceDetails({ device, check, connections, host, onClos
                       </span>
                     </div>
                     {item.label?.startsWith('LLDP · ') && <small>{item.label}</small>}
+                    {item.uplink && (
+                      <small>
+                        {item.uplink.label && `${item.uplink.label} · `}
+                        {item.portStatus}
+                        {(item.localPort?.label || item.localPort?.index) &&
+                          ` · Local ${item.localPort.label || `index ${item.localPort.index}`}`}
+                        {(item.peerPort?.label || item.peerPort?.index) &&
+                          ` · Peer ${item.peerPort.label || `index ${item.peerPort.index}`}`}
+                      </small>
+                    )}
                     <small>
                       {item.health === 'down'
                         ? 'Red path · a connected device is down'

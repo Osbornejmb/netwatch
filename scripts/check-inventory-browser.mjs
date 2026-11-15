@@ -17,7 +17,7 @@ await page.getByRole('link',{name:'Edit map',exact:true}).click()
 const snapshot=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('netwatch-topology-v1')))
 const original=await snapshot()
 for(const selector of ['.router-node','.switch-node']){const shapes=await page.locator(selector).evaluateAll(nodes=>nodes.map(node=>{const s=getComputedStyle(node);return {radius:s.borderRadius,width:node.offsetWidth,height:node.offsetHeight}}));assert.ok(shapes.length);for(const shape of shapes){assert.equal(shape.radius,selector==='.router-node'?'999px':'12px');assert.ok(shape.width<=280);assert.ok(shape.height<=56)}}
-await page.locator('.editor-tools > summary').click()
+await page.locator('summary').filter({ hasText: /^Devices & connections$/ }).click()
 await page.getByLabel('Selected device',{exact:true}).selectOption('r1')
 const edit=page.locator('.inventory-controls').getByRole('button',{name:'Edit device',exact:true})
 await edit.focus(); await page.keyboard.press('Enter')

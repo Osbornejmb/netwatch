@@ -67,7 +67,35 @@ export function validateSnapshot(value, previousInventory) {
     new Set(activeIncidents.map((item) => item.deviceId)).size !== activeIncidents.length
   )
     throw new Error('Invalid active incidents.')
-  return { ...value, activeIncidents, inventory, checks }
+  const uplinkPorts = new Map()
+  if (value.uplinkPorts !== undefined) {
+    const links = new Map(inventory.topology.edges.map((edge) => [edge.id, edge]))
+    if (
+      !Array.isArray(value.uplinkPorts) ||
+      value.uplinkPorts.length > links.size ||
+      !Number.isFinite(value.uplinkStaleAfterMs) ||
+      value.uplinkStaleAfterMs <= 0
+    )
+      throw Error('Invalid uplink observations.')
+    for (const observation of value.uplinkPorts) {
+      const edge = links.get(observation?.id)
+      if (!edge?.uplink || uplinkPorts.has(edge.id) || (!observation.source && !observation.target))
+        throw Error('Invalid uplink observation.')
+      for (const side of ['source', 'target']) {
+        const port = observation[side]
+        if (
+          port !== undefined &&
+          (!edge.uplink[side].index ||
+            !Number.isFinite(Date.parse(port?.checkedAt)) ||
+            ![null, 1, 2, 3].includes(port.admin) ||
+            ![null, 1, 2, 3, 4, 5, 6, 7].includes(port.oper))
+        )
+          throw Error('Invalid uplink port observation.')
+      }
+      uplinkPorts.set(edge.id, observation)
+    }
+  }
+  return { ...value, activeIncidents, inventory, checks, uplinkPorts }
 }
 
 export function validateIncidents(items, ids, maximum = 25) {

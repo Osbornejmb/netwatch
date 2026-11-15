@@ -85,7 +85,7 @@ try {
   await page.getByRole('dialog').getByRole('button', { name: 'Add device', exact: true }).click()
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('netwatch-topology-v1')).nodes.length === 15)
   assert.deepEqual((await snapshot()).nodes.slice(0, 14), beforeAdd.nodes)
-  await page.locator('.editor-tools > summary').click()
+  await page.locator('summary').filter({ hasText: /^Devices & connections$/ }).click()
   await page.getByLabel('Selected device', { exact: true }).selectOption('core-a')
   await page.getByRole('button', { name: 'Delete device', exact: true }).click()
   await page.getByRole('dialog',{name:'Remove device?'}).getByRole('button',{name:'Cancel'}).click()

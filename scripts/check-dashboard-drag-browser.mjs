@@ -165,7 +165,7 @@ try {
   await page.waitForFunction((count) => document.querySelectorAll('.react-flow__edge').length === count, 4)
   const markers = await page.locator('.react-flow__edge-path').evaluateAll(paths => paths.map(path => path.getAttribute('marker-end')))
   assert.ok(markers.every(marker => !marker || marker === 'none'))
-  await page.locator('.editor-tools > summary').click()
+  await page.locator('summary').filter({ hasText: /^Devices & connections$/ }).click()
   await page.getByLabel('First device', { exact: true }).selectOption('s1')
   await page.getByLabel('Second device', { exact: true }).selectOption('r1')
   await page.getByRole('button', { name: 'Add connection', exact: true }).click()

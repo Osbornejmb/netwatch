@@ -1,5 +1,9 @@
 # Working checkpoint
 
+## Current status (2026-11-15) — uplinks and redundancy groups
+
+- Added draft configuration for uplink labels, interface mappings, and redundancy groups. Dashboard group status uses fresh port readings. Verification uses fixtures, with live switch testing deferred.
+
 ## Current status (2026-11-15) — LLDP neighbor review
 
 - Added bounded read-only LLDP collection and admin review in saved-device details for #8. Fixture checks cover malformed and partial evidence, stale observations, duplicates, dismissal, manual-link preservation, and backup/restore. Approved hardware verification remains pending.
