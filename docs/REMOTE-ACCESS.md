@@ -9,12 +9,13 @@ NetWatch serves the dashboard over HTTP by default. Anyone able to intercept tra
 | Access | What it permits |
 | --- | --- |
 | Remote viewer | Dashboard, status filters, device map and details, check history, outages and ports. Open viewer mode shares this data with any admitted client without a password. |
+| Remote operator | Viewer features plus the Devices list, discovery results and **Scan now**. Operators use a separate password. Operator scans leave the saved map untouched. |
 | Remote admin | Viewer features plus map editing and transfer, Devices, discovery review, browser map backups and imports, and per-device check controls. Admin sign-in always requires a password. |
 | Loopback admin | Current local dashboard behavior without sign-in. The access log, SNMP credential management, password and viewer policy changes, launcher options, database maintenance and restore, and stopping the host remain local. |
 
 NetWatch binds 127.0.0.1 and, when enabled, the PC's non-internal RFC1918 IPv4 addresses. It rejects socket peers outside loopback or the private ranges. Routed private clients can still qualify, so use Windows Firewall rules if you need to restrict access to particular networks. The listener leaves public addresses unbound. Clients connect directly because the host does not trust forwarding headers. The NetWatch PC's loopback URL always remains local admin. On the NetWatch PC, use its private URL to exercise the remote role workflow.
 
-Admin sessions expire after 30 minutes idle or 12 hours total. Viewer sessions expire after eight hours idle or seven days total. At most five admin and 20 viewer sessions are active. New sessions at the cap evict the oldest. Open viewer mode creates a new viewer session when the dashboard loads after sign-out.
+Admin and operator sessions expire after 30 minutes idle or 12 hours total. Viewer sessions expire after eight hours idle or seven days total. At most five admin, five operator and 20 viewer sessions are active. New sessions at the cap evict the oldest. Open viewer mode creates a new viewer session when the dashboard loads after sign-out.
 
 ## Windows launcher setup
 
@@ -39,6 +40,7 @@ Stop the tray host first. Use its database path if you want to share its existin
 $env:NETWATCH_DB = Join-Path $env:LOCALAPPDATA 'NetWatch\data\netwatch.sqlite'
 npm.cmd run auth -- set-admin-password
 npm.cmd run auth -- set-viewer-password
+npm.cmd run auth -- set-operator-password
 npm.cmd run auth -- viewer-mode password
 npm.cmd run auth -- status
 $env:NETWATCH_LAN = '1'
@@ -46,6 +48,12 @@ npm.cmd start
 ~~~
 
 Password prompts are masked. Rotate passwords by running the same commands or using the launcher. Rotation and viewer policy changes revoke remote sessions. Use **Sign out all remote sessions** in the launcher or stop the host and run the command below. Use the local Dashboard's **Access log** button or the launcher to review recent entries. The API retains up to 5,000 records for up to 30 days.
+
+Set an operator password from **Remote access → Set operator password**, then choose **Operator sign in** from the remote browser. Use **Disable operator access** or `npm.cmd run auth -- disable-operator` to clear the credential and revoke remote sessions. Operator access is disabled until configured.
+
+If you forget the admin password, use **Set admin password** on the NetWatch PC. If the launcher is unavailable, stop NetWatch, select its existing database with `NETWATCH_DB`, run `npm.cmd run auth -- set-admin-password`, and restart. The new password replaces the old one and all remote sessions are revoked. The inventory and history stay in that database.
+
+On the NetWatch PC, open **Access log → Download redacted log** to save a JSON file containing recognized event names, timestamps, roles and local or remote origin. The export excludes IP addresses, free-form details and credentials.
 
 ~~~powershell
 npm.cmd run auth -- revoke-sessions

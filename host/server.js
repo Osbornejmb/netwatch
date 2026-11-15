@@ -6,7 +6,7 @@ import { invalid, MAX_BODY } from './store.js'
 import { loopbackUrl, readPort } from './port.js'
 import { decodePath, serveStatic } from './routes/static.js'
 import { admitRequest } from './lan.js'
-import { readAudit } from './routes/audit.js'
+import { exportAudit, readAudit } from './routes/audit.js'
 import { authLogin, authLogout, authSession } from './routes/auth.js'
 import { health } from './routes/health.js'
 import { readTopology, writeTopology } from './routes/topology.js'
@@ -56,6 +56,7 @@ async function parseBody(req, bodyType) {
 export function createRoutes(discovery) {
   return [
     { method: 'GET', pattern: /^\/api\/v1\/audit$/, handler: readAudit, access: 'local' },
+    { method: 'GET', pattern: /^\/api\/v1\/audit\/export$/, handler: exportAudit, access: 'local' },
     { method: 'GET', pattern: /^\/api\/v1\/auth\/session$/, handler: authSession, access: 'public' },
     { method: 'POST', pattern: /^\/api\/v1\/auth\/login$/, handler: authLogin, access: 'public', bodyType: 'json' },
     { method: 'POST', pattern: /^\/api\/v1\/auth\/logout$/, handler: authLogout, access: 'public', bodyType: 'Logout' },
@@ -71,13 +72,13 @@ export function createRoutes(discovery) {
       bodyType: 'json',
     },
     { method: 'GET', pattern: /^\/api\/v1\/snapshot$/, handler: createSnapshotRoute(randomUUID()), access: 'viewer' },
-    { method: 'GET', pattern: /^\/api\/v1\/discovered$/, handler: listDiscovered, access: 'admin' },
+    { method: 'GET', pattern: /^\/api\/v1\/discovered$/, handler: listDiscovered, access: 'operator' },
     {
       method: 'POST',
       pattern: /^\/api\/v1\/discovered\/scan-now$/,
       handler: scanNow(discovery),
       auditAction: 'discovery_scan',
-      access: 'admin',
+      access: 'operator',
       requiresWrite: true,
       bodyType: 'Scan',
     },
@@ -182,15 +183,27 @@ export function createHost(
         const match = pattern.exec(url.pathname)
         if (!match) continue
         if (source === 'remote' && access !== 'public') {
-          if (access !== 'viewer' && access !== 'admin') throw invalid('Change this on the NetWatch PC.', 403)
+          if (access === 'local') throw invalid('Change this on the NetWatch PC.', 403)
           if (!role) throw invalid('Sign in to NetWatch.', 401)
-          if (access === 'admin' && role !== 'admin') {
-            if (auditAction) audit?.record('viewer_write_blocked', { source, ip, role, detail: auditAction })
-            throw invalid('This session is view-only.', 403)
+          if (
+            access !== 'viewer' &&
+            !(access === 'operator' && ['operator', 'admin'].includes(role)) &&
+            !(access === 'admin' && role === 'admin')
+          ) {
+            if (auditAction)
+              audit?.record(role === 'operator' ? 'operator_write_blocked' : 'viewer_write_blocked', {
+                source,
+                ip,
+                role,
+                detail: auditAction,
+              })
+            throw invalid('This session does not have permission.', 403)
           }
         }
-        if (requiresWrite && source === 'remote' && !auth.validWrite(session, req.headers['x-netwatch-write']))
+        if (requiresWrite && source === 'remote' && !auth.validWrite(session, req.headers['x-netwatch-write'])) {
+          audit?.record('write_token_rejected', { source, ip, role })
           throw invalid('Valid write token required. Reload NetWatch and try again.', 403)
+        }
         if (requiresWrite && source === 'local') {
           const token = req.headers['x-netwatch-write']
           if (

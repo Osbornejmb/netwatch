@@ -167,7 +167,7 @@ test('snapshot ETags skip the snapshot read and change with inventory, current r
 })
 
 test('every host route declares access and unknown API paths stay outside the static fallback', async (t) => {
-  for (const route of createRoutes()) assert.ok(['public', 'viewer', 'admin', 'local'].includes(route.access))
+  for (const route of createRoutes()) assert.ok(['public', 'viewer', 'operator', 'admin', 'local'].includes(route.access))
   const base = await fixture(t)
   assert.equal((await fetch(base + '/api/v1/unknown')).status, 404)
   assert.equal((await fetch(base + '/font.woff2', { method: 'POST' })).status, 404)

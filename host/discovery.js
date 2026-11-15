@@ -190,7 +190,7 @@ export function createDiscovery(
     counts: store.discoveryCounts(),
     diagnostics: [...diagnostics],
   })
-  async function runOnce() {
+  async function runOnce({ saveUpstream = true } = {}) {
     if (!enabled || platform !== 'win32' || stopped) return
     if (activeRun) return activeRun
     controller = new AbortController()
@@ -261,7 +261,7 @@ export function createDiscovery(
         )
         for (const row of byIp.values()) if (names.has(row.ip)) row.hostname = names.get(row.ip)
         if (controller.signal.aborted) throw Error('cancelled')
-        if (active && gateways.size) await traceUpstream(gateways, allowed, controller.signal)
+        if (saveUpstream && active && gateways.size) await traceUpstream(gateways, allowed, controller.signal)
         if (controller.signal.aborted) throw Error('cancelled')
         progress = { phase: 'saving', processed: progress.total, total: progress.total }
         store.recordDiscovery([...byIp.values()])

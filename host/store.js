@@ -153,11 +153,33 @@ const MIGRATIONS = [
         END;`)
     },
   },
+  {
+    version: 9,
+    up(db) {
+      db.exec(`ALTER TABLE auth_config ADD COLUMN operator_hash TEXT;
+        ALTER TABLE sessions RENAME TO sessions_v8;
+        CREATE TABLE sessions (id_hash TEXT PRIMARY KEY NOT NULL, role TEXT NOT NULL CHECK(role IN ('viewer','operator','admin')),
+          csrf_hash TEXT NOT NULL, created_at INTEGER NOT NULL, last_seen_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, ip TEXT NOT NULL);
+        INSERT INTO sessions SELECT * FROM sessions_v8;
+        DROP TABLE sessions_v8;`)
+    },
+  },
 ]
 
 export function openStore(
   path,
-  { now = () => Date.now(), migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7, migrateV8 } = {},
+  {
+    now = () => Date.now(),
+    migrate,
+    migrateV2,
+    migrateV3,
+    migrateV4,
+    migrateV5,
+    migrateV6,
+    migrateV7,
+    migrateV8,
+    migrateV9,
+  } = {},
 ) {
   const db = new DatabaseSync(path)
   db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=3000;')
@@ -166,7 +188,7 @@ export function openStore(
     db.close()
     throw new Error('Database schema is newer than this host. Use a compatible host; do not delete the database.')
   }
-  const hooks = [migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7, migrateV8]
+  const hooks = [migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7, migrateV8, migrateV9]
   try {
     for (const migration of MIGRATIONS) {
       if (migration.version <= version) continue

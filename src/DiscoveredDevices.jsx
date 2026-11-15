@@ -8,7 +8,7 @@ import { writeHeaders } from './monitoring.js'
 const statusLabel = { new: 'New', changed: 'Changed', added: 'Added', gone: 'Not seen' }
 const seenAt = (value) =>
   new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
-export default function DiscoveredDevices({ remote }) {
+export default function DiscoveredDevices({ remote, canEdit = true }) {
   const [confirm, setConfirm] = useState(null)
   const [devices, setDevices] = useState([]),
     [pending, setPending] = useState({ count: 0 }),
@@ -183,34 +183,38 @@ export default function DiscoveredDevices({ remote }) {
       <header className="page-heading">
         <h1 id="discovery-title">Discovered devices</h1>
         <div className="discovery-heading-actions">
-          <button
-            className="button secondary"
-            disabled={busy || !pending.count}
-            onClick={() =>
-              setConfirm({
-                title: 'Add all to map?',
-                message: `Add ${pending.count} results from the latest scan across all pages. New devices start with checks ${remote ? 'off' : 'on'}.`,
-                label: 'Add all',
-                onConfirm: addAll,
-              })
-            }
-          >
-            Add all to map
-          </button>
-          <button
-            className="button secondary"
-            disabled={busy || !devices.length}
-            onClick={() =>
-              setConfirm({
-                title: 'Clear discovery list?',
-                message: 'Devices already added to the map will stay there.',
-                label: 'Clear all',
-                onConfirm: clear,
-              })
-            }
-          >
-            Clear all
-          </button>
+          {canEdit && (
+            <>
+              <button
+                className="button secondary"
+                disabled={busy || !pending.count}
+                onClick={() =>
+                  setConfirm({
+                    title: 'Add all to map?',
+                    message: `Add ${pending.count} results from the latest scan across all pages. New devices start with checks ${remote ? 'off' : 'on'}.`,
+                    label: 'Add all',
+                    onConfirm: addAll,
+                  })
+                }
+              >
+                Add all to map
+              </button>
+              <button
+                className="button secondary"
+                disabled={busy || !devices.length}
+                onClick={() =>
+                  setConfirm({
+                    title: 'Clear discovery list?',
+                    message: 'Devices already added to the map will stay there.',
+                    label: 'Clear all',
+                    onConfirm: clear,
+                  })
+                }
+              >
+                Clear all
+              </button>
+            </>
+          )}
           <button className="button primary" disabled={busy} onClick={scan}>
             {scanning ? 'Scanning…' : 'Scan now'}
           </button>
@@ -266,26 +270,30 @@ export default function DiscoveredDevices({ remote }) {
                   )}
                 </div>
                 <div className="discovery-actions">
-                  <button className="button secondary" disabled={busy} onClick={() => action(device, 'add-to-map')}>
-                    {device.status === 'added' ? 'Update gateway link' : 'Add to map'}
-                  </button>
-                  <button
-                    className="button secondary"
-                    disabled={busy}
-                    onClick={() =>
-                      setConfirm({
-                        title: 'Remove discovered device?',
-                        message:
-                          'Remove ' +
-                          device.ip +
-                          ' from discovery? It can reappear after a scan. Your map stays as it is.',
-                        label: 'Remove',
-                        onConfirm: () => action(device, 'remove'),
-                      })
-                    }
-                  >
-                    Remove
-                  </button>
+                  {canEdit && (
+                    <>
+                      <button className="button secondary" disabled={busy} onClick={() => action(device, 'add-to-map')}>
+                        {device.status === 'added' ? 'Update gateway link' : 'Add to map'}
+                      </button>
+                      <button
+                        className="button secondary"
+                        disabled={busy}
+                        onClick={() =>
+                          setConfirm({
+                            title: 'Remove discovered device?',
+                            message:
+                              'Remove ' +
+                              device.ip +
+                              ' from discovery? It can reappear after a scan. Your map stays as it is.',
+                            label: 'Remove',
+                            onConfirm: () => action(device, 'remove'),
+                          })
+                        }
+                      >
+                        Remove
+                      </button>
+                    </>
+                  )}
                   <InfoTooltip label={'Information for ' + device.ip}>
                     <span>Hardware address · {device.mac || 'Unavailable'}</span>
                     {device.source === 'gateway' ? (

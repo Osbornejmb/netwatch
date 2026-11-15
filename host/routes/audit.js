@@ -14,3 +14,8 @@ export function readAudit({ store, url, audit = createAudit(store.db) }) {
     throw invalid('Invalid audit page.')
   return audit.read({ limit, before })
 }
+
+export function exportAudit({ store, response, audit = createAudit(store.db) }) {
+  response.headers = { 'Content-Disposition': 'attachment; filename="netwatch-access-log.json"' }
+  return audit.export()
+}

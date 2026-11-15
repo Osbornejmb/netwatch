@@ -1,5 +1,9 @@
 # Working checkpoint
 
+## Current status (2026-11-15) — operator access and audit export
+
+- Added an optional operator password, scan-only discovery permissions, local password-reset coverage and redacted audit export for #10. Tests use disposable databases and isolated loopback.
+
 ## Current status (2026-11-15) — uplinks and redundancy groups
 
 - Added draft configuration for uplink labels, interface mappings, and redundancy groups. Dashboard group status uses fresh port readings. Verification uses fixtures, with live switch testing deferred.

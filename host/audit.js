@@ -1,4 +1,20 @@
 const maxAge = 30 * 24 * 60 * 60 * 1000
+const exportActions = new Set([
+  'login_success',
+  'login_failure',
+  'logout',
+  'session_upgrade',
+  'topology_applied',
+  'discovery_scan',
+  'discovery_clear',
+  'discovery_add',
+  'discovery_remove',
+  'viewer_write_blocked',
+  'operator_write_blocked',
+  'write_token_rejected',
+  'rate_limit_lockout',
+  'access_settings_changed',
+])
 
 export function createAudit(db, now = Date.now) {
   const insert = db.prepare('INSERT INTO audit_log(at, source, ip, role, action, detail) VALUES(?,?,?,?,?,?)')
@@ -17,6 +33,22 @@ export function createAudit(db, now = Date.now) {
       const rows = page.all(before, limit + 1)
       const entries = rows.slice(0, limit)
       return { entries, nextBefore: rows.length > limit ? entries.at(-1).id : null }
+    },
+    export() {
+      const at = now()
+      const entries = db
+        .prepare('SELECT at, source, role, action FROM audit_log WHERE at>=? ORDER BY id DESC LIMIT 5000')
+        .all(at - maxAge)
+        .filter(
+          (row) =>
+            exportActions.has(row.action) &&
+            ['remote', 'local'].includes(row.source) &&
+            [null, 'viewer', 'operator', 'admin'].includes(row.role) &&
+            Number.isSafeInteger(row.at) &&
+            row.at >= 0 &&
+            row.at <= at,
+        )
+      return { exportedAt: new Date(at).toISOString(), entries }
     },
   }
 }

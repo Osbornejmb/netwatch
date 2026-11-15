@@ -99,7 +99,7 @@ The Vite development UI is browser-only and does not run the monitoring host. Us
 
 ## Remaining work
 
-Authentication and role enforcement (#10) and opt-in private-network access with optional direct HTTPS (#12) are implemented. Per-user accounts, SSO, automatic certificate provisioning, unattended Windows service packaging and second-PC release verification remain open. Local outages and SNMP interfaces are available. Admins can review LLDP neighbor proposals under saved device details. Hardware verification, external notifications and broader redundancy work remain pending.
+NetWatch supports viewer, operator, and admin roles, local password recovery, and redacted audit export (#10). Private-network access is opt-in and supports direct HTTPS (#12). Per-user accounts, SSO, automatic certificate provisioning, unattended Windows service packaging and second-PC release verification remain open. Local outages and SNMP interfaces are available. Admins can review LLDP neighbor proposals under saved device details. Hardware verification, external notifications and broader redundancy work remain pending.
 
 See [ROADMAP.md](docs/ROADMAP.md), [Windows launcher](docs/WINDOWS-LAUNCHER.md), [monitoring policy](docs/ICMP-COLLECTOR.md), and [WORKLOG.md](docs/WORKLOG.md) for details and evidence.
 

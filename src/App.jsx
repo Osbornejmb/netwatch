@@ -35,13 +35,14 @@ const viewFromHash = (hash) =>
 
 const nodeTypes = { router: RouterNode, switch: SwitchNode }
 
-export default function App({ viewer = false, remote = false, accessControls }) {
+export default function App({ viewer = false, operator = false, remote = false, accessControls }) {
+  const readOnly = viewer || operator
   const saved = useMemo(
     () =>
-      viewer
+      readOnly
         ? { topology: { nodes: [], edges: [] } }
         : readTopology({ getItem: (key) => localStorage.getItem(key) }, { nodes: [], edges: [] }),
-    [viewer],
+    [readOnly],
   )
   const [nodes, setNodes, onNodesChange] = useNodesState(saved.topology.nodes)
   const [editorSizes, setEditorSizes] = useState({})
@@ -60,19 +61,20 @@ export default function App({ viewer = false, remote = false, accessControls }) 
         return group.links.length >= 2 && new Set(members.filter((id) => routers.has(id))).size >= 2
       })
   }, [draftGroups, edges, nodes])
-  const [currentView, setView] = useState(() => viewFromHash(location.hash))
-  const view = viewer ? 'dashboard' : currentView
+  const role = viewer ? 'viewer' : operator ? 'operator' : 'admin'
+  const [currentView, setView] = useState(() => viewFromHash(allowedHash(location.hash, role)))
+  const view = viewer || (operator && currentView === 'editor') ? 'dashboard' : currentView
   const [dashboardView, setDashboardView] = useState({ source: 'host', layout: 'radial', centerId: '' })
   useEffect(() => {
     const navigate = () => {
-      const hash = allowedHash(location.hash, viewer ? 'viewer' : 'admin')
+      const hash = allowedHash(location.hash, role)
       if (location.hash !== hash) history.replaceState(null, '', hash)
       setView(viewFromHash(hash))
     }
     navigate()
     window.addEventListener('hashchange', navigate)
     return () => window.removeEventListener('hashchange', navigate)
-  }, [viewer])
+  }, [role])
   const [showAccessLog, setShowAccessLog] = useState(false)
   const [deviceNotice, setDeviceNotice] = useState('')
   const [showModal, setShowModal] = useState(false)
@@ -94,7 +96,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
   const [importGeneration, setImportGeneration] = useState(0)
 
   useEffect(() => {
-    if (viewer || autosavePaused) return
+    if (readOnly || autosavePaused) return
     try {
       writeTopology(localStorage, { nodes, edges, groups })
       setStorageError('')
@@ -105,7 +107,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
       )
       setAutosavePaused(true)
     }
-  }, [nodes, edges, groups, autosavePaused, viewer])
+  }, [nodes, edges, groups, autosavePaused, readOnly])
 
   const importTopology = async (event) => {
     const file = event.target.files?.[0]
@@ -313,14 +315,16 @@ export default function App({ viewer = false, remote = false, accessControls }) 
             </a>
             {!viewer && (
               <>
-                <a
-                  href="#topology"
-                  aria-label="Edit map"
-                  aria-current={view === 'editor' ? 'page' : undefined}
-                  onClick={() => setView('editor')}
-                >
-                  Edit map
-                </a>
+                {!operator && (
+                  <a
+                    href="#topology"
+                    aria-label="Edit map"
+                    aria-current={view === 'editor' ? 'page' : undefined}
+                    onClick={() => setView('editor')}
+                  >
+                    Edit map
+                  </a>
+                )}
                 <a
                   href="#inventory"
                   aria-label="Devices"
@@ -345,7 +349,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
               Access log
             </button>
           )}
-          {!viewer && (
+          {!readOnly && (
             <section className="backup-recovery" aria-label="Map backup and recovery">
               <details open={storageError || importError ? true : undefined}>
                 <summary aria-label="Map backup and recovery">
@@ -404,15 +408,15 @@ export default function App({ viewer = false, remote = false, accessControls }) 
         {showAccessLog && <AccessLog onClose={() => setShowAccessLog(false)} />}
 
         {view === 'discovered' ? (
-          <DiscoveredDevices remote={remote} />
+          <DiscoveredDevices remote={remote} canEdit={!readOnly} />
         ) : view !== 'editor' ? (
           <Dashboard
             nodes={nodes}
             edges={edges}
             groups={groups}
-            viewer={viewer}
+            viewer={readOnly}
             remote={remote}
-            viewOptions={viewer ? { ...dashboardView, source: 'host' } : dashboardView}
+            viewOptions={readOnly ? { ...dashboardView, source: 'host' } : dashboardView}
             setViewOptions={setDashboardView}
             showInventory={view === 'inventory'}
             onEdit={() => {
