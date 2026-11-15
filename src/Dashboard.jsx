@@ -510,7 +510,7 @@ export default function Dashboard({
             nodesConnectable={false}
             multiSelectionKeyCode={null}
             nodeDragThreshold={3}
-            nodeClickDistance={5}
+            nodeClickDistance={3}
             onNodeDragStart={(_, node) => {
               setHighlightedId(node.id)
               setSelectedId(null)
