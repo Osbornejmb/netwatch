@@ -47,7 +47,7 @@ const rate = (value) =>
     : value >= 1000000
       ? `${(value / 1000000).toFixed(2)} Mbps`
       : `${(value / 1000).toFixed(1)} kbps`
-export default function DeviceInterfaces({ deviceId, revision }) {
+export default function DeviceInterfaces({ deviceId, revision, remote, viewer }) {
   const [page, setPage] = useState(null),
     [error, setError] = useState(''),
     [after, setAfter] = useState(0),
@@ -107,7 +107,9 @@ export default function DeviceInterfaces({ deviceId, revision }) {
         <>
           <p>
             {!page.configured
-              ? 'Port checks are not set up on this PC.'
+              ? remote && !viewer
+                ? 'Change this on the NetWatch PC'
+                : 'Port checks are not set up on this PC.'
               : page.monitoring.collectorState === 'disabled'
                 ? 'Port checks are paused.'
                 : !current
