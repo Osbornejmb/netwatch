@@ -1,5 +1,5 @@
 import ConfirmDialog from './ConfirmDialog'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import InfoTooltip from './InfoTooltip'
 import { guessDeviceType } from './discoveryType.js'
 import { writeHeaders } from './monitoring.js'
@@ -19,17 +19,17 @@ export default function DiscoveredDevices() {
     [after, setAfter] = useState(0),
     [pages, setPages] = useState([]),
     [nextAfter, setNextAfter] = useState(null)
-  const refresh = async (cursor = after) => {
+  const refresh = useCallback(async (cursor) => {
     const r = await fetch(`/api/v1/discovered?after=${cursor}&limit=200`)
     if (!r.ok) throw Error()
     const value = await r.json()
     setDevices(value.devices)
     setNextAfter(value.nextAfter)
     setAfter(cursor)
-  }
+  }, [])
   useEffect(() => {
     void refresh(0).catch(() => setMessage('Connect to the NetWatch host to review discovered devices.'))
-  }, [])
+  }, [refresh])
   useEffect(() => {
     if (!scanning) return
     let stopped = false,
@@ -66,7 +66,7 @@ export default function DiscoveredDevices() {
       })
       if (!r.ok) throw Error()
       const result = await r.json()
-      await refresh()
+      await refresh(after)
       setMessage(
         result.promotedRouter
           ? 'Updated device to Router.'

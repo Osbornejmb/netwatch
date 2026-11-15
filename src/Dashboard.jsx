@@ -211,7 +211,7 @@ export default function Dashboard({
           {live && (
             <InfoTooltip label="Monitoring information">
               <span>{collectorLabel(live.collector.state)}</span>
-              <span>Updated {formatCheckTime(live.generatedAt)}</span>
+              <span>Updated {formatCheckTime(host.receivedAt ?? live.generatedAt)}</span>
             </InfoTooltip>
           )}
           {showInventory && highlightedDevice && (

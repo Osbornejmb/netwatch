@@ -10,7 +10,7 @@ import { createHost } from '../host/server.js'
 import { MAX_BODY, openStore } from '../host/store.js'
 import { fetchWriteToken, writeTokenFixture } from './fixtures/write-token.js'
 
-async function fixture(t) {
+async function fixture(t, { collector, expose } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'netwatch-http-'))
   const store = openStore(join(dir, 'db'))
   const dist = join(dir, 'dist')
@@ -20,7 +20,8 @@ async function fixture(t) {
   writeFileSync(join(dist, 'assets', 'config.json'), '{}')
   writeFileSync(join(dist, 'font.woff2'), '')
   writeFileSync(join(dist, 'index.js.map'), '{}')
-  const server = createHost(store, { dist, port: 0 })
+  const server = createHost(store, { dist, port: 0, collector })
+  expose?.(store)
   server.listen(0, '127.0.0.1')
   await once(server, 'listening')
   t.after(async () => {
@@ -118,4 +119,48 @@ test('the write token is injected per launch and is accepted only by its own hos
     method: 'POST', headers: { 'X-NetWatch-Write': token },
   })
   assert.equal(response.status, 200)
+})
+
+test('snapshot ETags skip the snapshot read and change with inventory, current results, and collector state', async (t) => {
+  let store, reads=0, state='idle'
+  const base = await fixture(t, {
+    collector: { snapshot:()=>({state,freshness:{staleAfterMs:30000}}) },
+    expose(value) {
+      store=value
+      const snapshot=store.snapshot
+      store.snapshot=()=>{reads++;return snapshot()}
+    },
+  })
+  const request=(etag)=>fetch(base+'/api/v1/snapshot',{headers:etag?{'If-None-Match':etag}:{}})
+  const initial=await request()
+  const first=initial.headers.get('ETag')
+  assert.match(first,/^W\/"[^"]+"$/)
+  assert.equal(initial.status,200)
+  await initial.json()
+  const unchanged=await request('"other", '+first.slice(2))
+  assert.equal(unchanged.status,304)
+  assert.equal(unchanged.headers.get('ETag'),first)
+  assert.equal(await unchanged.text(),'')
+  assert.equal(reads,1)
+  store.write({
+    source:'inventory',monitoring:{r:true},topology:{
+      schemaVersion:1,nodes:[{id:'r',type:'router',position:{x:0,y:0},data:{label:'Router',ip:'192.0.2.1'}}],edges:[],
+    },
+  },0)
+  const inventory=await request(first)
+  assert.equal(inventory.status,200)
+  const second=inventory.headers.get('ETag')
+  assert.notEqual(second,first)
+  assert.equal((await inventory.json()).inventory.revision,1)
+  store.append([{deviceId:'r',status:'down',checkedAt:new Date().toISOString()}])
+  const observed=await request(second)
+  assert.equal(observed.status,200)
+  const third=observed.headers.get('ETag')
+  assert.notEqual(third,second)
+  assert.equal((await observed.json()).activeIncidents.length,1)
+  state='running'
+  const collecting=await request(third)
+  assert.equal(collecting.status,200)
+  assert.notEqual(collecting.headers.get('ETag'),third)
+  assert.equal((await collecting.json()).collector.state,'running')
 })

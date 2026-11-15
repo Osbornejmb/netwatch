@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { hostRequest, formatCheckTime } from './monitoring'
 import { HEALTH } from './health'
 
@@ -6,48 +6,51 @@ export default function DeviceHistory({ deviceId, revision, checkedAt }) {
   const [page, setPage] = useState({ checks: [], nextBefore: null, loading: true, error: '' })
   const [reload, setReload] = useState(0)
   const active = useRef(null)
-  const load = async (before, signal) => {
-    setPage((previous) => ({ ...previous, loading: true, error: '' }))
-    try {
-      const value = await hostRequest(
-        `devices/${encodeURIComponent(deviceId)}/checks?limit=25${before ? `&before=${before}` : ''}`,
-        { signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]) },
-      )
-      if (value.revision !== revision) throw new Error('Saved devices changed. Refresh before reading history.')
-      if (
-        !Array.isArray(value.checks) ||
-        value.checks.length > 25 ||
-        value.checks.some(
-          (check, index) =>
-            check.deviceId !== deviceId ||
-            !Number.isSafeInteger(check.id) ||
-            check.id < 1 ||
-            (index > 0 && check.id >= value.checks[index - 1].id) ||
-            (before && check.id >= before) ||
-            !['up', 'down', 'unknown'].includes(check.status) ||
-            !Number.isFinite(Date.parse(check.checkedAt)),
-        ) ||
-        (value.nextBefore !== null && (value.checks.length === 0 || value.nextBefore !== value.checks.at(-1).id))
-      )
-        throw new Error('Invalid history response.')
-      if (!signal.aborted)
-        setPage((previous) => ({
-          checks: before ? [...previous.checks, ...value.checks] : value.checks,
-          nextBefore: value.nextBefore,
-          loading: false,
-          error: '',
-        }))
-    } catch (error) {
-      if (!signal.aborted)
-        setPage((previous) => ({
-          ...previous,
-          loading: false,
-          error: error.message.startsWith('Saved devices changed')
-            ? error.message
-            : 'History is unavailable. Try Refresh history.',
-        }))
-    }
-  }
+  const load = useCallback(
+    async (before, signal) => {
+      setPage((previous) => ({ ...previous, loading: true, error: '' }))
+      try {
+        const value = await hostRequest(
+          `devices/${encodeURIComponent(deviceId)}/checks?limit=25${before ? `&before=${before}` : ''}`,
+          { signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]) },
+        )
+        if (value.revision !== revision) throw new Error('Saved devices changed. Refresh before reading history.')
+        if (
+          !Array.isArray(value.checks) ||
+          value.checks.length > 25 ||
+          value.checks.some(
+            (check, index) =>
+              check.deviceId !== deviceId ||
+              !Number.isSafeInteger(check.id) ||
+              check.id < 1 ||
+              (index > 0 && check.id >= value.checks[index - 1].id) ||
+              (before && check.id >= before) ||
+              !['up', 'down', 'unknown'].includes(check.status) ||
+              !Number.isFinite(Date.parse(check.checkedAt)),
+          ) ||
+          (value.nextBefore !== null && (value.checks.length === 0 || value.nextBefore !== value.checks.at(-1).id))
+        )
+          throw new Error('Invalid history response.')
+        if (!signal.aborted)
+          setPage((previous) => ({
+            checks: before ? [...previous.checks, ...value.checks] : value.checks,
+            nextBefore: value.nextBefore,
+            loading: false,
+            error: '',
+          }))
+      } catch (error) {
+        if (!signal.aborted)
+          setPage((previous) => ({
+            ...previous,
+            loading: false,
+            error: error.message.startsWith('Saved devices changed')
+              ? error.message
+              : 'History is unavailable. Try Refresh history.',
+          }))
+      }
+    },
+    [deviceId, revision],
+  )
   useEffect(() => {
     const controller = new AbortController()
     active.current = controller
@@ -56,7 +59,7 @@ export default function DeviceHistory({ deviceId, revision, checkedAt }) {
     return () => {
       controller.abort()
     }
-  }, [deviceId, revision, checkedAt, reload])
+  }, [load, checkedAt, reload])
   return (
     <section className="health-history" aria-label="Check history" aria-busy={page.loading}>
       <h3>Check history</h3>

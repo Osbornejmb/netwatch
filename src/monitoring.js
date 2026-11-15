@@ -25,8 +25,8 @@ export async function hostRequest(path, { signal, body } = {}) {
   return value
 }
 
-export function validateSnapshot(value) {
-  const inventory = value?.inventory
+export function validateSnapshot(value, previousInventory) {
+  let inventory = value?.inventory
   if (
     !Number.isSafeInteger(inventory?.revision) ||
     inventory.revision < 0 ||
@@ -40,10 +40,12 @@ export function validateSnapshot(value) {
     value.observations.length > 2000
   )
     throw new Error('Invalid host snapshot.')
-  const topology = validateTopology(inventory.topology)
-  const ids = new Set(topology.nodes.map((node) => node.id))
-  for (const [id, enabled] of Object.entries(inventory.monitoring)) {
-    if (!ids.has(id) || typeof enabled !== 'boolean') throw new Error('Invalid host monitoring settings.')
+  const unchanged = inventory.revision === previousInventory?.revision
+  inventory = unchanged ? previousInventory : { ...inventory, topology: validateTopology(inventory.topology) }
+  const ids = new Set(inventory.topology.nodes.map((node) => node.id))
+  if (!unchanged) {
+    for (const [id, enabled] of Object.entries(inventory.monitoring))
+      if (!ids.has(id) || typeof enabled !== 'boolean') throw new Error('Invalid host monitoring settings.')
   }
   const checks = Object.create(null)
   for (const check of value.observations) {
@@ -64,7 +66,7 @@ export function validateSnapshot(value) {
     new Set(activeIncidents.map((item) => item.deviceId)).size !== activeIncidents.length
   )
     throw new Error('Invalid active incidents.')
-  return { ...value, activeIncidents, inventory: { ...inventory, topology }, checks }
+  return { ...value, activeIncidents, inventory, checks }
 }
 
 export function validateIncidents(items, ids, maximum = 25) {
@@ -88,8 +90,22 @@ export function validateIncidents(items, ids, maximum = 25) {
     throw new Error('Invalid incidents.')
 }
 
+async function requestSnapshot(path, { signal, etag }) {
+  const response = await fetch('/api/v1/' + path, {
+    signal,
+    cache: 'no-store',
+    headers: etag ? { 'If-None-Match': etag } : {},
+  })
+  if (response.status === 304) return { unchanged: true }
+  if (!response.ok) throw new Error('Unable to reach the monitoring service. Try again.')
+  return { value: await response.json(), etag: response.headers.get('ETag') }
+}
+
 // Serial, deadline-bounded polling. Cleanup also rejects late responses from transports that ignore abort.
-export function pollSnapshot(onState, { request = hostRequest, intervalMs = 1000, timeoutMs = 10000 } = {}) {
+export function pollSnapshot(
+  onState,
+  { request = requestSnapshot, intervalMs = 1000, timeoutMs = 10000, now = Date.now, cache = {} } = {},
+) {
   let stopped = false,
     timer,
     controller
@@ -97,9 +113,24 @@ export function pollSnapshot(onState, { request = hostRequest, intervalMs = 1000
     controller = new AbortController()
     const deadline = setTimeout(() => controller.abort(), timeoutMs)
     try {
-      const snapshot = validateSnapshot(await request('snapshot', { signal: controller.signal }))
-      if (!stopped && !controller.signal.aborted) onState({ snapshot, state: 'connected', error: '' })
-      else if (!stopped) onState({ state: 'disconnected', error: 'Host request timed out.' })
+      const reply = await request('snapshot', { signal: controller.signal, etag: cache.etag })
+      if (stopped) return
+      if (controller.signal.aborted) throw new Error('Host request timed out.')
+      const connection = { state: 'connected', error: '', receivedAt: new Date(now()).toISOString() }
+      if (reply.unchanged) {
+        if (!cache.etag || !cache.inventory) throw new Error('No previous host snapshot.')
+        onState(connection)
+      } else {
+        // A different host instance can start at the same revision with a different database.
+        const instance = (value) => value?.split('.')[0]
+        const snapshot = validateSnapshot(
+          reply.value,
+          instance(cache.etag) === instance(reply.etag) ? cache.inventory : undefined,
+        )
+        cache.etag = reply.etag
+        cache.inventory = snapshot.inventory
+        onState({ ...connection, snapshot })
+      }
     } catch (error) {
       if (!stopped)
         onState({ state: 'disconnected', error: controller.signal.aborted ? 'Host request timed out.' : error.message })

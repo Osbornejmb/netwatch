@@ -169,6 +169,7 @@ export function openStore(
     openedAt: new Date(r.opened_at).toISOString(),
     resolvedAt: r.resolved_at === null ? null : new Date(r.resolved_at).toISOString(),
   })
+  let observationVersion = 0
   let cachedInventory
   const transaction = (fn, readOnly = false) => {
     db.exec(readOnly ? 'BEGIN' : 'BEGIN IMMEDIATE')
@@ -185,6 +186,7 @@ export function openStore(
   const readRevision = db.prepare('SELECT revision FROM inventory')
   const readInventory = db.prepare('SELECT * FROM inventory')
   const revision = () => readRevision.get().revision
+  const databaseVersion = db.prepare('PRAGMA data_version')
   const readState = () => {
     if (cachedInventory && revision() === cachedInventory.revision) return cachedInventory
     const row = readInventory.get()
@@ -271,6 +273,7 @@ export function openStore(
   return {
     read: () => structuredClone(readState()),
     revision,
+    snapshotVersion: () => [revision(), observationVersion, databaseVersion.get().data_version],
     cleanup,
     discoveryCounts: () =>
       db
@@ -439,7 +442,8 @@ export function openStore(
     append(observations, { revision } = {}) {
       if (!Array.isArray(observations) || observations.length > 2000)
         throw invalid('At most 2000 observations per batch.')
-      return transaction(() => {
+      let latestChanged = false
+      transaction(() => {
         const state = readState()
         if (revision !== undefined && revision !== state.revision) throw invalid('Inventory changed during probe.', 409)
         const sampledDevices = new Set()
@@ -473,6 +477,7 @@ export function openStore(
           // Older results can contribute history but cannot replace current evidence or change outages.
           if (!latest || time >= latest.checked_at) {
             updateLatest.run(...fields)
+            latestChanged = true
             if (o.status === 'down' && outcome === 'unreachable')
               incidentChanged =
                 db
@@ -502,6 +507,7 @@ export function openStore(
         if (sampledDevices.size) trimNetwork()
         if (resolvedIncident) trimIncidentCount()
       })
+      if (latestChanged) observationVersion++
     },
     incidents(id, { before, limit = 25 } = {}) {
       return transaction(() => {

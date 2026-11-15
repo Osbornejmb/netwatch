@@ -1,12 +1,12 @@
 import http from 'node:http'
-import { randomBytes, timingSafeEqual } from 'node:crypto'
+import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { resolve, extname, relative, isAbsolute } from 'node:path'
 import { invalid, MAX_BODY } from './store.js'
 import { loopbackUrl, readPort } from './port.js'
 import { health } from './routes/health.js'
 import { readTopology, writeTopology } from './routes/topology.js'
-import { snapshot } from './routes/snapshot.js'
+import { createSnapshotRoute } from './routes/snapshot.js'
 import { listDiscovered, scanNow, clearDiscovered, addDiscoveredToMap, removeDiscovered } from './routes/discovered.js'
 import { deviceChecks, deviceIncidents, deviceInterfaces } from './routes/devices.js'
 
@@ -66,7 +66,7 @@ export function createHost(
     { method: 'GET', pattern: /^\/api\/v1\/health$/, handler: health },
     { method: 'GET', pattern: /^\/api\/v1\/topology$/, handler: readTopology },
     { method: 'PUT', pattern: /^\/api\/v1\/topology$/, handler: writeTopology, requiresWrite: true, bodyType: 'json' },
-    { method: 'GET', pattern: /^\/api\/v1\/snapshot$/, handler: snapshot },
+    { method: 'GET', pattern: /^\/api\/v1\/snapshot$/, handler: createSnapshotRoute(randomUUID()) },
     { method: 'GET', pattern: /^\/api\/v1\/discovered$/, handler: listDiscovered },
     {
       method: 'POST',
@@ -101,11 +101,12 @@ export function createHost(
     { method: 'GET', pattern: /^\/api\/v1\/devices\/([^/]+)\/interfaces$/, handler: deviceInterfaces },
   ]
   const server = http.createServer(async (req, res) => {
-    const send = (status, body) => {
+    const send = (status, body, headers) => {
       res.writeHead(status, {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-store',
         'X-Content-Type-Options': 'nosniff',
+        ...headers,
       })
       res.end(JSON.stringify(body))
     }
@@ -140,7 +141,19 @@ export function createHost(
         if (bodyType === 'json') requireJson(req)
         const body = await parseBody(req, bodyType)
         const id = match[1] === undefined ? undefined : decodePath(match[1])
-        return send(200, await handler({ store, collector, interfaces, discovery, url, id, body }))
+        const response = {}
+        const result = await handler({
+          store,
+          collector,
+          interfaces,
+          discovery,
+          url,
+          id,
+          body,
+          requestHeaders: req.headers,
+          response,
+        })
+        return send(response.status ?? 200, result, response.headers)
       }
       if (url.pathname.startsWith('/api/') || req.method !== 'GET') throw invalid('Route not found.', 404)
       const file = resolve(dist, `.${decodePath(url.pathname === '/' ? '/index.html' : url.pathname)}`)
