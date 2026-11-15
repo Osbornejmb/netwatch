@@ -61,6 +61,8 @@ export default function Dashboard({
   edges: inventoryEdges,
   showInventory = false,
   onEdit,
+  viewer = false,
+  remote = false,
   viewOptions,
   setViewOptions,
 }) {
@@ -261,22 +263,24 @@ export default function Dashboard({
           <details className="health-view-options">
             <summary>View options{statusFilter !== 'all' || query ? ' · Filtered' : ''}</summary>
             <div>
-              <label className="health-filter">
-                Show{' '}
-                <select
-                  aria-label="Network source"
-                  value={source}
-                  onChange={(event) => {
-                    setSource(event.target.value)
-                    setSelectedId(null)
-                    setHighlightedId(null)
-                    finishDrag()
-                  }}
-                >
-                  <option value="host">Monitored network</option>
-                  <option value="browser">Draft map</option>
-                </select>
-              </label>
+              {!viewer && (
+                <label className="health-filter">
+                  Show{' '}
+                  <select
+                    aria-label="Network source"
+                    value={source}
+                    onChange={(event) => {
+                      setSource(event.target.value)
+                      setSelectedId(null)
+                      setHighlightedId(null)
+                      finishDrag()
+                    }}
+                  >
+                    <option value="host">Monitored network</option>
+                    <option value="browser">Draft map</option>
+                  </select>
+                </label>
+              )}
               {source === 'host' && (
                 <button className="health-button" onClick={host.refresh}>
                   Refresh now
@@ -502,7 +506,7 @@ export default function Dashboard({
               setSelectedId(null)
               setHighlightedId(null)
             }}
-            nodesDraggable
+            nodesDraggable={!viewer}
             nodesConnectable={false}
             multiSelectionKeyCode={null}
             nodeDragThreshold={3}
@@ -529,21 +533,25 @@ export default function Dashboard({
               <p>
                 {nodes.length
                   ? 'Try another name or status filter.'
-                  : 'Create a map, then choose which devices to monitor.'}
+                  : viewer
+                    ? 'There are no devices on the monitored map yet.'
+                    : 'Create a map, then choose which devices to monitor.'}
               </p>
-              <button
-                className="health-button"
-                onClick={
-                  nodes.length
-                    ? () => {
-                        setQuery('')
-                        setStatusFilter('all')
-                      }
-                    : onEdit
-                }
-              >
-                {nodes.length ? 'Clear filters' : 'Create your map'}
-              </button>
+              {(!viewer || nodes.length > 0) && (
+                <button
+                  className="health-button"
+                  onClick={
+                    nodes.length
+                      ? () => {
+                          setQuery('')
+                          setStatusFilter('all')
+                        }
+                      : onEdit
+                  }
+                >
+                  {nodes.length ? 'Clear filters' : 'Create your map'}
+                </button>
+              )}
             </div>
           )}
           {highlightedDevice && (
@@ -570,6 +578,8 @@ export default function Dashboard({
         <DeviceDetails
           key={`${source}-${selected.id}-${live ? live.inventory.revision : 'local'}`}
           host={live ? host : null}
+          viewer={viewer}
+          remote={remote}
           device={selected}
           check={checks[selected.id]}
           connections={connections}

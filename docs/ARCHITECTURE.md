@@ -18,10 +18,10 @@ An optional bounded Windows ICMP collector is implemented; live dashboard integr
 
 An optional Windows WinForms tray/desktop controller (#28) now starts/stops its own Node host through `host/desktop.js` and private IPC. A single controller is allowed per user/session; no remote shutdown route is added. The default database/settings live under LOCALAPPDATA/NetWatch, separate from the checkout and without automatically migrating existing inventory. See WINDOWS-LAUNCHER.md. The controller requires a signed-in interactive session; the future #12 Windows service remains the unattended owner, with the tray attaching rather than creating a second collector. Remote browsers never own collector lifetime.
 
-Browser working copy → explicit preview/confirmed loopback API transfer → SQLite inventory/history. Authentication is planned before remote access.
+Browser working copy → explicit preview and confirmed same-origin admin transfer → SQLite inventory and history. Remote viewers consume a dashboard-only snapshot projection.
 The current host owns bounded optional ICMP workers (ICMP-COLLECTOR.md); a packaged Windows service and SNMP/LLDP collectors remain planned, and browsers will never launch probes or receive device credentials. Start with one service and one database. Add separate workers only when measured load requires them.
 
-Implemented API routes: GET /api/v1/health, GET/PUT /api/v1/topology, GET /api/v1/snapshot and paginated GET /api/v1/devices/:id/checks. The production host serves the compiled UI on the same origin, enforces Host/Origin/write intent, and binds only to 127.0.0.1:4317. There is no observation-write route. See HOST-API.md for exact shapes, revision conflict rules and retention.
+Implemented API routes: GET /api/v1/health, GET/PUT /api/v1/topology, GET /api/v1/snapshot and paginated GET /api/v1/devices/:id/checks. The production host serves the compiled UI on the same origin, enforces Host/Origin/write intent, and binds to 127.0.0.1:4317 by default. LAN sharing adds listeners only on private IPv4 interfaces and refreshes them every 60 seconds. There is no observation-write route. See HOST-API.md for exact shapes, revision conflict rules and retention.
 
 Topology JSON: schemaVersion 1, nodes[{id,type,position:{x,y},data:{label,ip,description}}], edges[{id,source,target,label,sourceHandle,targetHandle}]. Node IDs and link IDs are unique within their collections. Links reference existing distinct nodes. Limits: 2,000 nodes, 10,000 links, 5 MB import. This version has no credentials or monitoring results. Reject unsupported future schema versions rather than silently migrating them.
 
@@ -29,9 +29,9 @@ Topology JSON: schemaVersion 1, nodes[{id,type,position:{x,y},data:{label,ip,des
 
 Treat browser storage, imported files, API input, discovery results, and device responses as untrusted. Validate at each boundary. Never interpolate device addresses into shell commands. Probe only configured authorized inventory, with rate/concurrency/time bounds. Keep secrets in host-managed secure storage; exclude them from logs, exports, and repository history.
 
-Opt-in local discovery reads Windows neighbor entries and keeps them separate from inventory. Results are restricted to directly attached IPv4 subnets and reviewed explicitly before adding. Discovery alone never authorizes checks; the explicit Add to map action saves the device with normal checks enabled, subject to the separately enabled global collector. Optional discovery ICMP does not create saved-device observations. See DISCOVERY.md for limits and API behavior.
+Opt-in local discovery reads Windows neighbor entries and keeps them separate from inventory. Results are restricted to directly attached IPv4 subnets and reviewed explicitly before adding. Discovery requires an explicit Add to map action. On the NetWatch PC, that action enables checks for the saved device, subject to the global collector setting. Remote admin additions start with checks off. Optional discovery ICMP does not create saved-device observations. See DISCOVERY.md for limits and API behavior.
 
-Bind development and the future API to loopback by default. LAN development is explicit. Remote access requires authentication, authorization, HTTPS or VPN, audit records, and restrictive firewall rules. No public development-server deployment.
+The development server and production host default to loopback. The production host derives access from the socket peer, enforces the Host and Origin allow-list, and authorizes each declared route. Remote admin writes use session CSRF tokens. SQLite stores scrypt password hashes, hashes of session secrets, and a bounded access log. Native launcher controls use private IPC. Direct HTTPS is configurable with a certificate and key. HTTP credentials and sessions are visible to observers on the LAN. See [Remote access](REMOTE-ACCESS.md).
 
 ## Recovery and delivery
 

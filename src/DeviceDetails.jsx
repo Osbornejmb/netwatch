@@ -7,7 +7,7 @@ import DeviceHistory from './DeviceHistory'
 import DeviceIncidents from './DeviceIncidents'
 import DeviceInterfaces from './DeviceInterfaces'
 
-export default function DeviceDetails({ device, check, connections, host, onClose }) {
+export default function DeviceDetails({ device, check, connections, host, onClose, viewer, remote }) {
   const modal = useModal(onClose)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -91,15 +91,19 @@ export default function DeviceDetails({ device, check, connections, host, onClos
           </dl>
           {host && (
             <>
-              <p>Turn on checks only for devices you manage.</p>
-              <button
-                className="health-button"
-                disabled={saving || host.state !== 'connected' || !device.data.ip}
-                onClick={changeMonitoring}
-              >
-                {saving ? 'Saving…' : enabled ? 'Turn checks off' : 'Turn checks on'}
-              </button>
-              {error && <p role="alert">{error}</p>}
+              {!viewer && (
+                <>
+                  <p>Turn on checks only for devices you manage.</p>
+                  <button
+                    className="health-button"
+                    disabled={saving || host.state !== 'connected' || !device.data.ip}
+                    onClick={changeMonitoring}
+                  >
+                    {saving ? 'Saving…' : enabled ? 'Turn checks off' : 'Turn checks on'}
+                  </button>
+                  {error && <p role="alert">{error}</p>}
+                </>
+              )}
               <details className="health-history-options">
                 <summary>Outages</summary>
                 <DeviceIncidents
@@ -125,7 +129,14 @@ export default function DeviceDetails({ device, check, connections, host, onClos
               onToggle={(event) => setInterfacesOpen(event.currentTarget.open)}
             >
               <summary>Ports</summary>
-              {interfacesOpen && <DeviceInterfaces deviceId={device.id} revision={host.snapshot.inventory.revision} />}
+              {interfacesOpen && (
+                <DeviceInterfaces
+                  remote={remote}
+                  viewer={viewer}
+                  deviceId={device.id}
+                  revision={host.snapshot.inventory.revision}
+                />
+              )}
             </details>
           )}
           <details className="health-history-options">

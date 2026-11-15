@@ -1,7 +1,12 @@
 import { mkdirSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { openStore } from './store.js'
-import { createHost } from './server.js'
+import { createLanListeners } from './lan.js'
+import { createAudit } from './audit.js'
+import { manageLauncherAccess } from './auth-config.js'
+import { createSessions } from './sessions.js'
+import { createHost, createRoutes } from './server.js'
+import { readTlsOptions } from './tls.js'
 import { loopbackUrl, readPort } from './port.js'
 import { lock } from './files.js'
 import { createCollector } from './collector.js'
@@ -12,6 +17,9 @@ import { createInterfaceCollector } from './snmp-collector.js'
 import { createDiscovery } from './discovery.js'
 import { createProbeGate } from './probe-gate.js'
 const port = readPort()
+const tls = readTlsOptions()
+const scheme = tls ? 'https' : 'http'
+const dashboardUrl = loopbackUrl(port, scheme)
 const path = resolve(process.env.NETWATCH_DB || 'data/netwatch.sqlite')
 mkdirSync(dirname(path), { recursive: true })
 const release = lock(path)
@@ -42,26 +50,48 @@ const discovery = createDiscovery(store, {
   probeGate,
   maxPrefix: discoveryPrefix,
 })
-const server = createHost(store, { port, collector, interfaces, discovery })
+const audit = createAudit(store.db)
+audit.purge()
+const auth = createSessions(store.db, { lan: process.env.NETWATCH_LAN === '1', audit })
+const hostOptions = { port, collector, interfaces, discovery, routes: createRoutes(discovery), auth, audit, tls }
+const lan =
+  process.env.NETWATCH_LAN === '1'
+    ? createLanListeners({
+        port,
+        scheme,
+        createServer: (lanAuthorities) => createHost(store, { ...hostOptions, lanAuthorities }),
+      })
+    : undefined
+const server = createHost(store, { ...hostOptions, lanAuthorities: lan?.authorities })
 server.listen(port, '127.0.0.1', () => {
   if (stopping) {
     server.close()
     return
   }
+  lan?.start()
   collector.start()
   interfaces.start()
   discovery.start()
-  console.log('NetWatch: ' + loopbackUrl(port) + ' (loopback only). Collector: ' + collector.snapshot().state)
-  if (process.connected) process.send({ type: 'ready', port, collector: collector.snapshot().state })
+  console.log('NetWatch: ' + dashboardUrl + ' Collector: ' + collector.snapshot().state)
+  if (process.connected)
+    process.send({ type: 'ready', port, dashboardUrl, collector: collector.snapshot().state, urls: lan?.urls() ?? [] })
 })
+const sessionCleanup = setInterval(() => {
+  auth.purge()
+  audit.purge()
+}, 60000)
+sessionCleanup.unref()
 let stopping = false
+let accessUpdate
 async function shutdown(code = 0) {
   if (stopping) return
   stopping = true
+  clearInterval(sessionCleanup)
   const closed = new Promise((resolve) => server.close(resolve))
   server.closeAllConnections()
-  await Promise.all([collector.stop(), interfaces.stop(), discovery.stop()])
+  await Promise.all([collector.stop(), interfaces.stop(), discovery.stop(), lan?.stop()])
   await closed
+  await accessUpdate
   store.close()
   release()
   process.exitCode = code
@@ -71,6 +101,34 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => void shutdo
 if (process.send) {
   process.on('message', (message) => {
     if (message?.type === 'shutdown') void shutdown()
+    if (message?.type !== 'access' || stopping) return
+    if (accessUpdate) {
+      if (message.request?.command !== 'status' && process.connected)
+        process.send({ type: 'access', error: 'Wait for the current change and try again.' })
+      return
+    }
+    accessUpdate = (async () => {
+      try {
+        const result = await manageLauncherAccess(store.db, message.request)
+        if (message.request?.command !== 'status') auth.invalidate()
+        auth.purge()
+        const sessions = store.db
+          .prepare('SELECT role, ip, last_seen_at AS lastSeen FROM sessions ORDER BY last_seen_at DESC')
+          .all()
+        if (process.connected)
+          process.send({
+            type: 'access',
+            ...result,
+            collector: collector.snapshot().state,
+            sessions,
+            urls: lan?.urls() ?? [],
+          })
+      } catch {
+        if (process.connected) process.send({ type: 'access', error: 'Unable to update access settings.' })
+      }
+    })().finally(() => {
+      accessUpdate = undefined
+    })
   })
   process.on('disconnect', () => void shutdown())
 }

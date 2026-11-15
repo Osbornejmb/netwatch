@@ -74,6 +74,8 @@ jobs:
           curl --fail --retry 10 --retry-connrefused --retry-delay 1 "$NETWATCH_HOST_URL/api/v1/health" >/dev/null
           # Windows release-device validation needs a real, explicitly authorized device.
           for script in scripts/check-*-browser.mjs; do
+            # The remote check needs a LAN URL and disposable login credentials.
+            if [ "$script" = scripts/check-remote-browser.mjs ]; then continue; fi
             node "$script"
           done
       - name: Upload fixture browser evidence

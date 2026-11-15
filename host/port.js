@@ -6,6 +6,6 @@ export function readPort(value = process.env.NETWATCH_PORT) {
   return port
 }
 
-export function loopbackUrl(port = readPort()) {
-  return `http://127.0.0.1:${port}`
+export function loopbackUrl(port = readPort(), scheme = 'http') {
+  return scheme + '://127.0.0.1:' + port
 }

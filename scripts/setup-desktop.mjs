@@ -13,11 +13,11 @@ if(!existsSync(join(root,'dist','index.html')))throw Error('Build the dashboard 
 const directory=join(process.env.LOCALAPPDATA,'NetWatch')
 mkdirSync(directory,{recursive:true})
 const configuration=join(directory,'desktop.json')
-let settings={node:process.execPath,root,database:join(directory,'data','netwatch.sqlite'),icmp:false,discovery:false,discoveryIcmp:false}
+let settings={node:process.execPath,root,database:join(directory,'data','netwatch.sqlite'),icmp:false,discovery:false,discoveryIcmp:false,lan:false}
 if(existsSync(configuration)) {
   const previous=JSON.parse(readFileSync(configuration,'utf8'))
   if(typeof previous.database!=='string'||!previous.database||typeof previous.icmp!=='boolean')throw Error('Invalid existing desktop.json; preserve it and repair before setup.')
-  settings={...settings,database:resolve(previous.database),icmp:previous.icmp,discovery:previous.discovery===true,discoveryIcmp:previous.discovery===true&&previous.discoveryIcmp===true}
+  settings={...settings,database:resolve(previous.database),icmp:previous.icmp,discovery:previous.discovery===true,discoveryIcmp:previous.discovery===true&&previous.discoveryIcmp===true,lan:previous.lan===true}
 }
 const executable=join(directory,'NetWatch.exe'),temporary=join(directory,`NetWatch-${process.pid}.exe`)
 try {

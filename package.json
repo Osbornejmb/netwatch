@@ -13,6 +13,7 @@
     "start": "node host/main.js",
     "db": "node host/maintenance.js",
     "desktop:setup": "node scripts/setup-desktop.mjs",
+    "auth": "node host/auth-config.js",
     "snmp": "node host/snmp-config.js",
     "lint": "eslint host src",
     "format": "prettier --write host src",

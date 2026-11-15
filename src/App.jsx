@@ -3,6 +3,8 @@ import { ReactFlow, Background, useEdgesState, useNodesState, Panel } from '@xyf
 import { Activity, Check, GitBranch, Plus, Search, Trash2, X } from 'lucide-react'
 import RouterNode from './nodes/RouterNode'
 import SwitchNode from './nodes/SwitchNode'
+import { allowedHash } from './auth'
+import AccessLog from './AccessLog'
 import Dashboard from './Dashboard'
 import HostStorage from './HostStorage'
 import DiscoveredDevices from './DiscoveredDevices'
@@ -20,7 +22,7 @@ import { nextFreePosition } from './nodes/placement'
 
 import { readTopology, writeTopology, validateTopology } from './topology'
 
-const viewFromHash = () =>
+const viewFromHash = (hash) =>
   ({
     '#dashboard': 'dashboard',
     '#topology': 'editor',
@@ -28,25 +30,35 @@ const viewFromHash = () =>
     '#inventory': 'inventory',
     '#devices': 'inventory',
     '#discovered': 'discovered',
-  })[location.hash] || 'dashboard'
+  })[hash] || 'dashboard'
 
 const nodeTypes = { router: RouterNode, switch: SwitchNode }
 
-export default function App() {
+export default function App({ viewer = false, remote = false, accessControls }) {
   const saved = useMemo(
-    () => readTopology({ getItem: (key) => localStorage.getItem(key) }, { nodes: [], edges: [] }),
-    [],
+    () =>
+      viewer
+        ? { topology: { nodes: [], edges: [] } }
+        : readTopology({ getItem: (key) => localStorage.getItem(key) }, { nodes: [], edges: [] }),
+    [viewer],
   )
   const [nodes, setNodes, onNodesChange] = useNodesState(saved.topology.nodes)
   const [editorSizes, setEditorSizes] = useState({})
   const [edges, setEdges, onEdgesChange] = useEdgesState(saved.topology.edges)
-  const [view, setView] = useState(viewFromHash)
+  const [currentView, setView] = useState(() => viewFromHash(location.hash))
+  const view = viewer ? 'dashboard' : currentView
   const [dashboardView, setDashboardView] = useState({ source: 'host', layout: 'radial', centerId: '' })
   useEffect(() => {
-    const navigate = () => setView(viewFromHash())
+    const navigate = () => {
+      const hash = allowedHash(location.hash, viewer ? 'viewer' : 'admin')
+      if (location.hash !== hash) history.replaceState(null, '', hash)
+      setView(viewFromHash(hash))
+    }
+    navigate()
     window.addEventListener('hashchange', navigate)
     return () => window.removeEventListener('hashchange', navigate)
-  }, [])
+  }, [viewer])
+  const [showAccessLog, setShowAccessLog] = useState(false)
   const [deviceNotice, setDeviceNotice] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [confirm, setConfirm] = useState(null)
@@ -67,7 +79,7 @@ export default function App() {
   const [importGeneration, setImportGeneration] = useState(0)
 
   useEffect(() => {
-    if (autosavePaused) return
+    if (viewer || autosavePaused) return
     try {
       writeTopology(localStorage, { nodes, edges })
       setStorageError('')
@@ -78,7 +90,7 @@ export default function App() {
       )
       setAutosavePaused(true)
     }
-  }, [nodes, edges, autosavePaused])
+  }, [nodes, edges, autosavePaused, viewer])
 
   const importTopology = async (event) => {
     const file = event.target.files?.[0]
@@ -283,92 +295,107 @@ export default function App() {
             >
               Dashboard
             </a>
-            <a
-              href="#topology"
-              aria-label="Edit map"
-              aria-current={view === 'editor' ? 'page' : undefined}
-              onClick={() => setView('editor')}
-            >
-              Edit map
-            </a>
-            <a
-              href="#inventory"
-              aria-label="Devices"
-              aria-current={view === 'inventory' ? 'page' : undefined}
-              onClick={() => setView('inventory')}
-            >
-              Devices
-            </a>
-            <a
-              href="#discovered"
-              aria-current={view === 'discovered' ? 'page' : undefined}
-              onClick={() => setView('discovered')}
-            >
-              Discovered
-            </a>
+            {!viewer && (
+              <>
+                <a
+                  href="#topology"
+                  aria-label="Edit map"
+                  aria-current={view === 'editor' ? 'page' : undefined}
+                  onClick={() => setView('editor')}
+                >
+                  Edit map
+                </a>
+                <a
+                  href="#inventory"
+                  aria-label="Devices"
+                  aria-current={view === 'inventory' ? 'page' : undefined}
+                  onClick={() => setView('inventory')}
+                >
+                  Devices
+                </a>
+                <a
+                  href="#discovered"
+                  aria-current={view === 'discovered' ? 'page' : undefined}
+                  onClick={() => setView('discovered')}
+                >
+                  Discovered
+                </a>
+              </>
+            )}
           </nav>
-          <section className="backup-recovery" aria-label="Map backup and recovery">
-            <details open={storageError || importError ? true : undefined}>
-              <summary aria-label="Map backup and recovery">
-                Backups{storageError ? ' · Needs attention' : importError ? ' · Import failed' : ''}
-              </summary>
-              <div className="backup-panel">
-                {storageError && (
-                  <p className="notice storage-warning" role="alert">
-                    {storageError}
-                  </p>
-                )}
-                {importError && (
-                  <p className="notice storage-warning" role="alert">
-                    {importError} Your current map and saved data have not been replaced.
-                  </p>
-                )}
-                <p>Download your draft or restore a previously saved copy.</p>
-                {recovery && (
-                  <p>
-                    {typeof recovery.raw === 'string'
-                      ? 'Download original saved content preserves the unreadable saved text exactly. It is separate from the current visible map.'
-                      : 'The original saved content is unavailable because storage access was denied. Export the visible map, allow browser storage, then reload to access the original before replacing it.'}
-                  </p>
-                )}
-                <div className="backup-actions">
-                  <button className="button secondary" onClick={exportTopology}>
-                    Download map
-                  </button>
-                  <button
-                    className="button secondary"
-                    disabled={importBusy}
-                    onClick={() => importInput.current.click()}
-                  >
-                    {importBusy ? 'Reading backup…' : 'Restore map'}
-                  </button>
-                  {autosavePaused && (
-                    <button className="button secondary" disabled={importBusy} onClick={saveNow}>
-                      Replace saved map…
-                    </button>
+          {accessControls}
+          {!remote && document.querySelector('meta[name="netwatch-write-token"]') && (
+            <button className="health-button" onClick={() => setShowAccessLog(true)}>
+              Access log
+            </button>
+          )}
+          {!viewer && (
+            <section className="backup-recovery" aria-label="Map backup and recovery">
+              <details open={storageError || importError ? true : undefined}>
+                <summary aria-label="Map backup and recovery">
+                  Backups{storageError ? ' · Needs attention' : importError ? ' · Import failed' : ''}
+                </summary>
+                <div className="backup-panel">
+                  {storageError && (
+                    <p className="notice storage-warning" role="alert">
+                      {storageError}
+                    </p>
                   )}
-                  {typeof recovery?.raw === 'string' && (
-                    <button className="button secondary" onClick={downloadOriginal}>
-                      Download original
-                    </button>
+                  {importError && (
+                    <p className="notice storage-warning" role="alert">
+                      {importError} Your current map and saved data have not been replaced.
+                    </p>
                   )}
+                  <p>Download your draft or restore a previously saved copy.</p>
+                  {recovery && (
+                    <p>
+                      {typeof recovery.raw === 'string'
+                        ? 'Download original saved content preserves the unreadable saved text exactly. It is separate from the current visible map.'
+                        : 'The original saved content is unavailable because storage access was denied. Export the visible map, allow browser storage, then reload to access the original before replacing it.'}
+                    </p>
+                  )}
+                  <div className="backup-actions">
+                    <button className="button secondary" onClick={exportTopology}>
+                      Download map
+                    </button>
+                    <button
+                      className="button secondary"
+                      disabled={importBusy}
+                      onClick={() => importInput.current.click()}
+                    >
+                      {importBusy ? 'Reading backup…' : 'Restore map'}
+                    </button>
+                    {autosavePaused && (
+                      <button className="button secondary" disabled={importBusy} onClick={saveNow}>
+                        Replace saved map…
+                      </button>
+                    )}
+                    {typeof recovery?.raw === 'string' && (
+                      <button className="button secondary" onClick={downloadOriginal}>
+                        Download original
+                      </button>
+                    )}
+                  </div>
+                  <p className="backup-status" role="status">
+                    {importBusy ? 'Validating backup…' : backupNotice}
+                  </p>
                 </div>
-                <p className="backup-status" role="status">
-                  {importBusy ? 'Validating backup…' : backupNotice}
-                </p>
-              </div>
-            </details>
-            <input ref={importInput} type="file" accept=".json,application/json" hidden onChange={importTopology} />
-          </section>
+              </details>
+              <input ref={importInput} type="file" accept=".json,application/json" hidden onChange={importTopology} />
+            </section>
+          )}
         </header>
+        {showAccessLog && <AccessLog onClose={() => setShowAccessLog(false)} />}
 
         {view === 'discovered' ? (
-          <DiscoveredDevices />
+          <DiscoveredDevices remote={remote} />
         ) : view !== 'editor' ? (
           <Dashboard
             nodes={nodes}
             edges={edges}
-            viewOptions={dashboardView}
+            viewer={viewer}
+            remote={remote}
+            viewOptions={viewer ? { ...dashboardView, source: 'host' } : dashboardView}
             setViewOptions={setDashboardView}
             showInventory={view === 'inventory'}
             onEdit={() => {

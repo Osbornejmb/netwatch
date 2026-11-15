@@ -1,22 +1,18 @@
 import http from 'node:http'
+import https from 'node:https'
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
-import { resolve, extname, relative, isAbsolute } from 'node:path'
+import { resolve } from 'node:path'
 import { invalid, MAX_BODY } from './store.js'
 import { loopbackUrl, readPort } from './port.js'
+import { decodePath, serveStatic } from './routes/static.js'
+import { admitRequest } from './lan.js'
+import { readAudit } from './routes/audit.js'
+import { authLogin, authLogout, authSession } from './routes/auth.js'
 import { health } from './routes/health.js'
 import { readTopology, writeTopology } from './routes/topology.js'
 import { createSnapshotRoute } from './routes/snapshot.js'
 import { listDiscovered, scanNow, clearDiscovered, addDiscoveredToMap, removeDiscovered } from './routes/discovered.js'
 import { deviceChecks, deviceIncidents, deviceInterfaces } from './routes/devices.js'
-
-function decodePath(path) {
-  try {
-    return decodeURIComponent(path)
-  } catch {
-    throw invalid('Malformed URL.')
-  }
-}
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -56,22 +52,31 @@ async function parseBody(req, bodyType) {
   }
 }
 
-export function createHost(
-  store,
-  { port = readPort(), dist = resolve('dist'), collector, interfaces, discovery } = {},
-) {
-  const writeToken = randomBytes(32).toString('hex')
-  const expectedToken = Buffer.from(writeToken, 'hex')
-  const routes = [
-    { method: 'GET', pattern: /^\/api\/v1\/health$/, handler: health },
-    { method: 'GET', pattern: /^\/api\/v1\/topology$/, handler: readTopology },
-    { method: 'PUT', pattern: /^\/api\/v1\/topology$/, handler: writeTopology, requiresWrite: true, bodyType: 'json' },
-    { method: 'GET', pattern: /^\/api\/v1\/snapshot$/, handler: createSnapshotRoute(randomUUID()) },
-    { method: 'GET', pattern: /^\/api\/v1\/discovered$/, handler: listDiscovered },
+export function createRoutes(discovery) {
+  return [
+    { method: 'GET', pattern: /^\/api\/v1\/audit$/, handler: readAudit, access: 'local' },
+    { method: 'GET', pattern: /^\/api\/v1\/auth\/session$/, handler: authSession, access: 'public' },
+    { method: 'POST', pattern: /^\/api\/v1\/auth\/login$/, handler: authLogin, access: 'public', bodyType: 'json' },
+    { method: 'POST', pattern: /^\/api\/v1\/auth\/logout$/, handler: authLogout, access: 'public', bodyType: 'Logout' },
+    { method: 'GET', pattern: /^\/api\/v1\/health$/, handler: health, access: 'viewer' },
+    { method: 'GET', pattern: /^\/api\/v1\/topology$/, handler: readTopology, access: 'admin' },
+    {
+      method: 'PUT',
+      pattern: /^\/api\/v1\/topology$/,
+      handler: writeTopology,
+      auditAction: 'topology_applied',
+      access: 'admin',
+      requiresWrite: true,
+      bodyType: 'json',
+    },
+    { method: 'GET', pattern: /^\/api\/v1\/snapshot$/, handler: createSnapshotRoute(randomUUID()), access: 'viewer' },
+    { method: 'GET', pattern: /^\/api\/v1\/discovered$/, handler: listDiscovered, access: 'admin' },
     {
       method: 'POST',
       pattern: /^\/api\/v1\/discovered\/scan-now$/,
       handler: scanNow(discovery),
+      auditAction: 'discovery_scan',
+      access: 'admin',
       requiresWrite: true,
       bodyType: 'Scan',
     },
@@ -79,6 +84,8 @@ export function createHost(
       method: 'POST',
       pattern: /^\/api\/v1\/discovered\/clear$/,
       handler: clearDiscovered,
+      auditAction: 'discovery_clear',
+      access: 'admin',
       requiresWrite: true,
       bodyType: 'Clear',
     },
@@ -86,6 +93,8 @@ export function createHost(
       method: 'POST',
       pattern: /^\/api\/v1\/discovered\/([^/]+)\/add-to-map$/,
       handler: addDiscoveredToMap,
+      auditAction: 'discovery_add',
+      access: 'admin',
       requiresWrite: true,
       bodyType: 'json',
     },
@@ -93,14 +102,47 @@ export function createHost(
       method: 'POST',
       pattern: /^\/api\/v1\/discovered\/([^/]+)\/remove$/,
       handler: removeDiscovered,
+      auditAction: 'discovery_remove',
+      access: 'admin',
       requiresWrite: true,
       bodyType: 'json',
     },
-    { method: 'GET', pattern: /^\/api\/v1\/devices\/([^/]+)\/checks$/, handler: deviceChecks },
-    { method: 'GET', pattern: /^\/api\/v1\/devices\/([^/]+)\/incidents$/, handler: deviceIncidents },
-    { method: 'GET', pattern: /^\/api\/v1\/devices\/([^/]+)\/interfaces$/, handler: deviceInterfaces },
+    { method: 'GET', pattern: /^\/api\/v1\/devices\/([^/]+)\/checks$/, handler: deviceChecks, access: 'viewer' },
+    { method: 'GET', pattern: /^\/api\/v1\/devices\/([^/]+)\/incidents$/, handler: deviceIncidents, access: 'viewer' },
+    {
+      method: 'GET',
+      pattern: /^\/api\/v1\/devices\/([^/]+)\/interfaces$/,
+      handler: deviceInterfaces,
+      access: 'viewer',
+    },
+    { method: 'GET', pattern: /^(?!\/api\/)/, handler: serveStatic, access: 'public' },
   ]
-  const server = http.createServer(async (req, res) => {
+}
+
+export function createHost(
+  store,
+  {
+    port = readPort(),
+    dist = resolve('dist'),
+    collector,
+    interfaces,
+    discovery,
+    routes = createRoutes(discovery),
+    lanAuthorities,
+    auth,
+    audit,
+    tls,
+    remoteAddress = (req) => req.socket.remoteAddress,
+  } = {},
+) {
+  const writeToken = randomBytes(32).toString('hex')
+  const expectedToken = Buffer.from(writeToken, 'hex')
+  const scheme = tls ? 'https' : 'http'
+  const request = async (req, res) => {
+    if (tls) res.setHeader('Strict-Transport-Security', 'max-age=31536000')
+    res.setHeader('Referrer-Policy', 'no-referrer')
+    res.setHeader('X-Frame-Options', 'DENY')
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin')
     const send = (status, body, headers) => {
       res.writeHead(status, {
         'Content-Type': 'application/json',
@@ -111,25 +153,34 @@ export function createHost(
       res.end(JSON.stringify(body))
     }
     try {
-      const origin = loopbackUrl(port === 0 ? server.address().port : port)
-      if (req.headers.host !== origin.slice('http://'.length)) {
-        if (/^(?:localhost|\[::1\])(?::\d+)?$/i.test(req.headers.host ?? '')) throw invalid('Use ' + origin + '.', 403)
-        throw invalid('Unexpected host.', 403)
-      }
-      if (req.headers.origin && req.headers.origin !== origin) throw invalid('Unexpected origin.', 403)
-      if (req.headers['sec-fetch-site'] && !['same-origin', 'none'].includes(req.headers['sec-fetch-site']))
-        throw invalid('Cross-site requests are disabled.', 403)
+      const origin = loopbackUrl(port === 0 ? server.address().port : port, scheme)
+      const authorities = new Set([origin.slice(scheme.length + 3), ...(lanAuthorities?.() ?? [])])
+      const ip = remoteAddress(req)
+      const source = admitRequest(req, origin, authorities, ip)
+      if (source === 'remote' && !auth?.enabled()) throw invalid('Remote access is unavailable.', 403)
+      const session = source === 'remote' ? auth.inspect(req) : undefined
+      const role = source === 'local' ? 'admin' : session?.role
       let url
       try {
         url = new URL(req.url, origin)
       } catch {
         throw invalid('Malformed URL.')
       }
-      for (const { method, pattern, handler, requiresWrite, bodyType } of routes) {
+      for (const { method, pattern, handler, requiresWrite, bodyType, access, auditAction } of routes) {
         if (req.method !== method) continue
         const match = pattern.exec(url.pathname)
         if (!match) continue
-        if (requiresWrite) {
+        if (source === 'remote' && access !== 'public') {
+          if (access !== 'viewer' && access !== 'admin') throw invalid('Change this on the NetWatch PC.', 403)
+          if (!role) throw invalid('Sign in to NetWatch.', 401)
+          if (access === 'admin' && role !== 'admin') {
+            if (auditAction) audit?.record('viewer_write_blocked', { source, ip, role, detail: auditAction })
+            throw invalid('This session is view-only.', 403)
+          }
+        }
+        if (requiresWrite && source === 'remote' && !auth.validWrite(session, req.headers['x-netwatch-write']))
+          throw invalid('Valid write token required. Reload NetWatch and try again.', 403)
+        if (requiresWrite && source === 'local') {
           const token = req.headers['x-netwatch-write']
           if (
             typeof token !== 'string' ||
@@ -144,6 +195,12 @@ export function createHost(
         const response = {}
         const result = await handler({
           store,
+          source,
+          role,
+          ip,
+          session,
+          auth,
+          audit,
           collector,
           interfaces,
           discovery,
@@ -152,52 +209,17 @@ export function createHost(
           body,
           requestHeaders: req.headers,
           response,
+          dist,
+          res,
+          writeToken: source === 'local' ? writeToken : undefined,
         })
+        if (auditAction) audit?.record(auditAction, { source, ip, role })
+        if (res.writableEnded) return
         return send(response.status ?? 200, result, response.headers)
       }
-      if (url.pathname.startsWith('/api/') || req.method !== 'GET') throw invalid('Route not found.', 404)
-      const file = resolve(dist, `.${decodePath(url.pathname === '/' ? '/index.html' : url.pathname)}`)
-      if (relative(dist, file).startsWith('..') || isAbsolute(relative(dist, file)))
-        throw invalid('Route not found.', 404)
-      let data
-      try {
-        data = await readFile(file)
-      } catch {
-        throw invalid('Build not found. Run npm run build.', 404)
-      }
-      const staticPath = relative(dist, file).replaceAll('\\', '/')
-      const index = staticPath === 'index.html'
-      if (index)
-        data = data
-          .toString('utf8')
-          .replace(
-            /<head(?:\s[^>]*)?>/i,
-            (head) => head + '<meta name="netwatch-write-token" content="' + writeToken + '">',
-          )
-      res.writeHead(200, {
-        ...(index ? { 'Cache-Control': 'no-store' } : {}),
-        ...(/^assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[^/]+$/.test(staticPath)
-          ? { 'Cache-Control': 'public, max-age=31536000, immutable' }
-          : {}),
-        'Content-Type':
-          {
-            '.html': 'text/html',
-            '.js': 'text/javascript',
-            '.css': 'text/css',
-            '.svg': 'image/svg+xml',
-            '.png': 'image/png',
-            '.ico': 'image/x-icon',
-            '.woff2': 'font/woff2',
-            '.json': 'application/json',
-            '.map': 'application/json',
-          }[extname(file)] || 'application/octet-stream',
-        'X-Content-Type-Options': 'nosniff',
-        'Content-Security-Policy':
-          "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'",
-      })
-      res.end(data)
+      throw invalid('Route not found.', 404)
     } catch (e) {
-      if (e.status === 413) {
+      if (e.status === 413 || e.message === 'Unexpected client address.') {
         res.setHeader('Connection', 'close')
         res.once('finish', () => req.socket.destroySoon())
       }
@@ -208,7 +230,8 @@ export function createHost(
         },
       })
     }
-  })
+  }
+  const server = tls ? https.createServer({ ...tls, minVersion: 'TLSv1.2' }, request) : http.createServer(request)
   server.requestTimeout = 15000
   server.headersTimeout = 10000
   server.maxHeadersCount = 50

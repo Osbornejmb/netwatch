@@ -39,7 +39,7 @@ For release acceptance, safe updates and recovery, see the [Windows release runb
 4. Review the replacement and choose **Confirm replacement**. New or changed devices start with monitoring disabled.
 5. Return to **Dashboard**, open a device and choose **Turn checks on**; select the monitored network under **View options → Show** if needed.
 
-Local network discovery is opt-in through the launcher and lists neighbors on the computer's directly attached IPv4 networks for review. It never adds or monitors a device automatically. Only enable checks for devices you manage; the launcher's ICMP setting and each saved device's monitoring setting are separate approvals. Wi-Fi isolation, blocked pings, randomized phone hardware addresses, and other subnets or VLANs can hide devices. See [Discovery](docs/DISCOVERY.md).
+Local network discovery is opt-in through the launcher and lists neighbors on the computer's directly attached IPv4 networks for review. Discovery requires an explicit Add to map action. On the NetWatch PC, **Add to map** turns checks on for that device, and the launcher’s ICMP setting must be on for checks to run. Remote admins add devices with checks off and can turn them on in device details. Only enable checks for devices you manage; the launcher's ICMP setting and each saved device's monitoring setting are separate approvals. Wi-Fi isolation, blocked pings, randomized phone hardware addresses, and other subnets or VLANs can hide devices. See [Discovery](docs/DISCOVERY.md).
 
 ## Read device status
 
@@ -60,13 +60,15 @@ Line colors summarize endpoint reachability, not verified cable, interface or ro
 
 **Monitored network** shows the host's saved devices and real checks. **Draft map** shows your local edits without live health. Loading or saving host inventory is an explicit reviewed replacement, not automatic synchronization.
 
-Use **Backups → Download map** to keep a copy of your draft, or **Edit map → Load saved map** to review the monitored map before downloading it. **Restore map** checks a backup file and asks before replacing the draft; **Use this map** applies the draft to the dashboard separately. Loading or restoring a draft never enables checks. Updates preserve saved maps and history; remove unwanted devices in the editor and review **Use this map** to apply the change.
+Use **Backups → Download map** to keep a copy of your draft, or **Edit map → Load saved map** to review the monitored map before downloading it. **Restore map** checks a backup file and asks before replacing the draft; **Use this map** applies the draft to the dashboard separately. **Use this map** and loading or restoring a map never turn checks on for a new or changed device. Updates preserve saved maps and history; remove unwanted devices in the editor and review **Use this map** to apply the change.
 
 Both maps open in the compact Circle layout; Tidy layout remains available. Connected devices stay grouped. Dragging a card against another pushes it out of the way. Moved devices stay in place until you leave the map, switch browser tabs, or reload. A move snaps back to its last valid position only if a connection stretches too far. Limits are 1.5× the arranged connection length, with a minimum reach of 320 layout pixels; unconnected devices can move freely. Drag adjustments only affect the open map. Connections are undirected: opposite or repeated entries draw one line, and adding the reverse link is blocked. Search stays beside the map; counts, Status and Needs attention are visible, while layout settings are in **View options**; the **Devices** page offers a keyboard-operable list. Device details open with a click or Enter/Space.
 
 The launcher stores data under `%LOCALAPPDATA%\NetWatch\data\netwatch.sqlite`; its control window shows the location. Browser JSON exports contain topology only, not history. For full database backup/restore, stop the host and follow [HOST-API.md](docs/HOST-API.md). A lock held by a running process blocks startup. NetWatch logs and replaces locks from dead local processes and ownerless or unreadable locks older than 60 seconds. Stop the owning process before maintenance. Never delete a database to resolve a startup error.
 
 ## Start and stop
+
+For another PC to open the dashboard, enable **Allow other PCs on this network** in the Windows launcher, set an admin password under **Remote access**, choose a viewer mode, and start the host. Use a URL shown by the launcher. Plain HTTP exposes passwords and session data to anyone who can intercept LAN traffic. Configure direct HTTPS before signing in from another PC on a network you do not fully trust. See [Remote access](docs/REMOTE-ACCESS.md).
 
 Closing the browser or hiding the control window keeps monitoring running. **Stop** stops the host; **Quit** stops it and exits the tray app. The PC must remain awake, connected and signed in. Automatic boot startup and unattended Windows service operation are not implemented.
 
@@ -81,7 +83,7 @@ This enables the collector for devices you separately authorize; it does not add
 
 ## Development and verification
 
-Direct host API clients use the per-launch write token for inventory and discovery changes. See [Host API](docs/HOST-API.md).
+Loopback API writes use the per-launch token. Remote admin writes use their session CSRF token. See [Host API](docs/HOST-API.md).
 
 NetWatch uses the experimental `node:sqlite` API in Node.js 22. Before upgrading Node, verify the host and its migrations with the test suite against the target Node version.
 
@@ -95,7 +97,7 @@ The Vite development UI is browser-only and does not run the monitoring host. Us
 
 ## Remaining work
 
-Local incidents/notifications (#11), broader Windows release/capacity/accessibility validation (#16), SNMP/LLDP/interface/redundancy work (#7/#8/#9), authentication (#10), and secured remote access/unattended service packaging (#12) remain planned. The current host is local-only; other PCs cannot access its dashboard. Do not expose the development server or bypass the host's loopback protections.
+Authentication and role enforcement (#10) and opt-in private-network access with optional direct HTTPS (#12) are implemented. Per-user accounts, SSO, automatic certificate provisioning, unattended Windows service packaging and second-PC release verification remain open. Local outages and SNMP interfaces are available. External notifications, LLDP and broader redundancy work remain planned.
 
 See [ROADMAP.md](docs/ROADMAP.md), [Windows launcher](docs/WINDOWS-LAUNCHER.md), [monitoring policy](docs/ICMP-COLLECTOR.md), and [WORKLOG.md](docs/WORKLOG.md) for details and evidence.
 

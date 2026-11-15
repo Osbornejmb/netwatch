@@ -70,3 +70,33 @@ test('desktop start preserves an existing lock; controller death leaves no runni
  }
  assert.equal(listening,false,'Controller death left a running orphan host')
 })
+
+test('launcher configures passwords through private pipes and reports only session metadata', async t => {
+ const path=join(setup(t),'db')
+ const instance=launch(t,path)
+ await running(instance)
+ async function command(value, match) {
+  const offset=instance.events.length
+  instance.child.stdin.write(JSON.stringify(value)+'\n')
+  const deadline=Date.now()+6000
+  for (;;) {
+   const event=instance.events.slice(offset).find(e=>e.type==='access'&&match(e))
+   if(event)return event
+   assert.ok(Date.now()<deadline,'Missing launcher access result')
+   await delay(25)
+  }
+ }
+ const password='test admin password'
+ const configured=await command({command:'set-admin-password',password,confirm:password},e=>e.adminConfigured)
+ assert.equal(configured.viewerMode,'password')
+ assert.deepEqual(configured.urls,[])
+ assert.deepEqual(configured.sessions,[])
+ assert.ok(!JSON.stringify(configured).includes(password))
+ assert.ok(!JSON.stringify(configured).includes('scrypt'))
+ const opened=await command({command:'viewer-mode',mode:'open'},e=>e.viewerMode==='open')
+ assert.equal(opened.adminConfigured,true)
+ assert.ok(opened.audit.some(entry=>entry.detail==='viewer-mode:open'))
+ assert.equal((await command({command:'revoke-sessions'},e=>!e.error)).sessions.length,0)
+ instance.child.stdin.write('stop\n')
+ assert.equal((await instance.closed)[0],0)
+})

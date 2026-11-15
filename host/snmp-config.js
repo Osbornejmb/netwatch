@@ -1,7 +1,8 @@
 import { mkdirSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { createInterface, emitKeypressEvents } from 'node:readline'
+import { createInterface } from 'node:readline'
+import { secret } from './secret-prompt.js'
 import { openStore } from './store.js'
 import { lock } from './files.js'
 import { createCredentialVault, credentialDirectory } from './snmp-secrets.js'
@@ -13,31 +14,6 @@ async function visible(question) {
   } finally {
     rl.close()
   }
-}
-async function secret(question) {
-  if (!process.stdin.isTTY) throw new Error('Use an interactive terminal for password entry.')
-  process.stdout.write(question)
-  emitKeypressEvents(process.stdin)
-  process.stdin.setRawMode(true)
-  process.stdin.resume()
-  return new Promise((resolve, reject) => {
-    let value = ''
-    const finish = (error) => {
-      process.stdin.removeListener('keypress', key)
-      process.stdin.setRawMode(false)
-      process.stdin.pause()
-      process.stdout.write('\n')
-      if (error) reject(error)
-      else resolve(value)
-    }
-    const key = (str, k) => {
-      if (k?.ctrl && k.name === 'c') return finish(new Error('Cancelled'))
-      if (k?.name === 'return') return finish()
-      if (k?.name === 'backspace') value = value.slice(0, -1)
-      else if (str && /^[\x20-\x7e]+$/.test(str) && value.length + str.length <= 128) value += str
-    }
-    process.stdin.on('keypress', key)
-  })
 }
 async function main() {
   if (process.platform !== 'win32') throw new Error('SNMP credential setup requires Windows.')

@@ -1,12 +1,13 @@
+import { csrf, hostFetch } from './auth.js'
 import { validateTopology } from './topology.js'
 
 export function writeHeaders() {
-  const token = globalThis.document?.querySelector('meta[name="netwatch-write-token"]')?.content
+  const token = csrf() ?? globalThis.document?.querySelector('meta[name="netwatch-write-token"]')?.content
   return token ? { 'X-NetWatch-Write': token } : {}
 }
 
 export async function hostRequest(path, { signal, body } = {}) {
-  const response = await fetch(`/api/v1/${path}`, {
+  const response = await hostFetch(`/api/v1/${path}`, {
     signal,
     cache: 'no-store',
     method: body ? 'PUT' : 'GET',
@@ -91,7 +92,7 @@ export function validateIncidents(items, ids, maximum = 25) {
 }
 
 async function requestSnapshot(path, { signal, etag }) {
-  const response = await fetch('/api/v1/' + path, {
+  const response = await hostFetch('/api/v1/' + path, {
     signal,
     cache: 'no-store',
     headers: etag ? { 'If-None-Match': etag } : {},

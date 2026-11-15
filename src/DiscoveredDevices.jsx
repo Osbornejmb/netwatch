@@ -1,3 +1,4 @@
+import { hostFetch } from './auth.js'
 import ConfirmDialog from './ConfirmDialog'
 import { useCallback, useEffect, useState } from 'react'
 import InfoTooltip from './InfoTooltip'
@@ -7,7 +8,7 @@ import { writeHeaders } from './monitoring.js'
 const statusLabel = { new: 'New', changed: 'Changed', added: 'Added', gone: 'Not seen' }
 const seenAt = (value) =>
   new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
-export default function DiscoveredDevices() {
+export default function DiscoveredDevices({ remote }) {
   const [confirm, setConfirm] = useState(null)
   const [devices, setDevices] = useState([]),
     [busy, setBusy] = useState(false),
@@ -20,7 +21,7 @@ export default function DiscoveredDevices() {
     [pages, setPages] = useState([]),
     [nextAfter, setNextAfter] = useState(null)
   const refresh = useCallback(async (cursor) => {
-    const r = await fetch(`/api/v1/discovered?after=${cursor}&limit=200`)
+    const r = await hostFetch(`/api/v1/discovered?after=${cursor}&limit=200`)
     if (!r.ok) throw Error()
     const value = await r.json()
     setDevices(value.devices)
@@ -36,7 +37,7 @@ export default function DiscoveredDevices() {
       timer
     const poll = async () => {
       try {
-        const r = await fetch('/api/v1/health')
+        const r = await hostFetch('/api/v1/health')
         if (r.ok && !stopped) {
           const health = await r.json()
           setProgress(health.discovery)
@@ -56,10 +57,10 @@ export default function DiscoveredDevices() {
     try {
       let body = {}
       if (kind === 'add-to-map') {
-        const inventory = await fetch('/api/v1/topology').then((r) => r.json())
+        const inventory = await hostFetch('/api/v1/topology').then((r) => r.json())
         body = { baseRevision: inventory.revision }
       }
-      const r = await fetch(`/api/v1/discovered/${encodeURIComponent(device.id)}/${kind}`, {
+      const r = await hostFetch(`/api/v1/discovered/${encodeURIComponent(device.id)}/${kind}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...writeHeaders() },
         body: JSON.stringify(body),
@@ -68,15 +69,17 @@ export default function DiscoveredDevices() {
       const result = await r.json()
       await refresh(after)
       setMessage(
-        result.promotedRouter
-          ? 'Updated device to Router.'
-          : result.discoveryLink
-            ? `Linked to ${result.discoveryLink.label}`
-            : kind === 'remove'
-              ? 'Removed from discovered devices.'
-              : device.status === 'added'
-                ? 'No gateway change was needed.'
-                : 'Added to the map.',
+        remote && kind === 'add-to-map' && device.status !== 'added'
+          ? 'Added with checks off. Turn checks on in device details.'
+          : result.promotedRouter
+            ? 'Updated device to Router.'
+            : result.discoveryLink
+              ? `Linked to ${result.discoveryLink.label}`
+              : kind === 'remove'
+                ? 'Removed from discovered devices.'
+                : device.status === 'added'
+                  ? 'No gateway change was needed.'
+                  : 'Added to the map.',
       )
     } catch {
       setMessage('Could not update this device. Refresh and try again.')
@@ -88,7 +91,7 @@ export default function DiscoveredDevices() {
     setBusy(true)
     setMessage('')
     try {
-      const r = await fetch('/api/v1/discovered/clear', { method: 'POST', headers: writeHeaders() })
+      const r = await hostFetch('/api/v1/discovered/clear', { method: 'POST', headers: writeHeaders() })
       if (!r.ok) throw Error()
       setPages([])
       await refresh(0)
@@ -104,7 +107,7 @@ export default function DiscoveredDevices() {
     setScanning(true)
     setMessage('')
     try {
-      const r = await fetch('/api/v1/discovered/scan-now', { method: 'POST', headers: writeHeaders() })
+      const r = await hostFetch('/api/v1/discovered/scan-now', { method: 'POST', headers: writeHeaders() })
       if (!r.ok) throw Error()
       const result = await r.json()
       if (result.state === 'disabled' || result.state === 'unsupported') throw Error()
@@ -112,7 +115,11 @@ export default function DiscoveredDevices() {
       await refresh(0)
       setMessage('Scan complete.')
     } catch {
-      setMessage('Scan could not run. Check that discovery is enabled in the launcher.')
+      setMessage(
+        remote
+          ? 'Scan could not run. Change this on the NetWatch PC.'
+          : 'Scan could not run. Check that discovery is enabled in the launcher.',
+      )
     } finally {
       setScanning(false)
       setProgress(null)
