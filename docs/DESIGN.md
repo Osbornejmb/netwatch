@@ -1,5 +1,11 @@
 # Dashboard design direction
 
+In Edit map, Backspace and Delete open the removal confirmation for the selected device. Text fields keep their normal editing behavior.
+
+Circle gives each branch a sector based on the number of devices at its ends. Tidy places small branches in columns beneath their parents, wraps sets of direct clients, and routes connections through the gaps between rows. Wider hierarchies use the compact grid. Both layouts use measured card widths once they are available.
+
+Circle packs busy hubs into a staggered arrangement and splits wide branches into bands. Large cyclic components that would stretch the overview use compact rows. Use Fit view for the whole topology and Zoom to 100% to read labels while panning.
+
 Configured operators can sign in to the Dashboard, Devices and Discovered views. Map editing and access settings remain separate. The local Access log includes a redacted JSON download.
 
 Uplinks & redundancy keeps configuration within the draft editor. Device details display mapped port status separately from reachability. The dashboard shows redundancy groups in a collapsible section only when groups are configured.

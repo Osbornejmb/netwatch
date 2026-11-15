@@ -115,7 +115,15 @@ assert.equal(await stored(),original)
 await page.getByRole('link',{name:'Edit map',exact:true}).click()
 assert.equal(await page.getByLabel('Map layout',{exact:true}).inputValue(),'radial')
 await page.getByLabel('Map layout',{exact:true}).selectOption('tidy')
-assert.deepEqual(await positions(),tidy)
+const rowAndColumn = (layout) => {
+ const coordinates=Object.entries(layout).map(([id,transform])=>{
+  const [,x,y]=/translate\(([-.\d]+)px, ([-.\d]+)px\)/.exec(transform)
+  return [id,Number(x),Number(y)]
+ })
+ const columns=[...new Set(coordinates.map(([,x])=>x))].sort((a,b)=>a-b)
+ return Object.fromEntries(coordinates.map(([id,x,y])=>[id,[columns.indexOf(x),y]]))
+}
+assert.deepEqual(rowAndColumn(await positions()),rowAndColumn(tidy))
 await page.getByRole('link',{name:'Network dashboard',exact:true}).click()
 await page.setViewportSize({width:390,height:565})
 await view.click()

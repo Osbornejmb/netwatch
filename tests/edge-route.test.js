@@ -24,3 +24,11 @@ test('an offset wide card routes from its bottom boundary to its peer', () => {
   assert.equal(end.y, 110)
   assert.ok(Math.abs((end.x - start.x) / (end.y - start.y) - 50 / 110) < 1e-9)
 })
+test('tidy links use the gap between rows instead of crossing neighboring cards', () => {
+  const upper = { x: 20, y: 0, width: 160, height: 56 }
+  const near = { x: 280, y: 104, width: 160, height: 56 }
+  const far = { x: 550, y: 104, width: 160, height: 56 }
+  const route = [{ x: 100, y: 56 }, { x: 630, y: 104 }]
+  assert.deepEqual(edgeRoute(upper, far, [upper, near, far], true), route)
+  assert.deepEqual(edgeRoute(far, upper, [upper, near, far], true), [...route].reverse())
+})

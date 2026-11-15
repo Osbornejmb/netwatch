@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { radialLayout, connectedDevices } from '../src/radial.js'
+import { radialLayout, tidyLayout, connectedDevices } from '../src/radial.js'
 import { NODE_MAX_WIDTH, NODE_HEIGHT } from '../src/nodes/dimensions.js'
 import { createScaleNetwork } from './fixtures/scale-network.js'
 const node = (id, type='switch') => ({id,type,position:{x:15,y:25},data:{label:id,ip:''}})
@@ -48,10 +48,15 @@ test('100-device mesh and 100-spoke star produce finite non-overlapping position
  const fixture=createScaleNetwork(Date.now())
  const star=fixture.nodes.slice(1).map(n=>link(fixture.nodes[0].id,n.id))
  for(const edges of [fixture.edges,star]) {
-  const layout=radialLayout(fixture.nodes,edges)
+  const sizes=Object.fromEntries(fixture.nodes.map(({id})=>[id,{width:160}]))
+  const layout=radialLayout(fixture.nodes,edges,'',sizes)
   assert.equal(layout.length,100)
   assert.ok(layout.every(n=>Number.isFinite(n.position.x)&&Number.isFinite(n.position.y)))
-  for(let a=0;a<layout.length;a++) for(let b=a+1;b<layout.length;b++) assert.ok(Math.abs(layout[a].position.x-layout[b].position.x)>=NODE_MAX_WIDTH-0.001||Math.abs(layout[a].position.y-layout[b].position.y)>=NODE_HEIGHT-0.001)
+  for (const axis of ['x','y']) {
+   const coordinates=layout.map(({position})=>position[axis])
+   assert.ok(Math.max(...coordinates)-Math.min(...coordinates)<2400,'The overview stays compact')
+  }
+  for(let a=0;a<layout.length;a++) for(let b=a+1;b<layout.length;b++) assert.ok(Math.abs(layout[a].position.x-layout[b].position.x)>=160-0.001||Math.abs(layout[a].position.y-layout[b].position.y)>=NODE_HEIGHT-0.001)
  }
 })
 
@@ -90,5 +95,50 @@ test('four peers clear the hub using card height above and below it', () => {
   for (const peer of [right, left]) {
     assert.ok(Math.abs(peer.y - hub.y) < 0.001)
     assert.ok(Math.abs(peer.x - hub.x) >= NODE_MAX_WIDTH + 20)
+  }
+})
+
+test('devices behind a secondary router stay with its branch in both layouts', () => {
+  const clients = Array.from({ length: 7 }, (_, index) => node('client-' + index))
+  const nodes = [node('main', 'router'), node('secondary', 'router'), ...clients, node('leaf-a'), node('leaf-b')]
+  const edges = [...clients.map((client) => link('main', client.id)), link('secondary', 'main'),
+    link('leaf-a', 'secondary'), link('secondary', 'leaf-b')]
+  const positions = (layout) => new Map(layout.map((item) => [item.id, item.position]))
+  const circle = positions(radialLayout(nodes, edges))
+  const root = circle.get('main')
+  const parent = circle.get('secondary')
+  for (const id of ['leaf-a', 'leaf-b']) {
+    const child = circle.get(id)
+    assert.ok(distance(child, parent) < distance(child, root))
+    assert.ok((child.x - parent.x) * (parent.x - root.x) + (child.y - parent.y) * (parent.y - root.y) > 0)
+  }
+  const tidy = positions(tidyLayout(nodes, edges))
+  const a = tidy.get('leaf-a'), b = tidy.get('leaf-b'), branch = tidy.get('secondary')
+  assert.equal(a.y, b.y)
+  assert.ok(a.y > branch.y)
+  assert.equal((a.x + b.x) / 2, branch.x)
+  assert.equal(Math.abs(a.x - b.x), NODE_MAX_WIDTH + 20)
+  const x = [...tidy.values()].map((position) => position.x)
+  assert.ok(Math.max(...x) - Math.min(...x) <= 4 * (NODE_MAX_WIDTH + 20))
+  assert.deepEqual(positions(radialLayout([...nodes].reverse(), [...edges].reverse())), circle)
+})
+
+test('both layouts close excess horizontal gaps once all card widths are known', () => {
+  const nodes = [node('router', 'router'), ...['a', 'b', 'c', 'd'].map((id) => node(id))]
+  const edges = nodes.slice(1).map(({ id }) => link('router', id))
+  const sizes = Object.fromEntries(nodes.map(({ id }) => [id, { width: 160 }]))
+  const width = (layout) => {
+    const x = layout.map(({ position }) => position.x)
+    return Math.max(...x) - Math.min(...x)
+  }
+  for (const [original, compact] of [
+    [radialLayout(nodes, edges), radialLayout(nodes, edges, '', sizes)],
+    [tidyLayout(nodes, edges), tidyLayout(nodes, edges, sizes)],
+  ]) {
+    assert.ok(width(compact) < width(original))
+    for (const [index, a] of compact.entries())
+      for (const b of compact.slice(index + 1))
+        assert.ok(Math.abs(a.position.x - b.position.x) >= 179.999 ||
+          Math.abs(a.position.y - b.position.y) >= NODE_HEIGHT + 23.999)
   }
 })

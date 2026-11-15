@@ -1,5 +1,9 @@
 # Working checkpoint
 
+## Current status (2026-11-16) — branch layout
+
+- Circle fans branches outward from their parent, and Tidy keeps small branches together beneath their parent. The map keeps all saved connections and device positions.
+
 ## Current status (2026-11-15) — operator access and audit export
 
 - Added an optional operator password, scan-only discovery permissions, local password-reset coverage and redacted audit export for #10. Tests use disposable databases and isolated loopback.

@@ -9,8 +9,8 @@ export function mapCard(node) {
 }
 
 function MapEdge({ id, data, style, label, labelStyle, markerEnd }) {
-  const { source, target, cards } = data
-  const points = edgeRoute(source, target, cards)
+  const { source, target, cards, layered } = data
+  const points = edgeRoute(source, target, cards, layered)
   const path = points.map(({ x, y }, index) => `${index === 0 ? 'M' : 'L'} ${x} ${y}`).join(' ')
   let a = points[0],
     b = points[1]

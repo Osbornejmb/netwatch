@@ -64,7 +64,12 @@ export default function InventoryControls({
           <button className="button secondary" onClick={onEdit}>
             Edit device
           </button>
-          <button className="button danger" onClick={onRemove}>
+          <button
+            className="button danger"
+            aria-keyshortcuts="Backspace Delete"
+            title="Backspace or Delete"
+            onClick={onRemove}
+          >
             Delete device
           </button>
         </div>

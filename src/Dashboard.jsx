@@ -113,8 +113,11 @@ export default function Dashboard({
   )
   const effectiveCenterId = nodes.some((node) => node.id === centerId) ? centerId : ''
   const layoutNodes = useMemo(
-    () => (mapLayout === 'radial' ? radialLayout(nodes, edges, effectiveCenterId) : tidyLayout(nodes, edges)),
-    [nodes, edges, mapLayout, effectiveCenterId],
+    () =>
+      mapLayout === 'radial'
+        ? radialLayout(nodes, edges, effectiveCenterId, nodeSizes)
+        : tidyLayout(nodes, edges, nodeSizes),
+    [nodes, edges, mapLayout, effectiveCenterId, nodeSizes],
   )
   const layoutKey = `${live ? 'host' : 'draft'}-${mapLayout}`
   const {
@@ -177,7 +180,12 @@ export default function Dashboard({
       target: edge.target,
       sourceHandle: 'radial-source-right',
       targetHandle: 'radial-target-left',
-      data: { source: cardsById.get(edge.source), target: cardsById.get(edge.target), cards },
+      data: {
+        source: cardsById.get(edge.source),
+        target: cardsById.get(edge.target),
+        cards,
+        layered: mapLayout === 'tidy',
+      },
       hidden: !visibleIds.has(edge.source) || !visibleIds.has(edge.target),
       type: 'mapLink',
       ariaLabel: `${source?.data.label} and ${target?.data.label}: ${label}`,
