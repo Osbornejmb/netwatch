@@ -16,3 +16,4 @@ snmp-credentials/
 !/docs/screenshots/desktop-after.png
 !/docs/screenshots/editor-after.png
 !/docs/screenshots/devices-narrow-after.png
+/docs/host-storage-*.jpg
