@@ -8,8 +8,9 @@ const limits = { viewer: [8 * hour, 168 * hour, 20], admin: [30 * minute, 12 * h
 const tokenPattern = /^[a-f0-9]{64}$/
 const digest = (token) => createHash('sha256').update(token).digest('hex')
 const dummy = ['scrypt', 32768, 8, 1, randomBytes(16).toString('hex'), randomBytes(64).toString('hex')].join('$')
-const cookie = (token, seconds) =>
-  'netwatch_session=' + token + '; HttpOnly; SameSite=Strict; Path=/; Max-Age=' + seconds
+const cookieName = (secure) => (secure ? '__Host-netwatch_session=' : 'netwatch_session=')
+const cookie = (token, seconds, secure) =>
+  cookieName(secure) + token + '; HttpOnly; SameSite=Strict; Path=/; Max-Age=' + seconds + (secure ? '; Secure' : '')
 
 export function createSessions(db, { lan, now = Date.now, audit } = {}) {
   const csrfKey = randomBytes(32)
@@ -40,11 +41,12 @@ export function createSessions(db, { lan, now = Date.now, audit } = {}) {
     for (const [ip, entry] of failures) if (at - entry.last >= 10 * minute) failures.delete(ip)
   }
   function inspect(req) {
+    const prefix = cookieName(req.socket.encrypted)
     const token = req.headers.cookie
       ?.split(';')
       .map((pair) => pair.trim())
-      .find((pair) => pair.startsWith('netwatch_session='))
-      ?.slice(17)
+      .find((pair) => pair.startsWith(prefix))
+      ?.slice(prefix.length)
     if (!tokenPattern.test(token ?? '')) return
     const session = select.get(digest(token))
     if (!session) return
@@ -94,7 +96,7 @@ export function createSessions(db, { lan, now = Date.now, audit } = {}) {
       db.exec('ROLLBACK')
       throw error
     }
-    res.setHeader('Set-Cookie', cookie(token, absolute / 1000))
+    res.setHeader('Set-Cookie', cookie(token, absolute / 1000, res.req.socket.encrypted))
     return { role, csrfToken, expiresAt }
   }
   function current({ session, ip, res, source }) {
@@ -204,7 +206,7 @@ export function createSessions(db, { lan, now = Date.now, audit } = {}) {
           remove.run(session.id_hash)
           audit?.record('logout', { source, ip, role: session.role })
         }
-        res.setHeader('Set-Cookie', cookie('', 0))
+        res.setHeader('Set-Cookie', cookie('', 0, res.req.socket.encrypted))
       }
       return { authenticated: false }
     },

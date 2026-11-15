@@ -6,6 +6,7 @@ import { createAudit } from './audit.js'
 import { manageLauncherAccess } from './auth-config.js'
 import { createSessions } from './sessions.js'
 import { createHost, createRoutes } from './server.js'
+import { readTlsOptions } from './tls.js'
 import { loopbackUrl, readPort } from './port.js'
 import { lock } from './files.js'
 import { createCollector } from './collector.js'
@@ -16,6 +17,9 @@ import { createInterfaceCollector } from './snmp-collector.js'
 import { createDiscovery } from './discovery.js'
 import { createProbeGate } from './probe-gate.js'
 const port = readPort()
+const tls = readTlsOptions()
+const scheme = tls ? 'https' : 'http'
+const dashboardUrl = loopbackUrl(port, scheme)
 const path = resolve(process.env.NETWATCH_DB || 'data/netwatch.sqlite')
 mkdirSync(dirname(path), { recursive: true })
 const release = lock(path)
@@ -49,11 +53,12 @@ const discovery = createDiscovery(store, {
 const audit = createAudit(store.db)
 audit.purge()
 const auth = createSessions(store.db, { lan: process.env.NETWATCH_LAN === '1', audit })
-const hostOptions = { port, collector, interfaces, discovery, routes: createRoutes(discovery), auth, audit }
+const hostOptions = { port, collector, interfaces, discovery, routes: createRoutes(discovery), auth, audit, tls }
 const lan =
   process.env.NETWATCH_LAN === '1'
     ? createLanListeners({
         port,
+        scheme,
         createServer: (lanAuthorities) => createHost(store, { ...hostOptions, lanAuthorities }),
       })
     : undefined
@@ -67,9 +72,9 @@ server.listen(port, '127.0.0.1', () => {
   collector.start()
   interfaces.start()
   discovery.start()
-  console.log('NetWatch: ' + loopbackUrl(port) + ' Collector: ' + collector.snapshot().state)
+  console.log('NetWatch: ' + dashboardUrl + ' Collector: ' + collector.snapshot().state)
   if (process.connected)
-    process.send({ type: 'ready', port, collector: collector.snapshot().state, urls: lan?.urls() ?? [] })
+    process.send({ type: 'ready', port, dashboardUrl, collector: collector.snapshot().state, urls: lan?.urls() ?? [] })
 })
 const sessionCleanup = setInterval(() => {
   auth.purge()
@@ -110,7 +115,14 @@ if (process.send) {
         const sessions = store.db
           .prepare('SELECT role, ip, last_seen_at AS lastSeen FROM sessions ORDER BY last_seen_at DESC')
           .all()
-        if (process.connected) process.send({ type: 'access', ...result, sessions, urls: lan?.urls() ?? [] })
+        if (process.connected)
+          process.send({
+            type: 'access',
+            ...result,
+            collector: collector.snapshot().state,
+            sessions,
+            urls: lan?.urls() ?? [],
+          })
       } catch {
         if (process.connected) process.send({ type: 'access', error: 'Unable to update access settings.' })
       }

@@ -15,7 +15,7 @@ public class DesktopSettings {
 }
 public class AuditRow {public long at {get;set;} public string ip {get;set;} public string action {get;set;} public string detail {get;set;}}
 public class RemoteSession {public string role {get;set;} public string ip {get;set;} public long lastSeen {get;set;}}
-public class HostEvent {public string type {get;set;} public string error {get;set;} public string viewerMode {get;set;} public bool adminConfigured {get;set;} public bool viewerConfigured {get;set;} public string[] urls {get;set;} public RemoteSession[] sessions {get;set;} public AuditRow[] audit {get;set;}public string state {get;set;} public string message {get;set;} public int port {get;set;}}
+public class HostEvent {public string type {get;set;} public string error {get;set;} public string viewerMode {get;set;} public bool adminConfigured {get;set;} public bool viewerConfigured {get;set;} public string[] urls {get;set;} public RemoteSession[] sessions {get;set;} public AuditRow[] audit {get;set;}public string state {get;set;} public string message {get;set;} public int port {get;set;} public string dashboardUrl {get;set;}}
 public class NetWatchMenuColors : ProfessionalColorTable {
  public override Color ToolStripDropDownBackground {get{return Color.FromArgb(252,251,247);}}
  public override Color ImageMarginGradientBegin {get{return ToolStripDropDownBackground;}}
@@ -39,7 +39,7 @@ public class NetWatch : Form {
  HostEvent accessInfo;
  Button start,stop,open;
  ToolStripMenuItem trayStart,trayStop,trayOpen;
- int dashboardPort=4317;
+ string dashboardUrl="http://127.0.0.1:4317";
  bool quitting=false;
  string state="stopped";
 
@@ -110,7 +110,7 @@ public class NetWatch : Form {
    info.EnvironmentVariables["NETWATCH_LAN"]=settings.lan?"1":"0";
    accessInfo=null;
    host=new Process{StartInfo=info,EnableRaisingEvents=true};
-   host.OutputDataReceived+=(s,e)=>{if(e.Data==null)return;try{var item=json.Deserialize<HostEvent>(e.Data);UI(()=>{if(item.type=="access"){ApplyAccess(item);return;}if(item.port>=1024&&item.port<=65535)dashboardPort=item.port;SetState(item.state,item.message);});}catch{}};
+   host.OutputDataReceived+=(s,e)=>{if(e.Data==null)return;try{var item=json.Deserialize<HostEvent>(e.Data);UI(()=>{if(item.type=="access"){ApplyAccess(item);return;}if(!String.IsNullOrEmpty(item.dashboardUrl))dashboardUrl=item.dashboardUrl;SetState(item.state,item.message);});}catch{}};
    host.ErrorDataReceived+=(s,e)=>{if(!String.IsNullOrWhiteSpace(e.Data))UI(()=>SetState("error","Launcher error. Check Node and the data path."));};
    host.Exited+=(s,e)=>{var ended=(Process)s;ended.WaitForExit();UI(()=>{if(host!=ended)return;ended.Dispose();host=null;accessInfo=null;if(accessWindow!=null)accessWindow.Apply(null);if(quitting)Application.Exit();else SetState(state=="error"?"error":"stopped",state=="error"?status.Text:"NetWatch is stopped. Your data is saved.");});};
    host.Start();host.BeginOutputReadLine();host.BeginErrorReadLine();SetState("starting","Starting NetWatch…");
@@ -153,7 +153,7 @@ public class NetWatch : Form {
   } catch {ApplyAccess(new HostEvent{error="Unable to update access settings. Check passwords and try again."});}
  }
  void StopHost(){if(host==null)return;try{host.StandardInput.WriteLine("stop");host.StandardInput.Flush();SetState("stopping","Finishing checks and saving your data…");}catch(Exception ex){SetState("error",ex.Message);}}
- void OpenDashboard(){try{Process.Start(new ProcessStartInfo("http://127.0.0.1:"+dashboardPort){UseShellExecute=true});}catch(Exception ex){MessageBox.Show(ex.Message,"Unable to open browser");}}
+ void OpenDashboard(){try{Process.Start(new ProcessStartInfo(dashboardUrl){UseShellExecute=true});}catch(Exception ex){MessageBox.Show(ex.Message,"Unable to open browser");}}
  void Quit(){quitting=true;if(host==null)Application.Exit();else StopHost();}
 }
 
@@ -161,7 +161,7 @@ public class AccessWindow : Form {
  readonly Action<string,string,string,string> send;
  readonly ComboBox mode,urls;
  readonly ListView sessions,audit;
- readonly Label status;
+ readonly Label status,networkNote;
  readonly Button revoke,copy;
  bool updating;
  public AccessWindow(Action<string,string,string,string> send) {
@@ -179,7 +179,7 @@ public class AccessWindow : Form {
   urls=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Location=new Point(16,148),Size=new Size(430,30),AccessibleName="Reachable URLs"};Controls.Add(urls);
   copy=AddButton("Copy URL",458,145,96);
   copy.Click+=(s,e)=>{if(urls.SelectedItem!=null)Clipboard.SetText((string)urls.SelectedItem);};
-  Controls.Add(new Label{Text="Plain HTTP on your private network. Use a unique password, allow Windows Firewall access on Private networks only, and consider a DHCP reservation.",Location=new Point(16,184),Size=new Size(538,46)});
+  networkNote=new Label{Location=new Point(16,184),Size=new Size(538,46)};Controls.Add(networkNote);
   sessions=new ListView{View=View.Details,Location=new Point(16,235),Size=new Size(538,106),FullRowSelect=true,AccessibleName="Active remote sessions"};
   sessions.Columns.Add("Role",105);sessions.Columns.Add("IP address",175);sessions.Columns.Add("Last seen",220);Controls.Add(sessions);
   revoke=AddButton("Sign out all remote sessions",16,354,230);
@@ -204,6 +204,7 @@ public class AccessWindow : Form {
   if(item!=null&&item.urls!=null)urls.Items.AddRange(item.urls);
   if(urls.Items.Count>0)urls.SelectedIndex=Math.Max(0,urls.Items.IndexOf(selection??""));
   copy.Enabled=urls.Items.Count>0;
+  networkNote.Text=(urls.Items.Count>0&&((string)urls.Items[0]).StartsWith("https://")?"HTTPS on your private network. ":"Plain HTTP on your private network. Use a unique password. ")+"Allow Windows Firewall access on Private networks only and consider a DHCP reservation.";
   sessions.Items.Clear();
   if(item!=null&&item.sessions!=null)foreach(var row in item.sessions) {
    var at=new DateTime(1970,1,1,0,0,0,DateTimeKind.Utc).AddMilliseconds(row.lastSeen).ToLocalTime();

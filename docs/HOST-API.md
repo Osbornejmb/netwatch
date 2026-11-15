@@ -2,7 +2,7 @@
 
 Current schema is SQLite `user_version=8`. The v5→v6 migration backfills `latest_check` from the newest timestamp and sequence per device.
 
-Requires Node 22.13+ (built-in node:sqlite; Node 22 prints an experimental SQLite warning). No external database server or runtime package is required. This is a local API, not remote authentication or a Windows service installer.
+Requires Node 22.13+ (built-in node:sqlite; Node 22 prints an experimental SQLite warning). No external database server or runtime package is required. This API serves the loopback dashboard and optional authenticated clients on a private network.
 
 ## Run and stop
 
@@ -44,6 +44,10 @@ The snapshot additionally includes `inventory` with the complete GET topology sh
 History additionally returns `revision`, read transactionally with checks; the dashboard rejects a page for a different selected inventory revision. Details fetch 25 rows at a time and display at most 200, with explicit refresh, error and empty states. Adjacent retained status changes are labelled without inferring continuity or uptime. Changing the selected device, inventory revision or latest check cancels obsolete requests and restarts from the newest page.
 
 Host validation reuses the v1 validator: router/switch only, 2,000 devices, 10,000 links, unique IDs and canonical nonempty IP literals, existing distinct endpoints, labels 100 chars, descriptions 500, handle strings 100, finite coordinates. Additional host bounds: IDs 100 chars and coordinates ±10,000,000. Monitoring only accepts booleans for existing devices and requires a literal management address when true. Unknown rendering/status properties are stripped from topology. Inventory validation performs no DNS lookup or probe. Only the explicitly enabled Windows collector can probe opted-in literal addresses.
+
+## Transport
+
+HTTP is the default and exposes credentials and sessions to anyone who can intercept LAN traffic. Set NETWATCH_TLS_CERT and NETWATCH_TLS_KEY to a matching PEM pair to require direct HTTPS (TLS 1.2+). The allow-list then accepts only HTTPS origins. The host adds Strict-Transport-Security and uses the Secure __Host-netwatch_session cookie only for HTTPS. The browser must trust the certificate and connect to the host directly. X-Forwarded-* headers are ignored. See [Remote access](REMOTE-ACCESS.md).
 
 ## Remote session API
 

@@ -68,6 +68,8 @@ The launcher stores data under `%LOCALAPPDATA%\NetWatch\data\netwatch.sqlite`; i
 
 ## Start and stop
 
+Trusted-LAN browser access is optional. Plain HTTP exposes passwords and session data to anyone who can intercept LAN traffic. Configure direct HTTPS before signing in from another PC on a network you do not fully trust. See [Remote access](docs/REMOTE-ACCESS.md).
+
 Closing the browser or hiding the control window keeps monitoring running. **Stop** stops the host; **Quit** stops it and exits the tray app. The PC must remain awake, connected and signed in. Automatic boot startup and unattended Windows service operation are not implemented.
 
 For a terminal-based setup, build once and run:

@@ -33,7 +33,11 @@ export function admitRequest(req, origin, authorities, remoteAddress) {
     if (/^(?:localhost|\[::1\])(?::\d+)?$/i.test(host ?? '')) throw invalid('Use ' + origin + '.', 403)
     throw invalid('Unexpected host.', 403)
   }
-  if (req.headers.origin && !authorities.has(req.headers.origin.startsWith('http://') && req.headers.origin.slice(7)))
+  const scheme = origin.slice(0, origin.indexOf('://') + 3)
+  if (
+    req.headers.origin &&
+    !authorities.has(req.headers.origin.startsWith(scheme) && req.headers.origin.slice(scheme.length))
+  )
     throw invalid('Unexpected origin.', 403)
   if (req.headers['sec-fetch-site'] && !['same-origin', 'none'].includes(req.headers['sec-fetch-site']))
     throw invalid('Cross-site requests are disabled.', 403)
@@ -46,6 +50,7 @@ export function createLanListeners({
   interfaces = networkInterfaces,
   names = process.env.NETWATCH_HOSTNAMES ?? hostname(),
   interval = 60000,
+  scheme = 'http',
   log = console.log,
 }) {
   const hosts = names
@@ -103,7 +108,7 @@ export function createLanListeners({
       timer.unref()
     },
     authorities,
-    urls: () => [...authorities()].map((authority) => 'http://' + authority),
+    urls: () => [...authorities()].map((authority) => scheme + '://' + authority),
     async stop() {
       stopped = true
       clearInterval(timer)

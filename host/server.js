@@ -1,4 +1,5 @@
 import http from 'node:http'
+import https from 'node:https'
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { resolve } from 'node:path'
 import { invalid, MAX_BODY } from './store.js'
@@ -130,12 +131,15 @@ export function createHost(
     lanAuthorities,
     auth,
     audit,
+    tls,
     remoteAddress = (req) => req.socket.remoteAddress,
   } = {},
 ) {
   const writeToken = randomBytes(32).toString('hex')
   const expectedToken = Buffer.from(writeToken, 'hex')
-  const server = http.createServer(async (req, res) => {
+  const scheme = tls ? 'https' : 'http'
+  const request = async (req, res) => {
+    if (tls) res.setHeader('Strict-Transport-Security', 'max-age=31536000')
     res.setHeader('Referrer-Policy', 'no-referrer')
     res.setHeader('X-Frame-Options', 'DENY')
     res.setHeader('Cross-Origin-Resource-Policy', 'same-origin')
@@ -149,8 +153,8 @@ export function createHost(
       res.end(JSON.stringify(body))
     }
     try {
-      const origin = loopbackUrl(port === 0 ? server.address().port : port)
-      const authorities = new Set([origin.slice(7), ...(lanAuthorities?.() ?? [])])
+      const origin = loopbackUrl(port === 0 ? server.address().port : port, scheme)
+      const authorities = new Set([origin.slice(scheme.length + 3), ...(lanAuthorities?.() ?? [])])
       const ip = remoteAddress(req)
       const source = admitRequest(req, origin, authorities, ip)
       if (source === 'remote' && !auth?.enabled()) throw invalid('Remote access is unavailable.', 403)
@@ -226,7 +230,8 @@ export function createHost(
         },
       })
     }
-  })
+  }
+  const server = tls ? https.createServer({ ...tls, minVersion: 'TLSv1.2' }, request) : http.createServer(request)
   server.requestTimeout = 15000
   server.headersTimeout = 10000
   server.maxHeadersCount = 50

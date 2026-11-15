@@ -58,6 +58,7 @@ test('sessions hash credentials, upgrade atomically, and require an admin CSRF t
   assert.equal(viewerSession.role, 'viewer')
   assert.match(initial.headers.get('set-cookie'), /^netwatch_session=[a-f0-9]{64}; HttpOnly; SameSite=Strict; Path=\/; Max-Age=604800$/)
   assert.equal(initial.headers.get('cache-control'), 'no-store')
+  assert.equal(initial.headers.get('strict-transport-security'), null)
   assert.equal(initial.headers.get('referrer-policy'), 'no-referrer')
   assert.equal(initial.headers.get('x-frame-options'), 'DENY')
   assert.equal(initial.headers.get('cross-origin-resource-policy'), 'same-origin')
