@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { ControlButton, Controls } from '@xyflow/react'
-import { Maximize, Minimize } from 'lucide-react'
+import { ControlButton, Controls, useReactFlow } from '@xyflow/react'
+import { Maximize, Minimize, ScanText } from 'lucide-react'
 
 export default function MapControls({ showInteractive }) {
+  const { zoomTo } = useReactFlow()
   const button = useRef(null)
   const [fullscreen, setFullscreen] = useState(false)
   const [error, setError] = useState('')
@@ -26,6 +27,9 @@ export default function MapControls({ showInteractive }) {
   const Icon = fullscreen ? Minimize : Maximize
   return (
     <Controls showInteractive={showInteractive} className="map-controls">
+      <ControlButton onClick={() => void zoomTo(1)} aria-label="Zoom to 100%" title="Zoom to 100%">
+        <ScanText aria-hidden="true" />
+      </ControlButton>
       {document.fullscreenEnabled && (
         <ControlButton onClick={toggle} aria-label={label} title={label}>
           <Icon ref={button} aria-hidden="true" />

@@ -183,34 +183,59 @@ export default function App({ viewer = false, operator = false, remote = false, 
     setShowModal(false)
   }
 
-  const confirmRemoval = (removed, removedEdges = []) => {
-    const ids = new Set(removed.map((node) => node.id))
-    const links = new Set(removedEdges.map(connectionKey))
-    setConfirm({
-      title: removed.length === 1 ? 'Remove device?' : 'Remove devices?',
-      message:
-        removed.length === 1
-          ? `Remove ${removed[0].data.label} and its links from the draft map?`
-          : `Remove ${removed.length} devices and their links from the draft map?`,
-      label: removed.length === 1 ? 'Remove device' : 'Remove devices',
-      onConfirm: () => {
-        setNodes((current) => current.filter((node) => !ids.has(node.id)))
-        setEdges((current) =>
-          current.filter((edge) => !ids.has(edge.source) && !ids.has(edge.target) && !links.has(connectionKey(edge))),
-        )
-        setSelectedId((current) => (ids.has(current) ? null : current))
-      },
-    })
-  }
+  const confirmRemoval = useCallback(
+    (removed, removedEdges = []) => {
+      const ids = new Set(removed.map((node) => node.id))
+      const links = new Set(removedEdges.map(connectionKey))
+      setConfirm({
+        title: removed.length === 1 ? 'Remove device?' : 'Remove devices?',
+        message:
+          removed.length === 1
+            ? `Remove ${removed[0].data.label} and its links from the draft map?`
+            : `Remove ${removed.length} devices and their links from the draft map?`,
+        label: removed.length === 1 ? 'Remove device' : 'Remove devices',
+        onConfirm: () => {
+          setNodes((current) => current.filter((node) => !ids.has(node.id)))
+          setEdges((current) =>
+            current.filter((edge) => !ids.has(edge.source) && !ids.has(edge.target) && !links.has(connectionKey(edge))),
+          )
+          setSelectedId((current) => (ids.has(current) ? null : current))
+        },
+      })
+    },
+    [setNodes, setEdges],
+  )
   const removeSelected = () => {
     if (selectedNode) confirmRemoval([selectedNode])
   }
+  useEffect(() => {
+    if (view !== 'editor' || !selectedNode) return
+    const removeByKey = (event) => {
+      if (
+        !['Backspace', 'Delete'].includes(event.key) ||
+        event.defaultPrevented ||
+        event.repeat ||
+        event.isComposing ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey ||
+        (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable]')) ||
+        document.querySelector('dialog[open]')
+      )
+        return
+      event.preventDefault()
+      confirmRemoval([selectedNode])
+    }
+    window.addEventListener('keydown', removeByKey)
+    return () => window.removeEventListener('keydown', removeByKey)
+  }, [view, selectedNode, confirmRemoval])
 
   const [editorLayout, setEditorLayout] = useState('radial')
   const mapEdges = useMemo(() => uniqueConnections(edges), [edges])
   const layoutNodes = useMemo(
-    () => (editorLayout === 'radial' ? radialLayout(nodes, edges) : tidyLayout(nodes, edges)),
-    [nodes, edges, editorLayout],
+    () =>
+      editorLayout === 'radial' ? radialLayout(nodes, edges, '', editorSizes) : tidyLayout(nodes, edges, editorSizes),
+    [nodes, edges, editorLayout, editorSizes],
   )
   const editorDrag = useLayoutDrag(layoutNodes, edges, `${view}-${editorLayout}`, editorSizes)
   const editorNodes = layoutNodes.map((node) => ({
@@ -512,7 +537,7 @@ export default function App({ viewer = false, operator = false, remote = false, 
                     sourceHandle: 'radial-source-right',
                     targetHandle: 'radial-target-left',
                     hidden: !source || !target,
-                    data: { source, target, cards },
+                    data: { source, target, cards, layered: editorLayout === 'tidy' },
                     type: 'mapLink',
                     style: { stroke: 'var(--map-link)', strokeWidth: 2 },
                   }
@@ -531,6 +556,7 @@ export default function App({ viewer = false, operator = false, remote = false, 
                 edgeTypes={mapEdgeTypes}
                 onMoveStart={() => document.dispatchEvent(new Event('mapviewportchange'))}
                 onNodeClick={(_, node) => setSelectedNode(node)}
+                onEdgeClick={() => setSelectedNode(null)}
                 onPaneClick={() => setSelectedNode(null)}
                 fitView
                 fitViewOptions={{ padding: 0.2 }}
@@ -539,7 +565,7 @@ export default function App({ viewer = false, operator = false, remote = false, 
                   confirmRemoval(removed, removedEdges)
                   return false
                 }}
-                deleteKeyCode={['Backspace', 'Delete']}
+                deleteKeyCode={selectedNode ? null : ['Backspace', 'Delete']}
                 defaultEdgeOptions={{
                   type: 'straight',
                   style: { stroke: 'var(--map-link)', strokeWidth: 2 },
@@ -591,7 +617,12 @@ export default function App({ viewer = false, operator = false, remote = false, 
                   <button className="button secondary full" onClick={() => setShowModal('edit')}>
                     Edit device
                   </button>
-                  <button className="button danger full" onClick={removeSelected}>
+                  <button
+                    className="button danger full"
+                    aria-keyshortcuts="Backspace Delete"
+                    title="Backspace or Delete"
+                    onClick={removeSelected}
+                  >
                     <Trash2 size={15} /> Remove device
                   </button>
                 </div>

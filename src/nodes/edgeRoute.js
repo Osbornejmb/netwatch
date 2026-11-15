@@ -22,9 +22,15 @@ export function crosses(a, b, box) {
   return Math.max(0, x[0], y[0]) < Math.min(1, x[1], y[1])
 }
 
-export function edgeRoute(source, target, cards) {
-  const start = port(source, center(target)),
-    end = port(target, center(source))
+export function edgeRoute(source, target, cards, layered = false) {
+  const downward = source.y + source.height <= target.y
+  const vertical = layered && (downward || target.y + target.height <= source.y)
+  const start = vertical
+      ? { x: center(source).x, y: downward ? source.y + source.height : source.y }
+      : port(source, center(target)),
+    end = vertical
+      ? { x: center(target).x, y: downward ? target.y : target.y + target.height }
+      : port(target, center(source))
   if (!cards.some((box) => box !== source && box !== target && crosses(start, end, box))) return [start, end]
 
   // Route through clear rectangle corners only when a card blocks the direct link.
