@@ -304,8 +304,20 @@ export function openStore(
         .get(),
     discoveredDevice(id) {
       return db
-        .prepare('SELECT ip, hostname, status, saved_device_id AS savedDeviceId FROM discovered_devices WHERE id=?')
+        .prepare(
+          'SELECT ip, hostname, source, status, saved_device_id AS savedDeviceId FROM discovered_devices WHERE id=?',
+        )
         .get(id)
+    },
+    observedGatewayAddresses() {
+      return db.prepare("SELECT ip,mac FROM discovered_devices WHERE source='gateway' AND mac IS NOT NULL").all()
+    },
+    pendingDiscovery() {
+      return db
+        .prepare(
+          "SELECT id,ip,mac,hostname,source FROM discovered_devices WHERE misses=0 AND status IN ('new','changed') ORDER BY rowid",
+        )
+        .all()
     },
     discovered({ after = 0, limit = 100 } = {}) {
       if (!Number.isSafeInteger(after) || after < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 200)
@@ -351,7 +363,7 @@ export function openStore(
           ).run(
             old?.id || randomUUID(),
             ip,
-            mac,
+            item.source === 'gateway' && old?.source === 'gateway' ? (mac ?? old.mac) : mac,
             hostname,
             item.source || 'neighbor',
             now(),

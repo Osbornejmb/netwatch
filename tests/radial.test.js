@@ -78,3 +78,17 @@ test('circle uses close card-aware spacing on small chains and opposite peers', 
     for(const a of layout) for(const b of layout) if(a!==b) assert.ok(Math.abs(a.position.x-b.position.x)>=NODE_MAX_WIDTH+19.999||Math.abs(a.position.y-b.position.y)>=NODE_HEIGHT+23.999)
   }
 })
+
+test('four peers clear the hub using card height above and below it', () => {
+  const peers = ['a', 'b', 'c', 'd'].map(id => node(id))
+  const layout = radialLayout([node('hub','router'), ...peers], peers.map(peer => link(peer.id,'hub')))
+  const [hub, above, right, below, left] = layout.map(node => node.position)
+  for (const peer of [above, below]) {
+    assert.ok(Math.abs(peer.x - hub.x) < 0.001)
+    assert.ok(Math.abs(peer.y - hub.y) >= NODE_HEIGHT + 24 && Math.abs(peer.y - hub.y) < NODE_HEIGHT + 25)
+  }
+  for (const peer of [right, left]) {
+    assert.ok(Math.abs(peer.y - hub.y) < 0.001)
+    assert.ok(Math.abs(peer.x - hub.x) >= NODE_MAX_WIDTH + 20)
+  }
+})

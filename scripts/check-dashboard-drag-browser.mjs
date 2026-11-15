@@ -191,6 +191,11 @@ try {
     if (previous) Object.defineProperty(document, 'hidden', previous)
     else delete document.hidden
   })
+  await page.waitForFunction(
+    (expected) => Object.entries(expected).every(([id, transform]) =>
+      document.querySelector(`.react-flow__node[data-id="${id}"]`)?.style.transform === transform),
+    editorDefault,
+  )
   assert.deepEqual(await positions(), editorDefault, 'Hidden tab resets moves')
   await page.reload()
   await page.locator('.device-node').first().waitFor()

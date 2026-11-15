@@ -193,9 +193,10 @@ export function radialLayout(nodes, edges, centerId = '') {
     let radius = 0
     for (let depth = 1; depth < levels.length; depth++) {
       const ring = levels[depth]
+      const horizontalScale = ring.length <= 4 ? (CARD_WIDTH + COLUMN_GAP) / (CARD_HEIGHT + ROW_GAP) : 1
       const directions = ring.map((_, index) => {
         const angle = -Math.PI / 2 + (2 * Math.PI * index) / ring.length
-        return { x: Math.cos(angle), y: Math.sin(angle) }
+        return { x: Math.cos(angle) * horizontalScale, y: Math.sin(angle) }
       })
       radius = clearRingRadius(directions, positions, radius + CARD_HEIGHT + ROW_GAP)
       ring.forEach((id, index) =>

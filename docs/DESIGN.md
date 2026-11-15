@@ -1,5 +1,11 @@
 # Dashboard design direction
 
+Discovery shows route-check progress and reports newly saved router links at scan completion.
+
+Small rings in Circle layout use card height for vertical clearance and card width for horizontal clearance. This keeps the cards above and below a router close even when it also has peers on either side.
+
+Discovered devices shows the default gateway as a router in the result row. Add all to map shows a confirmation with the result count and the starting check setting. The action applies across result pages.
+
 Remote viewers see the Dashboard and device details. Remote admins have the full map workflow with a remote session indicator. Sign-in uses the existing off-white surface and standard buttons, with inline errors and retry times.
 
 - Device type has a consistent silhouette in both dashboard and editor: routers are content-sized horizontal oblongs (280px maximum); switches are compact 160×56px rectangles. The editor uses type icons. Dashboard cards use a health border and an accessible status icon. Cards show device names and health icons. Information buttons reveal full names, addresses and check details on hover, focus or tap.

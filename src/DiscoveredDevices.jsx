@@ -11,6 +11,7 @@ const seenAt = (value) =>
 export default function DiscoveredDevices({ remote }) {
   const [confirm, setConfirm] = useState(null)
   const [devices, setDevices] = useState([]),
+    [pending, setPending] = useState({ count: 0 }),
     [busy, setBusy] = useState(false),
     [scanning, setScanning] = useState(false),
     [progress, setProgress] = useState(null),
@@ -25,6 +26,7 @@ export default function DiscoveredDevices({ remote }) {
     if (!r.ok) throw Error()
     const value = await r.json()
     setDevices(value.devices)
+    setPending({ count: value.pendingCount ?? 0, version: value.pendingVersion })
     setNextAfter(value.nextAfter)
     setAfter(cursor)
   }, [])
@@ -102,6 +104,33 @@ export default function DiscoveredDevices({ remote }) {
       setBusy(false)
     }
   }
+  const addAll = async () => {
+    setBusy(true)
+    setMessage('')
+    try {
+      const inventory = await hostFetch('/api/v1/topology')
+      if (!inventory.ok) throw Error()
+      const { revision: baseRevision } = await inventory.json()
+      const response = await hostFetch('/api/v1/discovered/add-to-map', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...writeHeaders() },
+        body: JSON.stringify({ baseRevision, pendingVersion: pending.version }),
+      })
+      if (response.status === 409) {
+        await refresh(after)
+        setMessage('The map or scan results changed. Review the results and try again.')
+        return
+      }
+      if (!response.ok) throw Error()
+      const { addedCount, existingCount } = await response.json()
+      setMessage(`Added ${addedCount} to the map.${existingCount ? ` Already on the map: ${existingCount}.` : ''}`)
+      await refresh(after).catch(() => {})
+    } catch {
+      setMessage('Could not add the scanned devices.')
+    } finally {
+      setBusy(false)
+    }
+  }
   const scan = async () => {
     setBusy(true)
     setScanning(true)
@@ -113,7 +142,13 @@ export default function DiscoveredDevices({ remote }) {
       if (result.state === 'disabled' || result.state === 'unsupported') throw Error()
       setPages([])
       await refresh(0)
-      setMessage('Scan complete.')
+      setMessage(
+        result.diagnostics?.length
+          ? 'Scan could not finish. Showing previous results.'
+          : result.upstreamLinks
+            ? `Scan complete. Saved ${result.upstreamLinks} router ${result.upstreamLinks === 1 ? 'link' : 'links'}.`
+            : 'Scan complete.',
+      )
     } catch {
       setMessage(
         remote
@@ -138,14 +173,30 @@ export default function DiscoveredDevices({ remote }) {
         ? 'Reading the Windows neighbor list…'
         : progress?.phase === 'names'
           ? `Looking up names for ${progress.processed} of ${progress.total} devices…`
-          : progress?.phase === 'saving'
-            ? 'Saving scan results…'
-            : 'Starting scan…'
+          : progress?.phase === 'routes'
+            ? `Checking routes to saved routers (${progress.processed} of ${progress.total})…`
+            : progress?.phase === 'saving'
+              ? 'Saving scan results…'
+              : 'Starting scan…'
   return (
     <section className="page-content discovery-page" aria-labelledby="discovery-title">
       <header className="page-heading">
         <h1 id="discovery-title">Discovered devices</h1>
         <div className="discovery-heading-actions">
+          <button
+            className="button secondary"
+            disabled={busy || !pending.count}
+            onClick={() =>
+              setConfirm({
+                title: 'Add all to map?',
+                message: `Add ${pending.count} results from the latest scan across all pages. New devices start with checks ${remote ? 'off' : 'on'}.`,
+                label: 'Add all',
+                onConfirm: addAll,
+              })
+            }
+          >
+            Add all to map
+          </button>
           <button
             className="button secondary"
             disabled={busy || !devices.length}
@@ -171,7 +222,7 @@ export default function DiscoveredDevices({ remote }) {
           role="progressbar"
           aria-label="Network scan progress"
           aria-valuemax={progress?.total || 100}
-          aria-valuenow={['icmp', 'names'].includes(progress?.phase) ? progress.processed : undefined}
+          aria-valuenow={['icmp', 'names', 'routes'].includes(progress?.phase) ? progress.processed : undefined}
         >
           <span className="discovery-spinner" aria-hidden="true" />
           <span>{phase}</span>
@@ -209,6 +260,10 @@ export default function DiscoveredDevices({ remote }) {
                   <strong>{device.hostname || device.ip}</strong>
                   {device.hostname && <span>{device.ip}</span>}
                   <span>{statusLabel[device.status] || 'New'}</span>
+                  {device.source === 'gateway' && device.status !== 'gone' && <span>Router · Default gateway</span>}
+                  {device.source === 'gateway-mac' && device.status !== 'gone' && (
+                    <span>Likely router · Matches known gateway</span>
+                  )}
                 </div>
                 <div className="discovery-actions">
                   <button className="button secondary" disabled={busy} onClick={() => action(device, 'add-to-map')}>
@@ -233,10 +288,18 @@ export default function DiscoveredDevices({ remote }) {
                   </button>
                   <InfoTooltip label={'Information for ' + device.ip}>
                     <span>Hardware address · {device.mac || 'Unavailable'}</span>
-                    <span>
-                      Type guess · {guess.type} ({guess.confidence.toLowerCase()} confidence)
-                    </span>
-                    <span>{guess.evidence}</span>
+                    {device.source === 'gateway' ? (
+                      <span>Windows reported this address as a default gateway.</span>
+                    ) : device.source === 'gateway-mac' ? (
+                      <span>Same hardware address as a previously observed default gateway.</span>
+                    ) : (
+                      <>
+                        <span>
+                          Type guess · {guess.type} ({guess.confidence.toLowerCase()} confidence)
+                        </span>
+                        <span>{guess.evidence}</span>
+                      </>
+                    )}
                     <span>First seen · {seenAt(device.firstSeen)}</span>
                     <span>Last seen · {seenAt(device.lastSeen)}</span>
                   </InfoTooltip>

@@ -1,5 +1,16 @@
 # Working checkpoint
 
+- Active Windows discovery can save an observed two-hop link between already-saved routers without changing monitoring settings.
+- Verified successful and incomplete traces against test output, duplicate prevention, scan feedback in Chrome, and the production build. Live verification from behind the Tenda is pending.
+
+- Tightened small rings in Circle layout, including the four-peer router layout. The spacing check covers both horizontal and vertical clearance.
+
+## Current status (2026-11-15) — discovery and bulk add
+
+- Scans show Windows default gateways as routers. Add all to map saves pending results from the latest successful scan in one inventory update.
+- Discovery uses a previously observed gateway's MAC address to suggest a router when the same hardware appears at another local IP.
+- Verified the live Windows gateway lookup, the bulk action in Chrome at desktop and narrow widths, lint and the production build. The full suite still hits the previously recorded Windows DPAPI credential failure.
+
 ## Current status (2026-11-15) — remote access
 
 - Added opt-in private-network listeners, per-route access checks, viewer and admin sessions, CSRF checks, and direct HTTPS. Loopback remains password-free. The Windows launcher configures access locally and shows active sessions and the last 50 audit records.
