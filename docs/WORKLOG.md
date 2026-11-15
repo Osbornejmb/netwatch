@@ -1,5 +1,9 @@
 # Working checkpoint
 
+## Current status (2026-11-15) — LLDP neighbor review
+
+- Added bounded read-only LLDP collection and admin review in saved-device details for #8. Fixture checks cover malformed and partial evidence, stale observations, duplicates, dismissal, manual-link preservation, and backup/restore. Approved hardware verification remains pending.
+
 - Active Windows discovery can save an observed two-hop link between already-saved routers without changing monitoring settings.
 - Verified successful and incomplete traces against test output, duplicate prevention, scan feedback in Chrome, and the production build. Live verification from behind the Tenda is pending.
 

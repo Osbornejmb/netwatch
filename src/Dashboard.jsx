@@ -183,7 +183,7 @@ export default function Dashboard({
         .filter((edge) => edge.source === selected.id || edge.target === selected.id)
         .map((edge) => {
           const device = devicesById.get(edge.source === selected.id ? edge.target : edge.source)
-          return { id: edge.id, device, health: connectionHealth(selected.health, device?.health) }
+          return { id: edge.id, device, label: edge.label, health: connectionHealth(selected.health, device?.health) }
         })
         .filter((item) => item.device)
     : []
@@ -576,7 +576,7 @@ export default function Dashboard({
       )}
       {selected && (
         <DeviceDetails
-          key={`${source}-${selected.id}-${live ? live.inventory.revision : 'local'}`}
+          key={`${source}-${selected.id}`}
           host={live ? host : null}
           viewer={viewer}
           remote={remote}

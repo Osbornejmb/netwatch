@@ -103,7 +103,8 @@ test('route table enforces local, unauthenticated, viewer, and admin access', as
     ['GET', api + 'snapshot', 200], ['GET', discoveryPath.slice(0, -1), 200], ['POST', discoveryPath + 'scan-now', 403],
     ['POST', discoveryPath + 'clear', 403], ['POST', discoveryPath + 'missing/add-to-map', 403],
     ['POST', discoveryPath + 'missing/remove', 403], ['GET', idPath + 'checks', 404],
-    ['GET', idPath + 'incidents', 404], ['GET', idPath + 'interfaces', 404], ['GET', '/', 200],
+    ['GET', idPath + 'incidents', 404], ['GET', idPath + 'interfaces', 404],
+    ['GET', idPath + 'neighbors', 404], ['PUT', idPath + 'neighbors', 403], ['GET', '/', 200],
   ]
   assert.equal(cases.length, createRoutes().length)
   for (const [method, path, status] of cases) {
@@ -116,7 +117,7 @@ test('route table enforces local, unauthenticated, viewer, and admin access', as
       assert.equal((await fetchAt(path, { method, headers })).status, expected, kind + ' ' + method + ' ' + path)
     }
   }
-  assert.equal(audit.read().entries.filter((entry) => entry.action === 'viewer_write_blocked').length, 5)
+  assert.equal(audit.read().entries.filter((entry) => entry.action === 'viewer_write_blocked').length, 6)
 })
 
 test('sessions expire by idle and absolute limits and evict the oldest session at each cap', async (t) => {

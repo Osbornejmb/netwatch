@@ -6,12 +6,14 @@ import { hostRequest, formatCheckTime, collectorLabel } from './monitoring'
 import DeviceHistory from './DeviceHistory'
 import DeviceIncidents from './DeviceIncidents'
 import DeviceInterfaces from './DeviceInterfaces'
+import DeviceNeighbors from './DeviceNeighbors'
 
 export default function DeviceDetails({ device, check, connections, host, onClose, viewer, remote }) {
   const modal = useModal(onClose)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [interfacesOpen, setInterfacesOpen] = useState(false)
+  const [neighborsOpen, setNeighborsOpen] = useState(false)
   const history = useRef(null)
   const viewChecks = () => {
     history.current.open = true
@@ -139,6 +141,15 @@ export default function DeviceDetails({ device, check, connections, host, onClos
               )}
             </details>
           )}
+          {host && !viewer && (
+            <details
+              className="health-history-options"
+              onToggle={(event) => setNeighborsOpen(event.currentTarget.open)}
+            >
+              <summary>Network neighbors</summary>
+              {neighborsOpen && <DeviceNeighbors key={device.id} deviceId={device.id} refreshMap={host.refresh} />}
+            </details>
+          )}
           <details className="health-history-options">
             <summary>Connections ({connections.length})</summary>
             {connections.length ? (
@@ -151,6 +162,7 @@ export default function DeviceDetails({ device, check, connections, host, onClos
                         {HEALTH[item.device.health].label}
                       </span>
                     </div>
+                    {item.label?.startsWith('LLDP · ') && <small>{item.label}</small>}
                     <small>
                       {item.health === 'down'
                         ? 'Red path · a connected device is down'

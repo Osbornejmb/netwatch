@@ -1,6 +1,7 @@
 import snmp from 'net-snmp'
 import { normalizeAddress } from '../src/inventory.js'
 import { INTERFACE_POLICY as POLICY, validateInterfaces } from './interfaces.js'
+import { readLldp } from './lldp.js'
 
 export const INTERFACE_OIDS = Object.freeze({
   description: '1.3.6.1.2.1.2.2.1.2',
@@ -171,7 +172,7 @@ export function createSnmpProbe({
       }
       const endUptime = await uptime()
       if (endUptime < startUptime) throw new Error('snmp_changed')
-      return validateInterfaces({
+      const interfaces = validateInterfaces({
         checkedAt: new Date(now()).toISOString(),
         uptime: endUptime,
         interfaces: [...rows.values()].map((r) => {
@@ -191,6 +192,11 @@ export function createSnmpProbe({
           }
         }),
       })
+      try {
+        return { ...interfaces, lldp: await readLldp(request, interfaces.checkedAt) }
+      } catch {
+        return { ...interfaces, lldp: { state: 'unavailable' } }
+      }
     } catch (error) {
       return {
         error: ['cancelled', 'snmp_limit', 'snmp_timeout', 'snmp_changed'].includes(error.message)
