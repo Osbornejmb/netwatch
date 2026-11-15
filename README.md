@@ -50,7 +50,7 @@ An optional Windows-host SNMPv3 feature adds interface status and traffic rates 
 - **Overdue:** the last check is too old to describe the device's current state.
 - **Not monitored:** monitoring is disabled, no address is configured, or no confirmed result is available.
 
-The collector normally checks every 10 seconds. The dashboard refreshes every second and ages checks using the host's freshness policy (at least 30 seconds, increasing with device count). Host disconnection preserves the last-known result and its timestamp; it does not turn devices Down. Device details show last check, measured response time, service state and collapsible recent history, 25 checks per page up to 200 displayed. No uptime percentage is inferred.
+The collector normally checks every 10 seconds. The dashboard polls every second, reuses unchanged snapshots, and ages checks using the host's freshness policy (at least 30 seconds, increasing with device count). Host disconnection preserves the last-known result and its timestamp; it does not turn devices Down. Device details show last check, measured response time, service state and collapsible recent history, 25 checks per page up to 200 displayed. No uptime percentage is inferred.
 
 Per-check history keeps roughly the most recent 5,000 stored checks per device. That covers about 3.5 days of stable one-minute samples and less when status or outcomes change often. Status, outcome and reason changes and outage transitions are always stored. A network-wide safety cap of 1,000,000 rows and a 30-day age ceiling can shorten that history.
 

@@ -141,3 +141,11 @@ See redacted live results from Git history and Down from Git history, recovered 
 ## Incident integration (2.4)
 
 The store now records an incident with each newly confirmed down result and resolves it only on confirmed reachable/up recovery. The current defaults are ten-second cycles, two failures for down and one successful reply for recovery; the older measurements above used the previous 30-second/three-failure policy. Pending results and collector errors cannot create or resolve outages; restart resets in-memory streaks while preserving the incident ledger. See HOST-API.md for schema v3, retention and migration. No additional probes or notification delivery are introduced.
+
+## Probe efficiency follow-up
+
+Windows still launches one bounded helper per probe. Before replacing it, measure warm process-launch time and CPU separately from network deadlines for a representative Windows inventory. A persistent helper would keep the existing collector runner and global concurrency gate, with a fixed worker limit and bounded JSON lines on stdin/stdout. Each request carries an ID and a validated literal address. The host tracks outstanding IDs, enforces deadlines, rejects malformed or duplicate replies, and ignores late responses after cancellation or an inventory change.
+
+An unexpected exit should resolve outstanding requests as collector errors and restart with bounded backoff before sending new work. Shutdown should stop accepting requests, cancel or drain workers, close stdin, and wait for process exit under a hard deadline. A future NETWATCH_PROBE_MODE=spawn option would retain the current implementation during rollout. Shipping the persistent mode requires Windows tests for timeouts, crash/restart, cancellation, malformed replies, shutdown, and parity with the current outage state machine.
+
+The optional Linux/macOS adapter is deferred. Apple ping and ping6 expose different timeout controls and exit conventions. Qualifying both IPv4 and IPv6 requires real platform tests that distinguish a no-reply result from a child deadline, cancellation, and local permission failure. Current collection remains Windows-only.

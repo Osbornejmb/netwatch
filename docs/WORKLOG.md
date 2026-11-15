@@ -1,5 +1,11 @@
 # Working checkpoint
 
+## Current status (2026-11-15) — sampled history and conditional polling
+
+- Refactored ordered migrations before adding schema v6. The latest observation persists independently of one-minute samples. Status, outcome, reason and outage transitions are always stored, with 5,000-row device and 1,000,000-row network caps. Resolved outages keep their 30-day and 10,000-record bounds.
+- Database ownership records allow reclaiming stale local locks, and the neighbor parser accepts localized Windows output. Unchanged snapshots return HTTP 304, and the UI refreshes connection status while retaining the latest device observations.
+- Fixture load results are recorded in WINDOWS-RELEASE-RUNBOOK.md. Linux/macOS probes and a persistent Windows helper remain deferred.
+
 ## Current status (2026-11-15)
 
 - Added the MIT license and a documentation index. Readme screenshots use an isolated fixture. Check scripts write generated evidence to ignored workspace paths, and CI collects scoped artifacts.
