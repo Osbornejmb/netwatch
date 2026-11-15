@@ -10,7 +10,7 @@ export function decodePath(path) {
   }
 }
 
-export async function serveStatic({ dist, url, res, writeToken }) {
+export async function serveStatic({ dist, url, res, writeToken, source, auth, session, ip }) {
   const file = resolve(dist, `.${decodePath(url.pathname === '/' ? '/index.html' : url.pathname)}`)
   if (relative(dist, file).startsWith('..') || isAbsolute(relative(dist, file))) throw invalid('Route not found.', 404)
   let data
@@ -21,7 +21,8 @@ export async function serveStatic({ dist, url, res, writeToken }) {
   }
   const staticPath = relative(dist, file).replaceAll('\\', '/')
   const index = staticPath === 'index.html'
-  if (index)
+  if (index && source === 'remote' && !session) auth.current({ source, res, ip })
+  if (index && writeToken)
     data = data
       .toString('utf8')
       .replace(

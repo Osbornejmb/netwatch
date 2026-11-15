@@ -5,6 +5,7 @@ import { invalid, MAX_BODY } from './store.js'
 import { loopbackUrl, readPort } from './port.js'
 import { decodePath, serveStatic } from './routes/static.js'
 import { admitRequest } from './lan.js'
+import { authLogin, authLogout, authSession } from './routes/auth.js'
 import { health } from './routes/health.js'
 import { readTopology, writeTopology } from './routes/topology.js'
 import { createSnapshotRoute } from './routes/snapshot.js'
@@ -51,6 +52,9 @@ async function parseBody(req, bodyType) {
 
 export function createRoutes(discovery) {
   return [
+    { method: 'GET', pattern: /^\/api\/v1\/auth\/session$/, handler: authSession, access: 'public' },
+    { method: 'POST', pattern: /^\/api\/v1\/auth\/login$/, handler: authLogin, access: 'public', bodyType: 'json' },
+    { method: 'POST', pattern: /^\/api\/v1\/auth\/logout$/, handler: authLogout, access: 'public', bodyType: 'Logout' },
     { method: 'GET', pattern: /^\/api\/v1\/health$/, handler: health, access: 'viewer' },
     { method: 'GET', pattern: /^\/api\/v1\/topology$/, handler: readTopology, access: 'admin' },
     {
@@ -116,6 +120,7 @@ export function createHost(
     interfaces,
     discovery,
     lanAuthorities,
+    auth,
     remoteAddress = (req) => req.socket.remoteAddress,
   } = {},
 ) {
@@ -123,6 +128,9 @@ export function createHost(
   const expectedToken = Buffer.from(writeToken, 'hex')
   const routes = createRoutes(discovery)
   const server = http.createServer(async (req, res) => {
+    res.setHeader('Referrer-Policy', 'no-referrer')
+    res.setHeader('X-Frame-Options', 'DENY')
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin')
     const send = (status, body, headers) => {
       res.writeHead(status, {
         'Content-Type': 'application/json',
@@ -135,19 +143,29 @@ export function createHost(
     try {
       const origin = loopbackUrl(port === 0 ? server.address().port : port)
       const authorities = new Set([origin.slice(7), ...(lanAuthorities?.() ?? [])])
-      const source = admitRequest(req, origin, authorities, remoteAddress(req))
-      if (source === 'remote') throw invalid('Remote access is unavailable.', 403)
+      const ip = remoteAddress(req)
+      const source = admitRequest(req, origin, authorities, ip)
+      if (source === 'remote' && !auth?.enabled()) throw invalid('Remote access is unavailable.', 403)
+      const session = source === 'remote' ? auth.inspect(req) : undefined
+      const role = source === 'local' ? 'admin' : session?.role
       let url
       try {
         url = new URL(req.url, origin)
       } catch {
         throw invalid('Malformed URL.')
       }
-      for (const { method, pattern, handler, requiresWrite, bodyType } of routes) {
+      for (const { method, pattern, handler, requiresWrite, bodyType, access } of routes) {
         if (req.method !== method) continue
         const match = pattern.exec(url.pathname)
         if (!match) continue
-        if (requiresWrite) {
+        if (source === 'remote' && access !== 'public') {
+          if (access === 'local') throw invalid('Change this on the NetWatch PC.', 403)
+          if (!role) throw invalid('Sign in to NetWatch.', 401)
+          if (access === 'admin' && role !== 'admin') throw invalid('This session is view-only.', 403)
+        }
+        if (requiresWrite && source === 'remote' && !auth.validWrite(session, req.headers['x-netwatch-write']))
+          throw invalid('Valid write token required. Reload NetWatch and try again.', 403)
+        if (requiresWrite && source === 'local') {
           const token = req.headers['x-netwatch-write']
           if (
             typeof token !== 'string' ||
@@ -163,7 +181,10 @@ export function createHost(
         const result = await handler({
           store,
           source,
-          role: 'admin',
+          role,
+          ip,
+          session,
+          auth,
           collector,
           interfaces,
           discovery,
@@ -174,14 +195,14 @@ export function createHost(
           response,
           dist,
           res,
-          writeToken,
+          writeToken: source === 'local' ? writeToken : undefined,
         })
         if (res.writableEnded) return
         return send(response.status ?? 200, result, response.headers)
       }
       throw invalid('Route not found.', 404)
     } catch (e) {
-      if (e.status === 413) {
+      if (e.status === 413 || e.message === 'Unexpected client address.') {
         res.setHeader('Connection', 'close')
         res.once('finish', () => req.socket.destroySoon())
       }

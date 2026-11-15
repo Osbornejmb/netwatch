@@ -25,7 +25,7 @@ export function removeDiscovered({ store, id }) {
   return { ok: true }
 }
 
-export async function addDiscoveredToMap({ store, discovery, id, body }) {
+export async function addDiscoveredToMap({ store, discovery, id, body, source = 'local' }) {
   const discovered = store.discoveredDevice(id)
   if (!discovered) throw invalid('Discovered device not found.', 404)
   if (body?.baseRevision !== store.revision()) throw invalid('Inventory changed.', 409)
@@ -50,7 +50,7 @@ export async function addDiscoveredToMap({ store, discovery, id, body }) {
       data: { label: item.hostname || item.ip, ip: item.ip, description: '' },
     }
     topology = { ...topology, nodes: [...topology.nodes, node] }
-    monitoring[deviceId] = true
+    monitoring[deviceId] = source === 'local'
   } else if (item.ip === gatewayIp && node.type !== 'router') {
     node = { ...node, type: 'router' }
     topology = {

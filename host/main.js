@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { openStore } from './store.js'
 import { createLanListeners } from './lan.js'
+import { createSessions } from './sessions.js'
 import { createHost } from './server.js'
 import { loopbackUrl, readPort } from './port.js'
 import { lock } from './files.js'
@@ -43,7 +44,8 @@ const discovery = createDiscovery(store, {
   probeGate,
   maxPrefix: discoveryPrefix,
 })
-const hostOptions = { port, collector, interfaces, discovery }
+const auth = createSessions(store.db, { lan: process.env.NETWATCH_LAN === '1' })
+const hostOptions = { port, collector, interfaces, discovery, auth }
 const lan =
   process.env.NETWATCH_LAN === '1'
     ? createLanListeners({
@@ -65,10 +67,13 @@ server.listen(port, '127.0.0.1', () => {
   if (process.connected)
     process.send({ type: 'ready', port, collector: collector.snapshot().state, urls: lan?.urls() ?? [] })
 })
+const sessionCleanup = setInterval(() => auth.purge(), 60000)
+sessionCleanup.unref()
 let stopping = false
 async function shutdown(code = 0) {
   if (stopping) return
   stopping = true
+  clearInterval(sessionCleanup)
   const closed = new Promise((resolve) => server.close(resolve))
   server.closeAllConnections()
   await Promise.all([collector.stop(), interfaces.stop(), discovery.stop(), lan?.stop()])
