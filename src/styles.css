@@ -33,7 +33,7 @@ select option {
 }
 
 :root {
-  font-family: "Segoe UI", Arial, sans-serif;
+  font-family: 'Segoe UI', Arial, sans-serif;
   color: #253a36;
   background: #f4f3ee;
   font-synthesis: none;
@@ -157,7 +157,7 @@ select {
 .top-menu a:hover {
   background: var(--subtle);
 }
-.top-menu a[aria-current="page"] {
+.top-menu a[aria-current='page'] {
   background: var(--accent-soft);
   color: var(--accent);
 }
@@ -210,7 +210,7 @@ select {
 .button.small {
   padding: 8px 12px;
 }
-input:not([type="checkbox"]),
+input:not([type='checkbox']),
 select {
   min-height: 44px;
   padding: 10px 12px;
@@ -225,7 +225,7 @@ select {
 input::placeholder {
   color: #6a756e;
 }
-input[type="checkbox"] {
+input[type='checkbox'] {
   width: 18px;
   height: 18px;
   vertical-align: middle;
@@ -613,12 +613,15 @@ label {
   padding: 26px;
   box-shadow: 0 24px 90px #253a3633;
   font:
-    14px/1.5 "Segoe UI",
+    14px/1.5 'Segoe UI',
     Arial,
     sans-serif;
   opacity: 0;
-  transform: translateY(8px) scale(.99);
-  transition: opacity 180ms ease, transform 180ms ease, display 180ms allow-discrete;
+  transform: translateY(8px) scale(0.99);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    display 180ms allow-discrete;
 }
 .modal[open],
 .health-device-dialog[open] {
@@ -629,7 +632,7 @@ label {
   .modal[open],
   .health-device-dialog[open] {
     opacity: 0;
-    transform: translateY(8px) scale(.99);
+    transform: translateY(8px) scale(0.99);
   }
 }
 .modal::backdrop,
@@ -668,7 +671,7 @@ label {
   font-weight: 550;
   color: var(--text);
 }
-.modal input:not([type="checkbox"]),
+.modal input:not([type='checkbox']),
 .modal select {
   width: 100%;
 }
@@ -682,7 +685,7 @@ label {
 .field-error {
   color: var(--danger) !important;
 }
-.modal [aria-invalid="true"] {
+.modal [aria-invalid='true'] {
   border-color: var(--danger);
 }
 @media (max-width: 720px) {

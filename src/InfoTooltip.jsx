@@ -25,14 +25,18 @@ export default function InfoTooltip({ label, children }) {
   useEffect(() => {
     if (!open) return
     const position = () => {
-      const anchor = button.current.getBoundingClientRect(), popup = tooltip.current
-      const gap = 8, width = popup.offsetWidth, height = popup.offsetHeight
+      const anchor = button.current.getBoundingClientRect(),
+        popup = tooltip.current
+      const gap = 8,
+        width = popup.offsetWidth,
+        height = popup.offsetHeight
       popup.style.left = `${Math.max(gap, Math.min(innerWidth - width - gap, anchor.left + (anchor.width - width) / 2))}px`
       popup.style.top = `${Math.max(gap, Math.min(innerHeight - height - gap, anchor.bottom + gap + height <= innerHeight ? anchor.bottom + gap : anchor.top - height - gap))}px`
     }
     position()
-    const dismiss = event => {
-      if (event.key === 'Escape' || (event.type === 'pointerdown' && !button.current.contains(event.target))) setOpen(false)
+    const dismiss = (event) => {
+      if (event.key === 'Escape' || (event.type === 'pointerdown' && !button.current.contains(event.target)))
+        setOpen(false)
     }
     const close = () => setOpen(false)
     document.addEventListener('mapviewportchange', close)
@@ -49,15 +53,61 @@ export default function InfoTooltip({ label, children }) {
     }
   }, [open])
 
-  return <><button ref={button} type="button" className="info-trigger nodrag nopan" aria-label={label}
-    aria-describedby={open ? id : undefined}
-    onPointerEnter={event => { if (event.pointerType !== 'touch') { hover.current = true; show() } }}
-    onPointerLeave={() => { hover.current = false; hide() }}
-    onFocus={() => { focused.current = true; show() }}
-    onBlur={() => { focused.current = false; hide() }}
-    onKeyDown={event => event.stopPropagation()} onKeyUp={event => event.stopPropagation()}
-    onClick={event => { event.stopPropagation(); show() }}><Info size={15} aria-hidden="true"/></button>
-    {open && createPortal(<div id={id} ref={tooltip} role="tooltip" className="info-tooltip"
-      onPointerEnter={() => { hover.current = true; show() }}
-      onPointerLeave={() => { hover.current = false; hide() }}>{children}</div>, document.fullscreenElement || document.body)}</>
+  return (
+    <>
+      <button
+        ref={button}
+        type="button"
+        className="info-trigger nodrag nopan"
+        aria-label={label}
+        aria-describedby={open ? id : undefined}
+        onPointerEnter={(event) => {
+          if (event.pointerType !== 'touch') {
+            hover.current = true
+            show()
+          }
+        }}
+        onPointerLeave={() => {
+          hover.current = false
+          hide()
+        }}
+        onFocus={() => {
+          focused.current = true
+          show()
+        }}
+        onBlur={() => {
+          focused.current = false
+          hide()
+        }}
+        onKeyDown={(event) => event.stopPropagation()}
+        onKeyUp={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation()
+          show()
+        }}
+      >
+        <Info size={15} aria-hidden="true" />
+      </button>
+      {open &&
+        createPortal(
+          <div
+            id={id}
+            ref={tooltip}
+            role="tooltip"
+            className="info-tooltip"
+            onPointerEnter={() => {
+              hover.current = true
+              show()
+            }}
+            onPointerLeave={() => {
+              hover.current = false
+              hide()
+            }}
+          >
+            {children}
+          </div>,
+          document.fullscreenElement || document.body,
+        )}
+    </>
+  )
 }

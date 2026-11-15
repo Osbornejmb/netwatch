@@ -24,10 +24,18 @@ export default function MapControls({ showInteractive }) {
   }
   const label = fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'
   const Icon = fullscreen ? Minimize : Maximize
-  return <Controls showInteractive={showInteractive} className="map-controls">
-    {document.fullscreenEnabled && <ControlButton onClick={toggle} aria-label={label} title={label}>
-      <Icon ref={button} aria-hidden="true"/>
-    </ControlButton>}
-    {error && <span className="map-fullscreen-error" role="status">{error}</span>}
-  </Controls>
+  return (
+    <Controls showInteractive={showInteractive} className="map-controls">
+      {document.fullscreenEnabled && (
+        <ControlButton onClick={toggle} aria-label={label} title={label}>
+          <Icon ref={button} aria-hidden="true" />
+        </ControlButton>
+      )}
+      {error && (
+        <span className="map-fullscreen-error" role="status">
+          {error}
+        </span>
+      )}
+    </Controls>
+  )
 }

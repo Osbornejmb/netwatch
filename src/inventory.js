@@ -5,12 +5,15 @@ export function normalizeAddress(value) {
   if (!address) return ''
   if (!address.includes(':')) {
     const parts = address.split('.')
-    if (parts.length === 4 && parts.every(part => /^(0|[1-9]\d{0,2})$/.test(part) && Number(part) <= 255)) return address
+    if (parts.length === 4 && parts.every((part) => /^(0|[1-9]\d{0,2})$/.test(part) && Number(part) <= 255))
+      return address
   } else if (/^[\da-f:.]+$/i.test(address)) {
     try {
       const host = new URL(`http://[${address}]/`).hostname
       if (host.startsWith('[') && host.endsWith(']')) return host.slice(1, -1)
-    } catch { /* report the same field error for all invalid literals */ }
+    } catch {
+      /* report the same field error for all invalid literals */
+    }
   }
   throw new Error('Enter an IPv4 or IPv6 address, or leave it empty for an unmonitored device.')
 }
@@ -19,7 +22,7 @@ export function deviceFields(fields, nodes, currentId) {
   const label = fields.label.trim()
   if (!label || label.length > 100) throw new Error('Enter a device name of 1–100 characters.')
   const ip = normalizeAddress(fields.ip)
-  if (ip && nodes.some(node => node.id !== currentId && normalizeAddress(node.data.ip || '') === ip)) {
+  if (ip && nodes.some((node) => node.id !== currentId && normalizeAddress(node.data.ip || '') === ip)) {
     throw new Error('Another device already uses this IP address.')
   }
   const description = fields.description.trim()

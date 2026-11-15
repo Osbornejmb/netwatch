@@ -21,6 +21,6 @@ export function summarizeHealth(nodes, checks, now, staleAfterMs) {
 
 export function connectionHealth(source, target) {
   if (source === 'down' || target === 'down') return 'down'
-  if (![source, target].every(status => ['up', 'stale'].includes(status))) return 'unknown'
+  if (![source, target].every((status) => ['up', 'stale'].includes(status))) return 'unknown'
   return source === 'stale' || target === 'stale' ? 'stale' : 'up'
 }
