@@ -29,7 +29,7 @@ try {
   await page.keyboard.press('Escape')
   append('down');append('down');await refresh()
   await page.locator('.health-node-down').waitFor()
-  await page.getByText('View options',{exact:true}).click();await page.getByRole('button',{name:/TEST-SWITCH.*Open outage/}).waitFor();await page.getByText('View options',{exact:true}).click()
+  await page.getByText(/^Needs attention/).click();await page.getByRole('button',{name:/TEST-SWITCH.*Open outage/}).waitFor();await page.getByText(/^Needs attention/).click()
   await inspect();await region().getByText('Open outage',{exact:true}).waitFor();assert.equal(await region().locator('li').count(),1)
   await region().getByRole('button',{name:'View checks'}).scrollIntoViewIfNeeded()
   await page.screenshot({path:'.tools/evidence/screenshots/incidents-desktop.png'})
