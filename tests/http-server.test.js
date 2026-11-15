@@ -6,7 +6,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { loopbackUrl, readPort } from '../host/port.js'
-import { createHost } from '../host/server.js'
+import { createSnapshotRoute } from '../host/routes/snapshot.js'
+import { createHost, createRoutes } from '../host/server.js'
 import { MAX_BODY, openStore } from '../host/store.js'
 import { fetchWriteToken, writeTokenFixture } from './fixtures/write-token.js'
 
@@ -163,4 +164,27 @@ test('snapshot ETags skip the snapshot read and change with inventory, current r
   assert.equal(collecting.status,200)
   assert.notEqual(collecting.headers.get('ETag'),third)
   assert.equal((await collecting.json()).collector.state,'running')
+})
+
+test('every host route declares access and unknown API paths stay outside the static fallback', async (t) => {
+  for (const route of createRoutes()) assert.ok(['public', 'viewer', 'admin', 'local'].includes(route.access))
+  const base = await fixture(t)
+  assert.equal((await fetch(base + '/api/v1/unknown')).status, 404)
+  assert.equal((await fetch(base + '/font.woff2', { method: 'POST' })).status, 404)
+})
+
+test('viewer snapshot projects dashboard data and omits administrative metadata', () => {
+  const inventory = { revision: 1, topology: { nodes: [], edges: [] }, monitoring: {} }
+  const result = createSnapshotRoute('test')({
+    role: 'viewer', requestHeaders: {}, response: {},
+    store: {
+      snapshotVersion: () => 1,
+      snapshot: () => ({ inventory, snmpEnrollment: true, databasePath: '/db', observations: [] }),
+    },
+    collector: { snapshot: () => ({ state: 'running', path: '/helper', freshness: { staleAfterMs: 90000 } }) },
+    discovery: { snapshot: () => ({ state: 'running' }) },
+  })
+  assert.deepEqual(result.inventory, inventory)
+  for (const key of ['discovery', 'snmpEnrollment', 'databasePath']) assert.equal(Object.hasOwn(result, key), false)
+  assert.deepEqual(result.collector, { state: 'running', freshness: { staleAfterMs: 90000 } })
 })

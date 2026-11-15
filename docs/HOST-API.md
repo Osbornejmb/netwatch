@@ -22,6 +22,8 @@ The dashboard defaults to saved host inventory and consumes the snapshot every s
 
 ## Versioned API
 
+Existing routes declare access levels in the host route table. Static GETs outside /api/ are public. Health, snapshots and device details are viewer routes. Topology and discovery management are admin routes. The listener remains loopback-only at this stage.
+
 All API responses are JSON with no-store. Errors use `{ "error": { "code": "request_rejected", "message": "..." } }`; conflicts use `revision_conflict`, unexpected failures `internal_error` with a generic message. HTTP 400 invalid input, 403 origin/host/write-intent failure, 404 missing route/device, 409 revision mismatch, 413 payload too large, 415 incorrect content type, 500 internal failure.
 
 - `GET /api/v1/health`: `{apiVersion:1, ready:true, collector:{state:"disabled", ...}}`. The listener starts only after migrations and retention cleanup succeed. Startup/database failure leaves no ready listener. Collector readiness is independent; disabled/unsupported/degraded collection does not mean devices are down.
