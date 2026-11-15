@@ -12,7 +12,7 @@ import { DatabaseSync } from 'node:sqlite'
 
 function setup(t) {
  const directory=mkdtempSync(join(tmpdir(),'netwatch-desktop-test-'))
- t.after(()=>rmSync(directory,{recursive:true,force:true}))
+ t.after(()=>rmSync(directory,{recursive:true,force:true,maxRetries:10,retryDelay:50}))
  return directory
 }
 function launch(t,path,execArgs=[]) {
