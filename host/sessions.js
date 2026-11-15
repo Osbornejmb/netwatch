@@ -4,7 +4,16 @@ import { invalid } from './store.js'
 
 const minute = 60000
 const hour = 60 * minute
-const limits = { viewer: [8 * hour, 168 * hour, 20], admin: [30 * minute, 12 * hour, 5] }
+const limits = {
+  viewer: [8 * hour, 168 * hour, 20],
+  operator: [30 * minute, 12 * hour, 5],
+  admin: [30 * minute, 12 * hour, 5],
+}
+const passwordColumns = new Map([
+  ['admin', 'admin_hash'],
+  ['operator', 'operator_hash'],
+  ['viewer', 'viewer_hash'],
+])
 const tokenPattern = /^[a-f0-9]{64}$/
 const digest = (token) => createHash('sha256').update(token).digest('hex')
 const dummy = ['scrypt', 32768, 8, 1, randomBytes(16).toString('hex'), randomBytes(64).toString('hex')].join('$')
@@ -33,11 +42,9 @@ export function createSessions(db, { lan, now = Date.now, audit } = {}) {
     return config
   }
   function purge(at = now()) {
-    db.prepare("DELETE FROM sessions WHERE expires_at<=? OR last_seen_at<=? OR (role='admin' AND last_seen_at<=?)").run(
-      at,
-      at - limits.viewer[0],
-      at - limits.admin[0],
-    )
+    db.prepare(
+      "DELETE FROM sessions WHERE expires_at<=? OR last_seen_at<=? OR (role!='viewer' AND last_seen_at<=?)",
+    ).run(at, at - limits.viewer[0], at - limits.admin[0])
     for (const [ip, entry] of failures) if (at - entry.last >= 10 * minute) failures.delete(ip)
   }
   function inspect(req) {
@@ -60,6 +67,7 @@ export function createSessions(db, { lan, now = Date.now, audit } = {}) {
       (config.viewer_mode === 'disabled' || (config.viewer_mode === 'password' && !config.viewer_hash))
     )
       return
+    if (session.role === 'operator' && !config.operator_hash) return
     if (at - session.last_seen_at >= minute)
       db.prepare('UPDATE sessions SET last_seen_at=? WHERE id_hash=?').run(at, session.id_hash)
     return { ...session, token }
@@ -104,6 +112,7 @@ export function createSessions(db, { lan, now = Date.now, audit } = {}) {
     const base = {
       source,
       viewerMode: settings?.viewer_mode ?? 'disabled',
+      operatorConfigured: Boolean(settings?.operator_hash),
       remoteEnabled: remoteEnabled(lan, settings),
     }
     if (source === 'local') return { ...base, authenticated: true, role: 'admin' }
@@ -153,9 +162,8 @@ export function createSessions(db, { lan, now = Date.now, audit } = {}) {
       throw limited(Math.max(1, Math.ceil((retry - at) / 1000)))
     }
     if (busy) throw limited(1)
-    const column = role === 'admin' ? 'admin_hash' : 'viewer_hash'
-    const hash =
-      role === 'admin' || (role === 'viewer' && settings.viewer_mode === 'password') ? settings[column] : null
+    const column = passwordColumns.get(role)
+    const hash = column && (role !== 'viewer' || settings.viewer_mode === 'password') ? settings[column] : null
     busy = true
     try {
       const matched = await verifyPassword(
@@ -166,7 +174,7 @@ export function createSessions(db, { lan, now = Date.now, audit } = {}) {
         const end = now()
         const entry = failure(previous, end)
         global = failure(global, end)
-        audit?.record('login_failure', { source, ip, role: role === 'admin' || role === 'viewer' ? role : null })
+        audit?.record('login_failure', { source, ip, role: passwordColumns.has(role) ? role : null })
         if (record(ip, { ...entry, attempts: previous.attempts }, end)) {
           audit?.record('rate_limit_lockout', { source, ip, role: null })
           throw limited(600)

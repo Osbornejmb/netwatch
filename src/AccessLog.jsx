@@ -13,6 +13,8 @@ const actions = {
   discovery_add: 'Added discovered device',
   discovery_remove: 'Removed discovered device',
   viewer_write_blocked: 'Blocked viewer change',
+  operator_write_blocked: 'Blocked operator change',
+  write_token_rejected: 'Blocked an unverified change',
   rate_limit_lockout: 'Sign-in temporarily blocked',
   access_settings_changed: 'Changed access settings',
 }
@@ -55,9 +57,14 @@ export default function AccessLog({ onClose }) {
           ))}
         </ol>
       )}
-      <button className="button secondary" data-initial-focus onClick={onClose}>
-        Close
-      </button>
+      <div className="modal-actions">
+        <a className="button secondary" href="/api/v1/audit/export" download="netwatch-access-log.json">
+          Download redacted log
+        </a>
+        <button className="button secondary" data-initial-focus onClick={onClose}>
+          Close
+        </button>
+      </div>
     </dialog>
   )
 }

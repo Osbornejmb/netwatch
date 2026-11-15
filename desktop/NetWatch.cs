@@ -15,7 +15,7 @@ public class DesktopSettings {
 }
 public class AuditRow {public long at {get;set;} public string ip {get;set;} public string action {get;set;} public string detail {get;set;}}
 public class RemoteSession {public string role {get;set;} public string ip {get;set;} public long lastSeen {get;set;}}
-public class HostEvent {public string type {get;set;} public string error {get;set;} public string viewerMode {get;set;} public bool adminConfigured {get;set;} public bool viewerConfigured {get;set;} public string[] urls {get;set;} public RemoteSession[] sessions {get;set;} public AuditRow[] audit {get;set;}public string state {get;set;} public string message {get;set;} public int port {get;set;} public string dashboardUrl {get;set;}}
+public class HostEvent {public string type {get;set;} public string error {get;set;} public string viewerMode {get;set;} public bool adminConfigured {get;set;} public bool viewerConfigured {get;set;} public bool operatorConfigured {get;set;} public string[] urls {get;set;} public RemoteSession[] sessions {get;set;} public AuditRow[] audit {get;set;}public string state {get;set;} public string message {get;set;} public int port {get;set;} public string dashboardUrl {get;set;}}
 public class NetWatchMenuColors : ProfessionalColorTable {
  public override Color ToolStripDropDownBackground {get{return Color.FromArgb(252,251,247);}}
  public override Color ImageMarginGradientBegin {get{return ToolStripDropDownBackground;}}
@@ -162,7 +162,7 @@ public class AccessWindow : Form {
  readonly ComboBox mode,urls;
  readonly ListView sessions,audit;
  readonly Label status,networkNote;
- readonly Button revoke,copy;
+ readonly Button revoke,copy,disableOperator;
  bool updating;
  public AccessWindow(Action<string,string,string,string> send) {
   this.send=send;
@@ -172,9 +172,12 @@ public class AccessWindow : Form {
   status=new Label{Location=new Point(16,14),Size=new Size(538,44),Text="Reading access settings…"};Controls.Add(status);
   var admin=AddButton("Set admin password…",16,63,170);admin.Click+=(s,e)=>Password("admin");
   var viewer=AddButton("Set viewer password…",198,63,175);viewer.Click+=(s,e)=>Password("viewer");
+  var changeOperator=AddButton("Set operator password…",385,63,169);changeOperator.Click+=(s,e)=>Password("operator");
   Controls.Add(new Label{Text="Viewers",Location=new Point(16,113),AutoSize=true});
   mode=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Location=new Point(85,108),Size=new Size(215,30),AccessibleName="Viewers"};
   mode.Items.AddRange(new object[]{"Open (no password)","Password","Disabled"});Controls.Add(mode);
+  disableOperator=AddButton("Disable operator access",320,105,234);disableOperator.Enabled=false;
+  disableOperator.Click+=(s,e)=>send("disable-operator",null,null,null);
   mode.SelectedIndexChanged+=(s,e)=>{if(!updating&&mode.SelectedIndex>=0)send("viewer-mode",new[]{"open","password","disabled"}[mode.SelectedIndex],null,null);};
   urls=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Location=new Point(16,148),Size=new Size(430,30),AccessibleName="Reachable URLs"};Controls.Add(urls);
   copy=AddButton("Copy URL",458,145,96);
@@ -196,6 +199,7 @@ public class AccessWindow : Form {
  public void Apply(HostEvent item) {
   if(item!=null&&item.error!=null){status.Text=item.error;return;}
   status.Text=item==null?"Reading access settings…":!item.adminConfigured?"Set an admin password to allow remote access.":item.viewerMode=="password"&&!item.viewerConfigured?"Set a viewer password to allow viewer sign-in.":"Admin password is set.";
+  disableOperator.Enabled=item!=null&&item.operatorConfigured;
   updating=true;
   mode.SelectedIndex=item==null?-1:Array.IndexOf(new[]{"open","password","disabled"},item.viewerMode);
   updating=false;

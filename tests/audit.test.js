@@ -22,3 +22,18 @@ test('audit keeps the newest 5000 rows, pages exclusively, and expires entries a
     assert.throws(() => readAudit({ store, audit, url: new URL('http://localhost/?' + query) }), { status: 400 })
   }
 })
+
+test('audit export limits fields and excludes old or unrecognized events', (t) => {
+  const store = openStore(':memory:')
+  t.after(() => store.close())
+  let time = 1
+  const audit = createAudit(store.db, () => time)
+  audit.record('login_failure', { source: 'remote', ip: '192.0.2.1', detail: 'private data' })
+  time += 31 * 86400000
+  assert.deepEqual(audit.export().entries, [])
+  audit.record('operator_write_blocked', { source: 'remote', role: 'operator', ip: '192.0.2.1', detail: 'private data' })
+  audit.record('unrecognized record')
+  assert.deepEqual(audit.export().entries.map((entry) => ({ ...entry })), [
+    { at: time, source: 'remote', role: 'operator', action: 'operator_write_blocked' },
+  ])
+})

@@ -24,7 +24,7 @@ test('local configuration starts closed, takes passwords from prompts and revoke
   t.after(() => store.close())
   const { db } = store
   const config = () => readAuthConfig(db)
-  assert.deepEqual({ ...config() }, { viewer_mode: 'password', viewer_hash: null, admin_hash: null })
+  assert.deepEqual({ ...config() }, { viewer_mode: 'password', viewer_hash: null, admin_hash: null, operator_hash: null })
   assert.equal(remoteEnabled(true, config()), false)
   const messages = []
   const run = (args, ...answers) => manageAuth(db, args, { prompt: () => answers.shift(), print: (value) => messages.push(value) })
@@ -36,9 +36,10 @@ test('local configuration starts closed, takes passwords from prompts and revoke
   assert.equal(remoteEnabled(true, config()), true)
   assert.equal(remoteEnabled(false, config()), false)
   assert.equal(remoteEnabled(true, { ...config(), viewer_hash: 'malformed' }), false)
-  await assert.rejects(run(['set-viewer-password'], password, password), /different viewer and admin/)
+  await assert.rejects(run(['set-viewer-password'], password, password), /different password/)
+  await assert.rejects(run(['set-operator-password'], password, password), /different password/)
   await run(['status'])
-  assert.deepEqual(JSON.parse(messages.at(-1)), { viewerMode: 'password', viewerConfigured: false, adminConfigured: true })
+  assert.deepEqual(JSON.parse(messages.at(-1)), { viewerMode: 'password', viewerConfigured: false, adminConfigured: true, operatorConfigured: false })
   db.exec("INSERT INTO sessions VALUES('session-hash','admin','csrf-hash',1,1,2,'192.168.1.2')")
   await run(['viewer-mode', 'open'])
   assert.equal(config().viewer_mode, 'open')

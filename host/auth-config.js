@@ -12,14 +12,14 @@ export async function manageAuth(
   [command, mode, ...extra],
   { prompt = (question) => secret(question, /^[^\p{C}]+$/u, 129), print = console.log } = {},
 ) {
-  const passwordCommand = command === 'set-admin-password' || command === 'set-viewer-password'
+  const passwordRole = ['admin', 'viewer', 'operator'].find((role) => command === 'set-' + role + '-password')
   if (
     extra.length ||
     (command === 'viewer-mode' ? !viewerModes.includes(mode) : mode !== undefined) ||
-    (!passwordCommand && !['viewer-mode', 'status', 'revoke-sessions'].includes(command))
+    (!passwordRole && !['viewer-mode', 'status', 'revoke-sessions', 'disable-operator'].includes(command))
   )
     throw new Error(
-      'Usage: npm run auth -- set-admin-password | set-viewer-password | viewer-mode <open|password|disabled> | status | revoke-sessions.',
+      'Usage: npm run auth -- set-admin-password | set-viewer-password | set-operator-password | disable-operator | viewer-mode <open|password|disabled> | status | revoke-sessions.',
     )
   if (command === 'status') {
     print(JSON.stringify(accessStatus(db)))
@@ -27,16 +27,21 @@ export async function manageAuth(
   }
   let value = mode
   let column = 'viewer_mode'
-  if (passwordCommand) {
-    const admin = command === 'set-admin-password'
+  if (command === 'disable-operator') {
+    column = 'operator_hash'
+    value = null
+  }
+  if (passwordRole) {
     const password = await prompt('New password: ')
     if (!validPassword(password)) throw new Error('Use a password between 12 and 128 characters.')
     if (password !== (await prompt('Confirm password: '))) throw new Error('Passwords do not match.')
     const config = readAuthConfig(db)
-    if (await verifyPassword(password, admin ? config.viewer_hash : config.admin_hash))
-      throw new Error('Use different viewer and admin passwords.')
+    column = passwordRole + '_hash'
+    for (const other of ['viewer_hash', 'operator_hash', 'admin_hash']) {
+      if (other !== column && (await verifyPassword(password, config[other])))
+        throw new Error('Use a different password for each access role.')
+    }
     value = await hashPassword(password)
-    column = admin ? 'admin_hash' : 'viewer_hash'
   }
   db.exec('BEGIN IMMEDIATE')
   try {
@@ -63,6 +68,7 @@ export function accessStatus(db) {
   return {
     viewerMode: config.viewer_mode,
     viewerConfigured: Boolean(config.viewer_hash),
+    operatorConfigured: Boolean(config.operator_hash),
     adminConfigured: Boolean(config.admin_hash),
   }
 }
@@ -73,6 +79,8 @@ export async function manageLauncherAccess(db, request) {
     'status',
     'set-admin-password',
     'set-viewer-password',
+    'set-operator-password',
+    'disable-operator',
     'viewer-mode',
     'revoke-sessions',
   ]

@@ -1,6 +1,6 @@
 # Local host API and database (2.1)
 
-Current schema is SQLite `user_version=8`. The v5→v6 migration backfills `latest_check` from the newest timestamp and sequence per device.
+Current schema is SQLite `user_version=9`. The v5→v6 migration backfills `latest_check` from the newest timestamp and sequence per device. The v8→v9 migration adds the optional operator password hash and role while preserving existing sessions and inventory.
 
 Requires Node 22.13+ (built-in node:sqlite; Node 22 prints an experimental SQLite warning). No external database server or runtime package is required. This API serves the loopback dashboard and optional authenticated clients on a private network.
 
@@ -22,7 +22,7 @@ The dashboard defaults to saved host inventory and consumes the snapshot every s
 
 ## Versioned API
 
-Existing routes declare access levels in the host route table. Static GETs outside /api/ are public. Health, snapshots and device details are viewer routes. Topology and discovery management are admin routes. Loopback keeps admin access without signing in. Remote users need a session for nonpublic routes.
+Existing routes declare access levels in the host route table. Static GETs outside /api/ are public. Health, snapshots and device details are viewer routes. Operators and admins can read discovery results and request a scan. Operator scans do not write upstream links. Topology and other discovery writes are admin routes. Loopback keeps admin access without signing in. Remote users need a session for nonpublic routes.
 
 All API responses are JSON with no-store. Errors use `{ "error": { "code": "request_rejected", "message": "..." } }`; conflicts use `revision_conflict`, unexpected failures `internal_error` with a generic message. HTTP 400 covers invalid input, 401 covers missing sessions and invalid credentials, 403 covers admission or authorization failures, and 404 covers missing routes or devices. Revision mismatches use 409, oversized bodies 413, unsupported content types 415, temporary rate limits 429, and unexpected failures 500.
 
@@ -57,19 +57,21 @@ HTTP is the default and exposes credentials and sessions to anyone who can inter
 
 Requests are admitted by the real socket peer. Loopback, RFC1918 IPv4, IPv6 link-local and IPv6 ULA peers qualify. IPv4-mapped peers are classified by their IPv4 address. Production binds only loopback and private IPv4 interfaces. Host must match a listener or configured hostname and port. If present, Origin must use the matching transport and an allowed authority, and Sec-Fetch-Site must be same-origin or none.
 
-- GET /api/v1/auth/session returns authenticated, role, source, viewerMode and remoteEnabled. Authenticated remote sessions receive csrfToken and expiresAt. Open mode issues a viewer session here or on the SPA shell.
+- GET /api/v1/auth/session returns authenticated, role, source, viewerMode, operatorConfigured and remoteEnabled. Authenticated remote sessions receive csrfToken and expiresAt. Open mode issues a viewer session here or on the SPA shell.
 - POST /api/v1/auth/login accepts JSON with role and password. A successful login returns role, csrfToken and expiresAt and replaces the prior session. The cookie uses HttpOnly, SameSite=Strict and Path=/.
 - POST /api/v1/auth/logout is bodyless. It invalidates the remote session and clears its cookie.
 
-Remote admin writes require the session CSRF token in X-NetWatch-Write. Loopback writes retain the per-launch token. Remote protected requests without a session receive 401. Viewer requests to admin routes receive 403. Login backoff uses 429 and Retry-After. Admin sessions expire after 30 minutes idle or 12 hours absolute, with a limit of five. Viewer sessions expire after eight hours idle or seven days absolute, with a limit of 20. New sessions evict the oldest at each limit. All responses include Referrer-Policy, X-Frame-Options and Cross-Origin-Resource-Policy. API responses use Cache-Control: no-store.
+Remote admin and operator writes require the session CSRF token in X-NetWatch-Write. Loopback writes retain the per-launch token. Remote protected requests without a session receive 401. Requests below the required role receive 403. Login backoff uses 429 and Retry-After. Admin and operator sessions expire after 30 minutes idle or 12 hours absolute, with a separate limit of five for each role. Viewer sessions expire after eight hours idle or seven days absolute, with a limit of 20. New sessions evict the oldest at each limit. All responses include Referrer-Policy, X-Frame-Options and Cross-Origin-Resource-Policy. API responses use Cache-Control: no-store.
 
 ## Access log
 
 GET /api/v1/audit is loopback-only. It accepts limit (1–200, default 50) and before (an exclusive numeric ID). Results are {entries, nextBefore}, newest first. Entries contain id, at (Unix milliseconds), source, ip, role, action and detail. The audit log keeps at most 5,000 rows for up to 30 days and records fixed action names and outcomes. Passwords and tokens are excluded.
 
+`GET /api/v1/audit/export` is loopback-only and downloads `netwatch-access-log.json`. It returns `{exportedAt,entries}` with up to 5,000 retained entries. Entries are restricted to the event timestamp, source, role and a recognized action. IP addresses and event details are excluded.
+
 ## Local access configuration
 
-Stop the host and use the same NETWATCH_DB path as the launcher or host. Run npm run auth -- set-admin-password or npm run auth -- set-viewer-password in an interactive terminal. Passwords are entered twice without echo and must be distinct. Use npm run auth -- viewer-mode open (or password or disabled) to choose viewer policy, npm run auth -- status to inspect configuration, and npm run auth -- revoke-sessions to remove sessions. Restart the host after CLI changes. The management CLI shares the host database lock. The Windows launcher can apply access changes to its running host through private process IPC. Remote access requires NETWATCH_LAN=1 and a valid admin password hash. Password mode requires a viewer password for viewer sessions. Viewer snapshots omit discovery and administrative diagnostics. Disabled mode allows only remote admin sessions.
+Stop the host and use the same NETWATCH_DB path as the launcher or host. Run npm run auth -- set-admin-password, npm run auth -- set-viewer-password or npm run auth -- set-operator-password in an interactive terminal. Passwords are entered twice without echo and must be distinct. Use npm run auth -- viewer-mode open (or password or disabled) to choose viewer policy, npm run auth -- status to inspect configuration, and npm run auth -- revoke-sessions to remove sessions. Restart the host after CLI changes. The management CLI shares the host database lock. The Windows launcher can apply access changes to its running host through private process IPC. Remote access requires NETWATCH_LAN=1 and a valid admin password hash. Password mode requires a viewer password for viewer sessions. Viewer snapshots omit discovery and administrative diagnostics. Disabled viewer mode permits configured operator and admin sessions. The local CLI can clear operator access with npm run auth -- disable-operator.
 
 ## SQLite, migrations and retention
 
@@ -83,7 +85,7 @@ Only a locally enrolled target can receive interface samples, with matching inve
 
 The idempotent `checks_device_latest(device_id, checked_at DESC, seq DESC)` index supports sampling, retention and migration backfill. Snapshots read current observations from `latest_check` in one query. The latest observation advances even when a matching result is sampled out of check history.
 
-Schema version uses SQLite user_version=8 with transactional v1→v2→v3→v4→v5→v6→v7→v8 upgrades preserving inventory/history and adding bounded discovery records. See ICMP-COLLECTOR.md for new raw outcome, pending status and latency fields. Inventory (single revisioned record) and checks (indexed device, sequence and timestamp) are separate tables. Writes use BEGIN IMMEDIATE/COMMIT with rollback on failure. WAL and a three-second busy timeout support readers and serialize writers; one production host holds an exclusive filesystem lock directory. Observation batches are internal-only, max 2,000, validated against current explicit opt-in, optional expected inventory revision, finite latency and timestamps, and rolled back as a whole if any observation is invalid. Deleting a device or changing its address or type removes its old observations, including its latest result. Disabling monitoring retains history for the retention window.
+Schema version uses SQLite user_version=9 with transactional v1 through v9 upgrades preserving inventory/history and adding bounded discovery records. See ICMP-COLLECTOR.md for new raw outcome, pending status and latency fields. Inventory (single revisioned record) and checks (indexed device, sequence and timestamp) are separate tables. Writes use BEGIN IMMEDIATE/COMMIT with rollback on failure. WAL and a three-second busy timeout support readers and serialize writers; one production host holds an exclusive filesystem lock directory. Observation batches are internal-only, max 2,000, validated against current explicit opt-in, optional expected inventory revision, finite latency and timestamps, and rolled back as a whole if any observation is invalid. Deleting a device or changing its address or type removes its old observations, including its latest result. Disabling monitoring retains history for the retention window.
 
 Per-check history keeps roughly the most recent 5,000 stored checks per device. That covers about 3.5 days of stable one-minute samples and less when status or outcomes change often. Status, outcome and reason changes and outage transitions are always stored. A network-wide safety cap of 1,000,000 rows and a 30-day age ceiling can shorten that history. Retention runs at startup, after inventory writes and every ten minutes. Sample inserts enforce row caps immediately. History, incidents and snapshots use WAL read transactions. History pages return up to 200 rows. SQLite reuses freed pages, and offline backup compacts the file.
 

@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { createAudit } from '../host/audit.js'
+import { manageLauncherAccess } from '../host/auth-config.js'
 import { hashPassword, needsRehash } from '../host/auth.js'
 import { createHost, createRoutes } from '../host/server.js'
 import { createSessions } from '../host/sessions.js'
@@ -13,6 +14,7 @@ import { openStore } from '../host/store.js'
 import { writeTokenFixture } from './fixtures/write-token.js'
 
 const password = 'test admin password'
+const operatorPassword = 'test operator password'
 const idPath = '/api/v1/devices/missing/'
 const discoveryPath = '/api/v1/discovered/'
 const api = '/api/v1/'
@@ -24,11 +26,12 @@ async function fixture(t, options = {}) {
   const store = openStore(':memory:')
   const dist = mkdtempSync(join(tmpdir(), 'netwatch-session-test-'))
   writeTokenFixture(dist)
-  store.db.prepare('UPDATE auth_config SET viewer_mode=?, admin_hash=?, viewer_hash=?').run(
-    options.viewerMode ?? 'open', await hashPassword(password, options.parameters), await hashPassword('test viewer password'))
+  store.db.prepare('UPDATE auth_config SET viewer_mode=?, admin_hash=?, viewer_hash=?, operator_hash=?').run(
+    options.viewerMode ?? 'open', await hashPassword(password, options.parameters), await hashPassword('test viewer password'),
+    options.operator ? await hashPassword(operatorPassword) : null)
   const audit = createAudit(store.db, () => time)
   const auth = createSessions(store.db, { lan: true, now: () => time, audit })
-  const server = createHost(store, { auth, audit, dist, port: 0, remoteAddress: () => ip })
+  const server = createHost(store, { auth, audit, dist, discovery: options.discovery, port: 0, remoteAddress: () => ip })
   server.listen(0, '127.0.0.1')
   await once(server, 'listening')
   t.after(async () => {
@@ -44,7 +47,7 @@ async function fixture(t, options = {}) {
     headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}) },
     body: JSON.stringify(body),
   })
-  return { fetchAt, login, store, audit, clock: (delta) => { time += delta }, source: (address) => { ip = address } }
+  return { fetchAt, login, store, audit, auth, clock: (delta) => { time += delta }, source: (address) => { ip = address } }
 }
 
 const asCookie = (response) => response.headers.get('set-cookie')?.split(';')[0]
@@ -92,13 +95,15 @@ test('sessions hash credentials, upgrade atomically, and require an admin CSRF t
   assert.ok(!JSON.stringify(log).includes(password))
 })
 
-test('route table enforces local, unauthenticated, viewer, and admin access', async (t) => {
-  const { fetchAt, login, source, audit } = await fixture(t)
+test('route table enforces local, unauthenticated, viewer, operator, and admin access', async (t) => {
+  const { fetchAt, login, source, audit } = await fixture(t, { operator: true })
   const session = await fetchAt(api + 'auth/session')
   const viewer = asCookie(session)
   const admin = asCookie(await login({ role: 'admin', password }))
+  const operator = asCookie(await login({ role: 'operator', password: operatorPassword }))
   const cases = [
-    ['GET', api + 'audit', 200], ['GET', api + 'auth/session', 200], ['POST', api + 'auth/login', 415], ['POST', api + 'auth/logout', 200],
+    ['GET', api + 'audit', 200], ['GET', api + 'audit/export', 200],
+    ['GET', api + 'auth/session', 200], ['POST', api + 'auth/login', 415], ['POST', api + 'auth/logout', 200],
     ['GET', api + 'health', 200], ['GET', api + 'topology', 200], ['PUT', api + 'topology', 403],
     ['GET', api + 'snapshot', 200], ['GET', discoveryPath.slice(0, -1), 200], ['POST', discoveryPath + 'scan-now', 403],
     ['POST', discoveryPath + 'clear', 403], ['POST', discoveryPath + 'missing/add-to-map', 403],
@@ -109,15 +114,54 @@ test('route table enforces local, unauthenticated, viewer, and admin access', as
   assert.equal(cases.length, createRoutes().length)
   for (const [method, path, status] of cases) {
     const route = createRoutes().find((candidate) => candidate.method === method && candidate.pattern.test(path))
-    for (const [kind, cookie] of [['local'], ['unauthenticated'], ['viewer', viewer], ['admin', admin]]) {
+    for (const [kind, cookie] of [['local'], ['unauthenticated'], ['viewer', viewer], ['operator', operator], ['admin', admin]]) {
       source(kind === 'local' ? '127.0.0.1' : '192.168.1.12')
       const expected = route.access === 'local' && kind !== 'local' ? 403 : route.access !== 'public' && kind === 'unauthenticated' ? 401 :
-        route.access === 'admin' && kind === 'viewer' ? 403 : status
+        route.access === 'admin' && ['viewer', 'operator'].includes(kind) || route.access === 'operator' && kind === 'viewer' ? 403 : status
       const headers = cookie && !path.endsWith('/logout') ? { cookie } : {}
       assert.equal((await fetchAt(path, { method, headers })).status, expected, kind + ' ' + method + ' ' + path)
     }
   }
   assert.equal(audit.read().entries.filter((entry) => entry.action === 'viewer_write_blocked').length, 6)
+})
+
+test('operators can start a scan with CSRF but cannot change the map, and local recovery revokes their session', async (t) => {
+  const calls = []
+  const { fetchAt, login, store, auth, source } = await fixture(t, {
+    operator: true,
+    viewerMode: 'disabled',
+    discovery: { runOnce: async (options) => calls.push(options), snapshot: () => ({ state: 'idle' }) },
+  })
+  const operator = await login({ role: 'operator', password: operatorPassword })
+  assert.equal(operator.status, 200)
+  const cookie = asCookie(operator)
+  const { csrfToken } = await operator.json()
+  const scan = discoveryPath + 'scan-now'
+  assert.equal((await fetchAt(scan, { method: 'POST', headers: { cookie } })).status, 403)
+  const headers = { cookie, 'X-NetWatch-Write': csrfToken }
+  assert.equal((await fetchAt(scan, { method: 'POST', headers })).status, 200)
+  assert.deepEqual(calls, [{ saveUpstream: false }])
+  assert.equal((await fetchAt(api + 'topology', { method: 'PUT', headers })).status, 403)
+  assert.equal(store.revision(), 0)
+  assert.equal((await fetchAt(api + 'audit/export', { headers })).status, 403)
+  source('127.0.0.1')
+  const exported = await fetchAt(api + 'audit/export')
+  assert.match(exported.headers.get('content-disposition'), /netwatch-access-log\.json/)
+  const text = await exported.text()
+  assert.doesNotMatch(text, /192\.168\.1\.12|password|csrf|scrypt/)
+  assert.match(text, /write_token_rejected/)
+  source('192.168.1.12')
+  const replacement = 'replacement admin password'
+  const updated = await manageLauncherAccess(store.db, {
+    command: 'set-admin-password', password: replacement, confirm: replacement,
+  })
+  assert.equal(updated.operatorConfigured, true)
+  auth.invalidate()
+  assert.equal((await fetchAt(api + 'snapshot', { headers })).status, 401)
+  assert.equal((await login({ role: 'admin', password: replacement })).status, 200)
+  await manageLauncherAccess(store.db, { command: 'disable-operator' })
+  auth.invalidate()
+  assert.equal((await login({ role: 'operator', password: operatorPassword })).status, 401)
 })
 
 test('sessions expire by idle and absolute limits and evict the oldest session at each cap', async (t) => {
