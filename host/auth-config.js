@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { hashPassword, readAuthConfig, validPassword, verifyPassword, viewerModes } from './auth.js'
+import { createAudit } from './audit.js'
 import { lock } from './files.js'
 import { secret } from './secret-prompt.js'
 import { openStore } from './store.js'
@@ -44,6 +45,9 @@ export async function manageAuth(
         value,
         new Date().toISOString(),
       )
+    createAudit(db).record('access_settings_changed', {
+      detail: command === 'viewer-mode' ? command + ':' + mode : command,
+    })
     db.exec('DELETE FROM sessions; COMMIT')
   } catch (error) {
     db.exec('ROLLBACK')
@@ -64,13 +68,25 @@ export function accessStatus(db) {
 }
 
 export async function manageLauncherAccess(db, request) {
-  const allowed = ['status', 'set-admin-password', 'set-viewer-password', 'viewer-mode', 'revoke-sessions']
+  const allowed = [
+    'lan-preference',
+    'status',
+    'set-admin-password',
+    'set-viewer-password',
+    'viewer-mode',
+    'revoke-sessions',
+  ]
   if (!allowed.includes(request?.command)) throw new Error('Invalid access command.')
-  if (request.command !== 'status') {
+  if (request.command === 'lan-preference') {
+    if (!['enabled', 'disabled'].includes(request.mode)) throw new Error('Invalid LAN preference.')
+    createAudit(db).record('access_settings_changed', { detail: 'lan:' + request.mode })
+  } else if (request.command !== 'status') {
     const answers = [request.password, request.confirm]
     await manageAuth(db, [request.command, request.mode], { prompt: () => answers.shift(), print() {} })
   }
-  return accessStatus(db)
+  const audit = createAudit(db)
+  audit.purge()
+  return { ...accessStatus(db), audit: audit.read().entries }
 }
 
 async function main() {

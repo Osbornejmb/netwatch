@@ -4,6 +4,7 @@ import { Activity, Check, GitBranch, Plus, Search, Trash2, X } from 'lucide-reac
 import RouterNode from './nodes/RouterNode'
 import SwitchNode from './nodes/SwitchNode'
 import { allowedHash } from './auth'
+import AccessLog from './AccessLog'
 import Dashboard from './Dashboard'
 import HostStorage from './HostStorage'
 import DiscoveredDevices from './DiscoveredDevices'
@@ -57,6 +58,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
     window.addEventListener('hashchange', navigate)
     return () => window.removeEventListener('hashchange', navigate)
   }, [viewer])
+  const [showAccessLog, setShowAccessLog] = useState(false)
   const [deviceNotice, setDeviceNotice] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [confirm, setConfirm] = useState(null)
@@ -322,6 +324,11 @@ export default function App({ viewer = false, remote = false, accessControls }) 
             )}
           </nav>
           {accessControls}
+          {!remote && document.querySelector('meta[name="netwatch-write-token"]') && (
+            <button className="health-button" onClick={() => setShowAccessLog(true)}>
+              Access log
+            </button>
+          )}
           {!viewer && (
             <section className="backup-recovery" aria-label="Map backup and recovery">
               <details open={storageError || importError ? true : undefined}>
@@ -378,6 +385,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
             </section>
           )}
         </header>
+        {showAccessLog && <AccessLog onClose={() => setShowAccessLog(false)} />}
 
         {view === 'discovered' ? (
           <DiscoveredDevices remote={remote} />

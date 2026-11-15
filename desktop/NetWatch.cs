@@ -13,8 +13,9 @@ using System.Windows.Forms;
 public class DesktopSettings {
  public string node {get;set;} public string root {get;set;} public string database {get;set;} public bool icmp {get;set;} public bool discovery {get;set;} public bool discoveryIcmp {get;set;} public bool lan {get;set;}
 }
+public class AuditRow {public long at {get;set;} public string ip {get;set;} public string action {get;set;} public string detail {get;set;}}
 public class RemoteSession {public string role {get;set;} public string ip {get;set;} public long lastSeen {get;set;}}
-public class HostEvent {public string type {get;set;} public string error {get;set;} public string viewerMode {get;set;} public bool adminConfigured {get;set;} public bool viewerConfigured {get;set;} public string[] urls {get;set;} public RemoteSession[] sessions {get;set;}public string state {get;set;} public string message {get;set;} public int port {get;set;}}
+public class HostEvent {public string type {get;set;} public string error {get;set;} public string viewerMode {get;set;} public bool adminConfigured {get;set;} public bool viewerConfigured {get;set;} public string[] urls {get;set;} public RemoteSession[] sessions {get;set;} public AuditRow[] audit {get;set;}public string state {get;set;} public string message {get;set;} public int port {get;set;}}
 public class NetWatchMenuColors : ProfessionalColorTable {
  public override Color ToolStripDropDownBackground {get{return Color.FromArgb(252,251,247);}}
  public override Color ImageMarginGradientBegin {get{return ToolStripDropDownBackground;}}
@@ -71,7 +72,7 @@ public class NetWatch : Form {
   discoveryIcmp.CheckedChanged+=(s,e)=>{try{settings.discoveryIcmp=discoveryIcmp.Checked;File.WriteAllText(settingsPath,json.Serialize(settings));}catch(Exception ex){MessageBox.Show(ex.Message,"Unable to save settings");}};Controls.Add(discoveryIcmp);
   discovery.CheckedChanged+=(s,e)=>{discoveryIcmp.Enabled=discovery.Checked;if(!discovery.Checked){settings.discoveryIcmp=false;discoveryIcmp.Checked=false;}};
   lan=new CheckBox{Text="Allow other PCs on this network",Checked=settings.lan,Location=new Point(20,255),AutoSize=true};
-  lan.CheckedChanged+=(s,e)=>{try{settings.lan=lan.Checked;File.WriteAllText(settingsPath,json.Serialize(settings));}catch(Exception ex){MessageBox.Show(ex.Message,"Unable to save settings");}};Controls.Add(lan);
+  lan.CheckedChanged+=(s,e)=>{try{settings.lan=lan.Checked;File.WriteAllText(settingsPath,json.Serialize(settings));SendAccess("lan-preference",settings.lan?"enabled":"disabled",null,null);}catch(Exception ex){MessageBox.Show(ex.Message,"Unable to save settings");}};Controls.Add(lan);
   var access=new Button{Text="Remote access…",Location=new Point(350,251),Size=new Size(170,38)};
   access.Click+=(s,e)=>ShowAccess();Controls.Add(access);
   var data=new TextBox{Text="Saved data: "+settings.database,ReadOnly=true,Multiline=true,BorderStyle=BorderStyle.None,BackColor=BackColor,ForeColor=ForeColor,Location=new Point(20,302),Size=new Size(500,40),AccessibleName="Saved data location"};Controls.Add(data);
@@ -143,9 +144,10 @@ public class NetWatch : Form {
     info.EnvironmentVariables["NETWATCH_DB"]=settings.database;
     using(var process=Process.Start(info)) {
      process.StandardInput.WriteLine(message);process.StandardInput.Close();
+     var output=process.StandardOutput.ReadToEndAsync();
      if(!process.WaitForExit(6000)){process.Kill();throw new InvalidOperationException();}
      if(process.ExitCode!=0)throw new InvalidOperationException();
-     ApplyAccess(json.Deserialize<HostEvent>(process.StandardOutput.ReadToEnd()));
+     ApplyAccess(json.Deserialize<HostEvent>(output.Result));
     }
    }
   } catch {ApplyAccess(new HostEvent{error="Unable to update access settings. Check passwords and try again."});}
@@ -158,13 +160,13 @@ public class NetWatch : Form {
 public class AccessWindow : Form {
  readonly Action<string,string,string,string> send;
  readonly ComboBox mode,urls;
- readonly ListView sessions;
+ readonly ListView sessions,audit;
  readonly Label status;
  readonly Button revoke,copy;
  bool updating;
  public AccessWindow(Action<string,string,string,string> send) {
   this.send=send;
-  Text="Remote access";ClientSize=new Size(570,405);FormBorderStyle=FormBorderStyle.FixedDialog;
+  Text="Remote access";ClientSize=new Size(570,555);FormBorderStyle=FormBorderStyle.FixedDialog;
   StartPosition=FormStartPosition.CenterParent;MaximizeBox=false;MinimizeBox=false;
   BackColor=Color.FromArgb(244,243,238);ForeColor=Color.FromArgb(37,58,54);
   status=new Label{Location=new Point(16,14),Size=new Size(538,44),Text="Reading access settings…"};Controls.Add(status);
@@ -182,6 +184,9 @@ public class AccessWindow : Form {
   sessions.Columns.Add("Role",105);sessions.Columns.Add("IP address",175);sessions.Columns.Add("Last seen",220);Controls.Add(sessions);
   revoke=AddButton("Sign out all remote sessions",16,354,230);
   revoke.Click+=(s,e)=>send("revoke-sessions",null,null,null);
+  Controls.Add(new Label{Text="Access log",Location=new Point(16,396),AutoSize=true});
+  audit=new ListView{View=View.Details,Location=new Point(16,418),Size=new Size(538,125),FullRowSelect=true,AccessibleName="Access log"};
+  audit.Columns.Add("Last activity",150);audit.Columns.Add("Action",190);audit.Columns.Add("Details",170);Controls.Add(audit);
   var close=AddButton("Close",458,354,96);close.DialogResult=DialogResult.Cancel;CancelButton=close;
  }
  Button AddButton(string text,int x,int y,int width) {
@@ -205,6 +210,11 @@ public class AccessWindow : Form {
    sessions.Items.Add(new ListViewItem(new[]{row.role,row.ip,at.ToString("g")}));
   }
   revoke.Enabled=item!=null&&item.adminConfigured;
+  audit.Items.Clear();
+  if(item!=null&&item.audit!=null)foreach(var row in item.audit) {
+   var at=new DateTime(1970,1,1,0,0,0,DateTimeKind.Utc).AddMilliseconds(row.at).ToLocalTime();
+   audit.Items.Add(new ListViewItem(new[]{at.ToString("g"),row.action.Replace('_',' '),row.detail??row.ip??""}));
+  }
  }
  void Password(string role) {
   using(var dialog=new Form{Text="Set "+role+" password",ClientSize=new Size(390,220),StartPosition=FormStartPosition.CenterParent,FormBorderStyle=FormBorderStyle.FixedDialog,MinimizeBox=false,MaximizeBox=false,BackColor=BackColor,ForeColor=ForeColor}) {

@@ -953,3 +953,13 @@ label {
   align-items: center;
   gap: 0.5rem;
 }
+
+.access-log {
+  max-height: 50vh;
+  overflow: auto;
+}
+
+.access-log li {
+  display: grid;
+  padding: 0.375rem 0;
+}

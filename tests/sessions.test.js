@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
+import { createAudit } from '../host/audit.js'
 import { hashPassword, needsRehash } from '../host/auth.js'
 import { createHost, createRoutes } from '../host/server.js'
 import { createSessions } from '../host/sessions.js'
@@ -25,8 +26,9 @@ async function fixture(t, options = {}) {
   writeTokenFixture(dist)
   store.db.prepare('UPDATE auth_config SET viewer_mode=?, admin_hash=?, viewer_hash=?').run(
     options.viewerMode ?? 'open', await hashPassword(password, options.parameters), await hashPassword('test viewer password'))
-  const auth = createSessions(store.db, { lan: true, now: () => time })
-  const server = createHost(store, { auth, dist, port: 0, remoteAddress: () => ip })
+  const audit = createAudit(store.db, () => time)
+  const auth = createSessions(store.db, { lan: true, now: () => time, audit })
+  const server = createHost(store, { auth, audit, dist, port: 0, remoteAddress: () => ip })
   server.listen(0, '127.0.0.1')
   await once(server, 'listening')
   t.after(async () => {
@@ -42,13 +44,13 @@ async function fixture(t, options = {}) {
     headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}) },
     body: JSON.stringify(body),
   })
-  return { fetchAt, login, store, clock: (delta) => { time += delta }, source: (address) => { ip = address } }
+  return { fetchAt, login, store, audit, clock: (delta) => { time += delta }, source: (address) => { ip = address } }
 }
 
 const asCookie = (response) => response.headers.get('set-cookie')?.split(';')[0]
 
 test('sessions hash credentials, upgrade atomically, and require an admin CSRF token', async (t) => {
-  const { fetchAt, login, store } = await fixture(t, { parameters: { N: 16384, r: 8, p: 1 } })
+  const { fetchAt, login, store, audit } = await fixture(t, { parameters: { N: 16384, r: 8, p: 1 } })
   const endpoint = api + 'auth/session'
   const initial = await fetchAt(endpoint)
   const viewer = asCookie(initial)
@@ -83,15 +85,19 @@ test('sessions hash credentials, upgrade atomically, and require an admin CSRF t
   assert.match(out.headers.get('set-cookie'), /Max-Age=0$/)
   assert.equal((await fetchAt(api + 'health', { headers: { cookie: admin } })).status, 401)
   assert.doesNotMatch(await (await fetchAt('/')).text(), /netwatch-write-token/)
+  const log = audit.read().entries
+  for (const action of ['login_success', 'session_upgrade', 'topology_applied', 'logout']) assert.ok(log.some((entry) => entry.action === action))
+  assert.ok(!JSON.stringify(log).includes(csrfToken))
+  assert.ok(!JSON.stringify(log).includes(password))
 })
 
 test('route table enforces local, unauthenticated, viewer, and admin access', async (t) => {
-  const { fetchAt, login, source } = await fixture(t)
+  const { fetchAt, login, source, audit } = await fixture(t)
   const session = await fetchAt(api + 'auth/session')
   const viewer = asCookie(session)
   const admin = asCookie(await login({ role: 'admin', password }))
   const cases = [
-    ['GET', api + 'auth/session', 200], ['POST', api + 'auth/login', 415], ['POST', api + 'auth/logout', 200],
+    ['GET', api + 'audit', 200], ['GET', api + 'auth/session', 200], ['POST', api + 'auth/login', 415], ['POST', api + 'auth/logout', 200],
     ['GET', api + 'health', 200], ['GET', api + 'topology', 200], ['PUT', api + 'topology', 403],
     ['GET', api + 'snapshot', 200], ['GET', discoveryPath.slice(0, -1), 200], ['POST', discoveryPath + 'scan-now', 403],
     ['POST', discoveryPath + 'clear', 403], ['POST', discoveryPath + 'missing/add-to-map', 403],
@@ -103,12 +109,13 @@ test('route table enforces local, unauthenticated, viewer, and admin access', as
     const route = createRoutes().find((candidate) => candidate.method === method && candidate.pattern.test(path))
     for (const [kind, cookie] of [['local'], ['unauthenticated'], ['viewer', viewer], ['admin', admin]]) {
       source(kind === 'local' ? '127.0.0.1' : '192.168.1.12')
-      const expected = route.access !== 'public' && kind === 'unauthenticated' ? 401 :
+      const expected = route.access === 'local' && kind !== 'local' ? 403 : route.access !== 'public' && kind === 'unauthenticated' ? 401 :
         route.access === 'admin' && kind === 'viewer' ? 403 : status
       const headers = cookie && !path.endsWith('/logout') ? { cookie } : {}
       assert.equal((await fetchAt(path, { method, headers })).status, expected, kind + ' ' + method + ' ' + path)
     }
   }
+  assert.equal(audit.read().entries.filter((entry) => entry.action === 'viewer_write_blocked').length, 5)
 })
 
 test('sessions expire by idle and absolute limits and evict the oldest session at each cap', async (t) => {
@@ -137,7 +144,7 @@ test('sessions expire by idle and absolute limits and evict the oldest session a
 })
 
 test('password mode, disabled viewers and global and per-address backoff', async (t) => {
-  const { fetchAt, login, source, clock, store } = await fixture(t, { viewerMode: 'password' })
+  const { fetchAt, login, source, clock, store, audit } = await fixture(t, { viewerMode: 'password' })
   const endpoint = api + 'auth/session'
   assert.equal((await (await fetchAt(endpoint)).json()).authenticated, false)
   assert.equal((await login({ role: 'viewer', password: 'test viewer password' })).status, 200)
@@ -154,22 +161,24 @@ test('password mode, disabled viewers and global and per-address backoff', async
   clock(30000)
   assert.equal((await (await fetchAt(endpoint)).json()).viewerMode, 'disabled')
   assert.equal((await login({ role: 'viewer', password: 'test viewer password' })).status, 401)
+  for (const action of ['login_failure', 'rate_limit_lockout']) assert.ok(audit.read().entries.some((entry) => entry.action === action))
 })
 
 test('discovery adds with checks enabled only from loopback', async (t) => {
-  const { fetchAt, login, source, store } = await fixture(t)
+  const { fetchAt, login, source, store, audit } = await fixture(t)
   const remote = await login({ role: 'admin', password })
   const { csrfToken } = await remote.json()
   const adminCookie = asCookie(remote)
-  for (const [kind, ip, address, enabled] of [
-    ['local', '127.0.0.1', '192.168.1.40', true],
-    ['remote-admin', '192.168.1.12', '192.168.1.41', false],
+  const remoteId = '00000000-0000-0000-0000-000000000002'
+  for (const [kind, id, ip, address, enabled] of [
+    ['local', '00000000-0000-0000-0000-000000000001', '127.0.0.1', '192.168.1.40', true],
+    ['remote-admin', remoteId, '192.168.1.12', '192.168.1.41', false],
   ]) {
     source(ip)
-    store.db.prepare("INSERT INTO discovered_devices VALUES(?,?,NULL,NULL,'neighbor',1,1,'new',NULL,0)").run(kind, address)
+    store.db.prepare("INSERT INTO discovered_devices VALUES(?,?,NULL,NULL,'neighbor',?,?,'new',NULL,0)").run(id, address, Date.now(), Date.now())
     const localShell = ip === '127.0.0.1' ? await (await fetchAt('/')).text() : ''
     const token = enabled ? /name="netwatch-write-token" content="([a-f0-9]+)"/.exec(localShell)[1] : csrfToken
-    const result = await fetchAt(discoveryPath + kind + '/add-to-map', {
+    const result = await fetchAt(discoveryPath + id + '/add-to-map', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'X-NetWatch-Write': token, cookie: adminCookie },
       body: JSON.stringify({ baseRevision: store.read().revision }),
     })
@@ -178,4 +187,13 @@ test('discovery adds with checks enabled only from loopback', async (t) => {
     const device = saved.topology.nodes.find((node) => node.data.ip === address)
     assert.equal(saved.monitoring[device.id], enabled, kind)
   }
+  for (const [path, body] of [[remoteId + '/remove', {}], ['clear'], ['scan-now']]) {
+    const response = await fetchAt(discoveryPath + path, { method: 'POST',
+      headers: { 'X-NetWatch-Write': csrfToken, cookie: adminCookie, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    })
+    assert.equal(response.status, 200, path)
+  }
+  for (const action of ['discovery_add', 'discovery_remove', 'discovery_clear', 'discovery_scan'])
+    assert.ok(audit.read().entries.some((entry) => entry.action === action && entry.source === 'remote'))
 })

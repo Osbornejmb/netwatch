@@ -11,7 +11,7 @@ const dummy = ['scrypt', 32768, 8, 1, randomBytes(16).toString('hex'), randomByt
 const cookie = (token, seconds) =>
   'netwatch_session=' + token + '; HttpOnly; SameSite=Strict; Path=/; Max-Age=' + seconds
 
-export function createSessions(db, { lan, now = Date.now } = {}) {
+export function createSessions(db, { lan, now = Date.now, audit } = {}) {
   const csrfKey = randomBytes(32)
   const csrf = (token) => createHmac('sha256', csrfKey).update(token).digest('hex')
   const select = db.prepare('SELECT * FROM sessions WHERE id_hash=?')
@@ -71,6 +71,11 @@ export function createSessions(db, { lan, now = Date.now } = {}) {
     db.exec('BEGIN IMMEDIATE')
     try {
       purge(at)
+      audit?.record(previous?.role === 'viewer' && role === 'admin' ? 'session_upgrade' : 'login_success', {
+        source: 'remote',
+        ip,
+        role,
+      })
       if (previous) remove.run(previous.id_hash)
       db.prepare('INSERT INTO sessions VALUES(?,?,?,?,?,?,?)').run(
         digest(token),
@@ -139,7 +144,10 @@ export function createSessions(db, { lan, now = Date.now } = {}) {
       return invalid('Invalid credentials', 429)
     }
     if (retry > at) {
-      if (previous.attempts.length < 10 && record(ip, { ...previous, last: at }, at)) throw limited(600)
+      if (previous.attempts.length < 10 && record(ip, { ...previous, last: at }, at)) {
+        audit?.record('rate_limit_lockout', { source, ip, role: null })
+        throw limited(600)
+      }
       throw limited(Math.max(1, Math.ceil((retry - at) / 1000)))
     }
     if (busy) throw limited(1)
@@ -156,7 +164,11 @@ export function createSessions(db, { lan, now = Date.now } = {}) {
         const end = now()
         const entry = failure(previous, end)
         global = failure(global, end)
-        if (record(ip, { ...entry, attempts: previous.attempts }, end)) throw limited(600)
+        audit?.record('login_failure', { source, ip, role: role === 'admin' || role === 'viewer' ? role : null })
+        if (record(ip, { ...entry, attempts: previous.attempts }, end)) {
+          audit?.record('rate_limit_lockout', { source, ip, role: null })
+          throw limited(600)
+        }
         throw invalid('Invalid credentials', 401)
       }
       if (generationAtLogin !== generation) throw invalid('Invalid credentials', 401)
@@ -186,9 +198,12 @@ export function createSessions(db, { lan, now = Date.now } = {}) {
     current,
     login,
     purge,
-    logout({ session, res, source }) {
+    logout({ session, res, source, ip }) {
       if (source === 'remote') {
-        if (session) remove.run(session.id_hash)
+        if (session) {
+          remove.run(session.id_hash)
+          audit?.record('logout', { source, ip, role: session.role })
+        }
         res.setHeader('Set-Cookie', cookie('', 0))
       }
       return { authenticated: false }

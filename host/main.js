@@ -2,9 +2,10 @@ import { mkdirSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { openStore } from './store.js'
 import { createLanListeners } from './lan.js'
+import { createAudit } from './audit.js'
 import { manageLauncherAccess } from './auth-config.js'
 import { createSessions } from './sessions.js'
-import { createHost } from './server.js'
+import { createHost, createRoutes } from './server.js'
 import { loopbackUrl, readPort } from './port.js'
 import { lock } from './files.js'
 import { createCollector } from './collector.js'
@@ -45,8 +46,10 @@ const discovery = createDiscovery(store, {
   probeGate,
   maxPrefix: discoveryPrefix,
 })
-const auth = createSessions(store.db, { lan: process.env.NETWATCH_LAN === '1' })
-const hostOptions = { port, collector, interfaces, discovery, auth }
+const audit = createAudit(store.db)
+audit.purge()
+const auth = createSessions(store.db, { lan: process.env.NETWATCH_LAN === '1', audit })
+const hostOptions = { port, collector, interfaces, discovery, routes: createRoutes(discovery), auth, audit }
 const lan =
   process.env.NETWATCH_LAN === '1'
     ? createLanListeners({
@@ -68,7 +71,10 @@ server.listen(port, '127.0.0.1', () => {
   if (process.connected)
     process.send({ type: 'ready', port, collector: collector.snapshot().state, urls: lan?.urls() ?? [] })
 })
-const sessionCleanup = setInterval(() => auth.purge(), 60000)
+const sessionCleanup = setInterval(() => {
+  auth.purge()
+  audit.purge()
+}, 60000)
 sessionCleanup.unref()
 let stopping = false
 let accessUpdate

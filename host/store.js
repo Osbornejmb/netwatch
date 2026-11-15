@@ -142,11 +142,22 @@ const MIGRATIONS = [
       db.prepare("INSERT INTO auth_config VALUES(1,'password',NULL,NULL,?)").run(new Date(now()).toISOString())
     },
   },
+  {
+    version: 8,
+    up(db) {
+      db.exec(`CREATE TABLE audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL,
+        source TEXT NOT NULL, ip TEXT, role TEXT, action TEXT NOT NULL, detail TEXT);
+        CREATE INDEX audit_log_at ON audit_log(at);
+        CREATE TRIGGER audit_log_cap AFTER INSERT ON audit_log BEGIN
+          DELETE FROM audit_log WHERE id <= (SELECT id FROM audit_log ORDER BY id DESC LIMIT 1 OFFSET 5000);
+        END;`)
+    },
+  },
 ]
 
 export function openStore(
   path,
-  { now = () => Date.now(), migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7 } = {},
+  { now = () => Date.now(), migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7, migrateV8 } = {},
 ) {
   const db = new DatabaseSync(path)
   db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=3000;')
@@ -155,7 +166,7 @@ export function openStore(
     db.close()
     throw new Error('Database schema is newer than this host. Use a compatible host; do not delete the database.')
   }
-  const hooks = [migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7]
+  const hooks = [migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7, migrateV8]
   try {
     for (const migration of MIGRATIONS) {
       if (migration.version <= version) continue

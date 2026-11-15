@@ -95,6 +95,7 @@ test('launcher configures passwords through private pipes and reports only sessi
  assert.ok(!JSON.stringify(configured).includes('scrypt'))
  const opened=await command({command:'viewer-mode',mode:'open'},e=>e.viewerMode==='open')
  assert.equal(opened.adminConfigured,true)
+ assert.ok(opened.audit.some(entry=>entry.detail==='viewer-mode:open'))
  assert.equal((await command({command:'revoke-sessions'},e=>!e.error)).sessions.length,0)
  instance.child.stdin.write('stop\n')
  assert.equal((await instance.closed)[0],0)

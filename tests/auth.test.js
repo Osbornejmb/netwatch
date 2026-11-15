@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createAudit } from '../host/audit.js'
 import { manageAuth } from '../host/auth-config.js'
 import { hashPassword, needsRehash, readAuthConfig, remoteEnabled, verifyPassword } from '../host/auth.js'
 import { openStore } from '../host/store.js'
@@ -45,5 +46,6 @@ test('local configuration starts closed, takes passwords from prompts and revoke
   db.exec("INSERT INTO sessions VALUES('session-hash','admin','csrf-hash',1,1,2,'192.168.1.2')")
   await run(['revoke-sessions'])
   assert.equal(db.prepare('SELECT count(*) AS count FROM sessions').get().count, 0)
+  assert.deepEqual(createAudit(db).read().entries.map((entry) => entry.detail), ['revoke-sessions', 'viewer-mode:open', 'set-admin-password'])
   assert.ok(messages.every((message) => !message.includes(password) && !message.includes('scrypt$')))
 })
