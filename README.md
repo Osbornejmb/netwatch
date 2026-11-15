@@ -27,7 +27,7 @@ npm.cmd run desktop:setup -- --desktop-shortcut
 4. Open the **NetWatch** desktop shortcut.
 5. Enable its **Check devices on next start** checkbox if you want reachability checks, then click **Start** and **Open dashboard**.
 
-The dashboard is available at **http://127.0.0.1:4317** on this PC. No administrator access or PowerShell execution-policy change is required. Keep the repository folder and Node installation in place; rerun setup if either moves. Quit NetWatch before updating its launcher.
+The dashboard is available at **http://127.0.0.1:4317** by default. Set `NETWATCH_PORT` to a free port from 1024 through 65535 in the environment before starting the host or the launcher. No administrator access or PowerShell execution-policy change is required. Keep the repository folder and Node installation in place; rerun setup if either moves. Quit NetWatch before updating its launcher.
 
 For release acceptance, safe updates and recovery, see the [Windows release runbook](docs/WINDOWS-RELEASE-RUNBOOK.md).
 
@@ -87,7 +87,7 @@ npm.cmd run build
 npm.cmd run dev
 ```
 
-The Vite development UI is browser-only and does not run the monitoring host. Use the built app at port 4317 for monitoring. Optional browser checks in `scripts/check-*-browser.mjs` require external Playwright and Chromium; set `PLAYWRIGHT_MODULE`, `CHROMIUM_PATH` and `NETWATCH_URL` as needed. On Windows, an absolute module path must be a `file:///` URL. Test inventories and synthetic observations live under `tests/fixtures/`; they are not bundled into the application or probed.
+The Vite development UI is browser-only and does not run the monitoring host. Use the built app served by the host on its configured port for monitoring. Optional browser checks in `scripts/check-*-browser.mjs` use the Playwright dev dependency and Chromium; set `PLAYWRIGHT_MODULE`, `CHROMIUM_PATH` and `NETWATCH_URL` as needed. On Windows, an absolute module path must be a `file:///` URL. Test inventories and synthetic observations live under `tests/fixtures/`; they are not bundled into the application or probed.
 
 ## Remaining work
 

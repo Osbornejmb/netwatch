@@ -2,32 +2,101 @@ import http from 'node:http'
 import { readFile } from 'node:fs/promises'
 import { resolve, extname, relative, isAbsolute } from 'node:path'
 import { invalid, MAX_BODY } from './store.js'
-import { randomUUID } from 'node:crypto'
+import { loopbackUrl, readPort } from './port.js'
+import { health } from './routes/health.js'
+import { readTopology, writeTopology } from './routes/topology.js'
+import { snapshot } from './routes/snapshot.js'
+import { listDiscovered, scanNow, clearDiscovered, addDiscoveredToMap, removeDiscovered } from './routes/discovered.js'
+import { deviceChecks, deviceIncidents, deviceInterfaces } from './routes/devices.js'
+
+function decodePath(path) {
+  try {
+    return decodeURIComponent(path)
+  } catch {
+    throw invalid('Malformed URL.')
+  }
+}
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = []
     let bytes = 0
-    let rejected = false
     req.on('data', (chunk) => {
       bytes += chunk.length
       if (bytes > MAX_BODY) {
-        rejected = true
+        req.pause()
         chunks.length = 0
+        reject(invalid('Payload exceeds 5 MB.', 413))
         return
       }
-      if (!rejected) chunks.push(chunk)
+      chunks.push(chunk)
     })
-    req.on('end', () => {
-      if (rejected) reject(invalid('Payload exceeds 5 MB.', 413))
-      else resolve(Buffer.concat(chunks).toString('utf8'))
-    })
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
     req.on('error', () => reject(invalid('Request interrupted.')))
   })
 }
 
-export function createHost(store, { port = 4317, dist = resolve('dist'), collector, interfaces, discovery } = {}) {
-  let lastScanRequest = 0
+function requireJson(req) {
+  if (req.headers['content-type']?.split(';')[0] !== 'application/json') throw invalid('Use application/json.', 415)
+}
+
+async function parseBody(req, bodyType) {
+  if (!bodyType) return
+  if (bodyType !== 'json') {
+    if ((Number(req.headers['content-length']) || 0) > 0 || req.headers['transfer-encoding'])
+      throw invalid(bodyType + ' requests do not accept a body.')
+    return
+  }
+  const raw = await readBody(req)
+  try {
+    return JSON.parse(raw)
+  } catch {
+    throw invalid('Invalid JSON.')
+  }
+}
+
+export function createHost(
+  store,
+  { port = readPort(), dist = resolve('dist'), collector, interfaces, discovery } = {},
+) {
+  const routes = [
+    { method: 'GET', pattern: /^\/api\/v1\/health$/, handler: health },
+    { method: 'GET', pattern: /^\/api\/v1\/topology$/, handler: readTopology },
+    { method: 'PUT', pattern: /^\/api\/v1\/topology$/, handler: writeTopology, requiresWrite: true, bodyType: 'json' },
+    { method: 'GET', pattern: /^\/api\/v1\/snapshot$/, handler: snapshot },
+    { method: 'GET', pattern: /^\/api\/v1\/discovered$/, handler: listDiscovered },
+    {
+      method: 'POST',
+      pattern: /^\/api\/v1\/discovered\/scan-now$/,
+      handler: scanNow(discovery),
+      requiresWrite: true,
+      bodyType: 'Scan',
+    },
+    {
+      method: 'POST',
+      pattern: /^\/api\/v1\/discovered\/clear$/,
+      handler: clearDiscovered,
+      requiresWrite: true,
+      bodyType: 'Clear',
+    },
+    {
+      method: 'POST',
+      pattern: /^\/api\/v1\/discovered\/([^/]+)\/add-to-map$/,
+      handler: addDiscoveredToMap,
+      requiresWrite: true,
+      bodyType: 'json',
+    },
+    {
+      method: 'POST',
+      pattern: /^\/api\/v1\/discovered\/([^/]+)\/remove$/,
+      handler: removeDiscovered,
+      requiresWrite: true,
+      bodyType: 'json',
+    },
+    { method: 'GET', pattern: /^\/api\/v1\/devices\/([^/]+)\/checks$/, handler: deviceChecks },
+    { method: 'GET', pattern: /^\/api\/v1\/devices\/([^/]+)\/incidents$/, handler: deviceIncidents },
+    { method: 'GET', pattern: /^\/api\/v1\/devices\/([^/]+)\/interfaces$/, handler: deviceInterfaces },
+  ]
   const server = http.createServer(async (req, res) => {
     const send = (status, body) => {
       res.writeHead(status, {
@@ -38,179 +107,35 @@ export function createHost(store, { port = 4317, dist = resolve('dist'), collect
       res.end(JSON.stringify(body))
     }
     try {
-      const authority = `127.0.0.1:${port === 0 ? server.address().port : port}`
-      if (req.headers.host !== authority) throw invalid('Unexpected host.', 403)
-      if (req.headers.origin && req.headers.origin !== `http://${authority}`) throw invalid('Unexpected origin.', 403)
+      const origin = loopbackUrl(port === 0 ? server.address().port : port)
+      if (req.headers.host !== origin.slice('http://'.length)) {
+        if (/^(?:localhost|\[::1\])(?::\d+)?$/i.test(req.headers.host ?? '')) throw invalid('Use ' + origin + '.', 403)
+        throw invalid('Unexpected host.', 403)
+      }
+      if (req.headers.origin && req.headers.origin !== origin) throw invalid('Unexpected origin.', 403)
       if (req.headers['sec-fetch-site'] && !['same-origin', 'none'].includes(req.headers['sec-fetch-site']))
         throw invalid('Cross-site requests are disabled.', 403)
-      const url = new URL(req.url, `http://${authority}`)
-      if (req.method === 'GET' && url.pathname === '/api/v1/health') {
-        store.read()
-        return send(200, {
-          apiVersion: 1,
-          ready: true,
-          collector: collector?.snapshot() ?? { state: 'not-implemented' },
-          interfaces: interfaces?.snapshot() ?? { state: 'disabled' },
-          discovery: discovery?.snapshot() ?? { state: 'disabled' },
-        })
+      let url
+      try {
+        url = new URL(req.url, origin)
+      } catch {
+        throw invalid('Malformed URL.')
       }
-      if (req.method === 'GET' && url.pathname === '/api/v1/topology') return send(200, store.read())
-      if (req.method === 'GET' && url.pathname === '/api/v1/snapshot') {
-        const snapshot = store.snapshot()
-        const status = collector?.snapshot()
-        if (status) {
-          snapshot.collector = status
-          snapshot.freshness = status.freshness
-        }
-        snapshot.discovery = discovery?.snapshot() ?? { state: 'disabled' }
-        return send(200, snapshot)
-      }
-      if (req.method === 'GET' && url.pathname === '/api/v1/discovered')
-        return send(
-          200,
-          store.discovered({
-            after: url.searchParams.has('after') ? Number(url.searchParams.get('after')) : 0,
-            limit: url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : 100,
-          }),
-        )
-      if (req.method === 'POST' && url.pathname === '/api/v1/discovered/scan-now') {
-        if (req.headers['x-netwatch-write'] !== '1') throw invalid('Explicit write header required.', 403)
-        if ((Number(req.headers['content-length']) || 0) > 0 || req.headers['transfer-encoding'])
-          throw invalid('Scan requests do not accept a body.')
-        if (Date.now() - lastScanRequest < 30000) throw invalid('Wait before starting another scan.', 429)
-        lastScanRequest = Date.now()
-        await discovery?.runOnce()
-        return send(200, discovery?.snapshot() ?? { state: 'disabled' })
-      }
-      if (req.method === 'POST' && url.pathname === '/api/v1/discovered/clear') {
-        if (req.headers['x-netwatch-write'] !== '1') throw invalid('Explicit write header required.', 403)
-        if ((Number(req.headers['content-length']) || 0) > 0 || req.headers['transfer-encoding'])
-          throw invalid('Clear requests do not accept a body.')
-        return send(200, { removed: store.clearDiscovery() })
-      }
-      const discoveredAction = url.pathname.match(/^\/api\/v1\/discovered\/([^/]+)\/(add-to-map|remove)$/)
-      if (req.method === 'POST' && discoveredAction) {
-        if (req.headers['x-netwatch-write'] !== '1') throw invalid('Explicit write header required.', 403)
-        if (req.headers['content-type']?.split(';')[0] !== 'application/json')
-          throw invalid('Use application/json.', 415)
-        let body
-        try {
-          body = JSON.parse(await readBody(req))
-        } catch (e) {
-          if (e.status) throw e
-          throw invalid('Invalid JSON.')
-        }
-        const id = decodeURIComponent(discoveredAction[1]),
-          action = discoveredAction[2]
-        if (action === 'remove') {
-          store.removeDiscovery(id)
-          return send(200, { ok: true })
-        }
-        const discovered = store.discoveredDevice(id)
-        if (!discovered) throw invalid('Discovered device not found.', 404)
-        if (body?.baseRevision !== store.revision()) throw invalid('Inventory changed.', 409)
-        const gatewayIp = await discovery?.gatewayFor?.(discovered.ip)
-        const item = store.discoveredDevice(id)
-        if (!item) throw invalid('Discovered device not found.', 404)
-        const current = store.read()
-        if (body.baseRevision !== current.revision) throw invalid('Inventory changed.', 409)
-        let deviceId = item.savedDeviceId,
-          node = deviceId && current.topology.nodes.find((candidate) => candidate.id === deviceId),
-          topology = current.topology,
-          promotedRouter = false,
-          monitoring = { ...current.monitoring }
-        if (item.status === 'added' && !node) throw invalid('The saved device is missing from the map.', 409)
-        if (!node) {
-          deviceId = randomUUID()
-          node = {
-            id: deviceId,
-            type: item.ip === gatewayIp ? 'router' : 'switch',
-            position: { x: 0, y: 0 },
-            data: { label: item.hostname || item.ip, ip: item.ip, description: '' },
-          }
-          topology = { ...topology, nodes: [...topology.nodes, node] }
-          monitoring[deviceId] = true
-        } else if (item.ip === gatewayIp && node.type !== 'router') {
-          node = { ...node, type: 'router' }
-          topology = {
-            ...topology,
-            nodes: topology.nodes.map((candidate) => (candidate.id === deviceId ? node : candidate)),
-          }
-          promotedRouter = true
-        }
-        const gateway = topology.nodes.find(
-            (candidate) => candidate.type === 'router' && candidate.data.ip === gatewayIp && candidate.id !== deviceId,
-          ),
-          hasLink =
-            gateway &&
-            topology.edges.some(
-              (edge) =>
-                (edge.source === deviceId && edge.target === gateway.id) ||
-                (edge.source === gateway.id && edge.target === deviceId),
-            ),
-          edge =
-            gateway && !hasLink && topology.edges.length < 10000
-              ? { id: randomUUID(), source: deviceId, target: gateway.id, label: 'Gateway route' }
-              : null
-        if (edge) topology = { ...topology, edges: [...topology.edges, edge] }
-        const saved =
-          topology === current.topology
-            ? current
-            : store.write(
-                { source: 'inventory', topology, monitoring },
-                current.revision,
-                item.status === 'added' ? undefined : () => store.discoveryAction(id, 'added', deviceId),
-              )
-        return send(200, {
-          ...saved,
-          discoveryLink: edge ? { label: gateway.data.label || gateway.data.ip } : null,
-          promotedRouter,
-        })
-      }
-      const incidents = url.pathname.match(/^\/api\/v1\/devices\/([^/]+)\/incidents$/)
-      const ports = url.pathname.match(/^\/api\/v1\/devices\/([^/]+)\/interfaces$/)
-      if (req.method === 'GET' && ports) {
-        const id = decodeURIComponent(ports[1])
-        return send(200, {
-          ...store.interfaces(id, {
-            after: url.searchParams.has('after') ? Number(url.searchParams.get('after')) : 0,
-            limit: url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : 50,
-          }),
-          monitoring: interfaces?.device(id) ?? { collectorState: 'disabled', staleAfterMs: 180000 },
-        })
-      }
-      if (req.method === 'GET' && incidents)
-        return send(
-          200,
-          store.incidents(decodeURIComponent(incidents[1]), {
-            limit: url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : 25,
-            before: url.searchParams.has('before') ? Number(url.searchParams.get('before')) : undefined,
-          }),
-        )
-      const history = url.pathname.match(/^\/api\/v1\/devices\/([^/]+)\/checks$/)
-      if (req.method === 'GET' && history)
-        return send(
-          200,
-          store.history(decodeURIComponent(history[1]), {
-            limit: url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : 50,
-            before: url.searchParams.has('before') ? Number(url.searchParams.get('before')) : undefined,
-          }),
-        )
-      if (req.method === 'PUT' && url.pathname === '/api/v1/topology') {
-        if (req.headers['content-type']?.split(';')[0] !== 'application/json')
-          throw invalid('Use application/json.', 415)
-        if (req.headers['x-netwatch-write'] !== '1') throw invalid('Explicit write header required.', 403)
-        const raw = await readBody(req)
-        let body
-        try {
-          body = JSON.parse(raw)
-        } catch {
-          throw invalid('Invalid JSON.')
-        }
-        return send(200, store.write(body, body?.baseRevision))
+      for (const { method, pattern, handler, requiresWrite, bodyType } of routes) {
+        if (req.method !== method) continue
+        const match = pattern.exec(url.pathname)
+        if (!match) continue
+        // PUT topology has historically checked its media type before the write header.
+        if (method === 'PUT') requireJson(req)
+        if (requiresWrite && req.headers['x-netwatch-write'] !== '1')
+          throw invalid('Explicit write header required.', 403)
+        if (method !== 'PUT' && bodyType === 'json') requireJson(req)
+        const body = await parseBody(req, bodyType)
+        const id = match[1] === undefined ? undefined : decodePath(match[1])
+        return send(200, await handler({ store, collector, interfaces, discovery, url, id, body }))
       }
       if (url.pathname.startsWith('/api/') || req.method !== 'GET') throw invalid('Route not found.', 404)
-      const file = resolve(dist, `.${decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname)}`)
+      const file = resolve(dist, `.${decodePath(url.pathname === '/' ? '/index.html' : url.pathname)}`)
       if (relative(dist, file).startsWith('..') || isAbsolute(relative(dist, file)))
         throw invalid('Route not found.', 404)
       let data
@@ -219,7 +144,12 @@ export function createHost(store, { port = 4317, dist = resolve('dist'), collect
       } catch {
         throw invalid('Build not found. Run npm run build.', 404)
       }
+      const staticPath = relative(dist, file).replaceAll('\\', '/')
       res.writeHead(200, {
+        ...(staticPath === 'index.html' ? { 'Cache-Control': 'no-cache' } : {}),
+        ...(/^assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[^/]+$/.test(staticPath)
+          ? { 'Cache-Control': 'public, max-age=31536000, immutable' }
+          : {}),
         'Content-Type':
           {
             '.html': 'text/html',
@@ -228,6 +158,9 @@ export function createHost(store, { port = 4317, dist = resolve('dist'), collect
             '.svg': 'image/svg+xml',
             '.png': 'image/png',
             '.ico': 'image/x-icon',
+            '.woff2': 'font/woff2',
+            '.json': 'application/json',
+            '.map': 'application/json',
           }[extname(file)] || 'application/octet-stream',
         'X-Content-Type-Options': 'nosniff',
         'Content-Security-Policy':
@@ -235,6 +168,10 @@ export function createHost(store, { port = 4317, dist = resolve('dist'), collect
       })
       res.end(data)
     } catch (e) {
+      if (e.status === 413) {
+        res.setHeader('Connection', 'close')
+        res.once('finish', () => req.socket.destroySoon())
+      }
       send(e.status ?? 500, {
         error: {
           code: e.status === 409 ? 'revision_conflict' : !e.status ? 'internal_error' : 'request_rejected',

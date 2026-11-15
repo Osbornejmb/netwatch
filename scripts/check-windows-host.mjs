@@ -1,3 +1,4 @@
+import { loopbackUrl } from '../host/port.js'
 import assert from 'node:assert/strict'
 import { fork, execFile } from 'node:child_process'
 import { once } from 'node:events'
@@ -20,7 +21,7 @@ if (process.argv[2] === '--child') {
   if (process.platform !== 'win32' || process.argv[2] !== '--loopback') throw new Error('Windows only; pass --loopback to authorize only 127.0.0.1 and ::1.')
   const dir = mkdtempSync(join(tmpdir(), 'netwatch-host-'))
   const path = join(dir, 'db')
-  const base = 'http://127.0.0.1:4317'
+  const base = loopbackUrl()
   const nodes = ['127.0.0.1', '::1'].map((ip, i) => ({id:`loopback-${i}`,type:'router',position:{x:0,y:0},data:{label:`Loopback ${i}`,ip}}))
   const evidence = {scope:'Windows loopback only; IPC invokes SIGINT handler, not a physical Ctrl+C',node:process.version,windows: (await import('node:os')).release()}
   let child, exit, output = ''

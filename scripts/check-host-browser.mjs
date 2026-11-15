@@ -1,10 +1,11 @@
+import { loopbackUrl } from '../host/port.js'
 import { mkdirSync } from 'node:fs'
 import { createEditorNetwork } from '../tests/fixtures/editor-network.js'
 import assert from 'node:assert/strict'
 
 mkdirSync('.tools/evidence', { recursive: true })
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright')
-const base=process.env.NETWATCH_HOST_URL||'http://127.0.0.1:4317'
+const base=process.env.NETWATCH_HOST_URL||loopbackUrl()
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']})
 const context=await browser.newContext({viewport:{width:1440,height:900}})
 await context.addInitScript(network => { if (!localStorage.getItem('netwatch-topology-v1')) localStorage.setItem('netwatch-topology-v1', JSON.stringify(network)) }, createEditorNetwork())

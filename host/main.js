@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { openStore } from './store.js'
 import { createHost } from './server.js'
+import { loopbackUrl, readPort } from './port.js'
 import { lock } from './files.js'
 import { createCollector } from './collector.js'
 import { createWindowsProbe } from './windows-probe.js'
@@ -10,6 +11,7 @@ import { createCredentialVault, credentialDirectory } from './snmp-secrets.js'
 import { createInterfaceCollector } from './snmp-collector.js'
 import { createDiscovery } from './discovery.js'
 import { createProbeGate } from './probe-gate.js'
+const port = readPort()
 const path = resolve(process.env.NETWATCH_DB || 'data/netwatch.sqlite')
 mkdirSync(dirname(path), { recursive: true })
 const release = lock(path)
@@ -40,8 +42,8 @@ const discovery = createDiscovery(store, {
   probeGate,
   maxPrefix: discoveryPrefix,
 })
-const server = createHost(store, { collector, interfaces, discovery })
-server.listen(4317, '127.0.0.1', () => {
+const server = createHost(store, { port, collector, interfaces, discovery })
+server.listen(port, '127.0.0.1', () => {
   if (stopping) {
     server.close()
     return
@@ -49,8 +51,8 @@ server.listen(4317, '127.0.0.1', () => {
   collector.start()
   interfaces.start()
   discovery.start()
-  console.log('NetWatch: http://127.0.0.1:4317 (loopback only). Collector: ' + collector.snapshot().state)
-  if (process.connected) process.send({ type: 'ready', collector: collector.snapshot().state })
+  console.log('NetWatch: ' + loopbackUrl(port) + ' (loopback only). Collector: ' + collector.snapshot().state)
+  if (process.connected) process.send({ type: 'ready', port, collector: collector.snapshot().state })
 })
 let stopping = false
 async function shutdown(code = 0) {

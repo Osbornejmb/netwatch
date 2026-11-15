@@ -11,7 +11,7 @@ using System.Windows.Forms;
 public class DesktopSettings {
  public string node {get;set;} public string root {get;set;} public string database {get;set;} public bool icmp {get;set;} public bool discovery {get;set;} public bool discoveryIcmp {get;set;}
 }
-public class HostEvent {public string state {get;set;} public string message {get;set;}}
+public class HostEvent {public string state {get;set;} public string message {get;set;} public int port {get;set;}}
 public class NetWatchMenuColors : ProfessionalColorTable {
  public override Color ToolStripDropDownBackground {get{return Color.FromArgb(252,251,247);}}
  public override Color ImageMarginGradientBegin {get{return ToolStripDropDownBackground;}}
@@ -33,6 +33,7 @@ public class NetWatch : Form {
  CheckBox monitoring,discovery,discoveryIcmp;
  Button start,stop,open;
  ToolStripMenuItem trayStart,trayStop,trayOpen;
+ int dashboardPort=4317;
  bool quitting=false;
  string state="stopped";
 
@@ -94,13 +95,13 @@ public class NetWatch : Form {
    var info=new ProcessStartInfo(settings.node,"host/desktop.js"){WorkingDirectory=settings.root,UseShellExecute=false,CreateNoWindow=true,RedirectStandardInput=true,RedirectStandardOutput=true,RedirectStandardError=true,StandardOutputEncoding=Encoding.UTF8,StandardErrorEncoding=Encoding.UTF8};
    info.EnvironmentVariables["NETWATCH_DB"]=settings.database;info.EnvironmentVariables["NETWATCH_ICMP"]=settings.icmp?"1":"0";info.EnvironmentVariables["NETWATCH_DISCOVERY"]=settings.discovery?"1":"0";info.EnvironmentVariables["NETWATCH_DISCOVERY_ICMP"]=settings.discovery&&settings.discoveryIcmp?"1":"0";
    host=new Process{StartInfo=info,EnableRaisingEvents=true};
-   host.OutputDataReceived+=(s,e)=>{if(e.Data==null)return;try{var item=json.Deserialize<HostEvent>(e.Data);UI(()=>SetState(item.state,item.message));}catch{}};
+   host.OutputDataReceived+=(s,e)=>{if(e.Data==null)return;try{var item=json.Deserialize<HostEvent>(e.Data);UI(()=>{if(item.port>=1024&&item.port<=65535)dashboardPort=item.port;SetState(item.state,item.message);});}catch{}};
    host.ErrorDataReceived+=(s,e)=>{if(!String.IsNullOrWhiteSpace(e.Data))UI(()=>SetState("error","Launcher error. Check Node and the data path."));};
    host.Exited+=(s,e)=>{var ended=(Process)s;ended.WaitForExit();UI(()=>{if(host!=ended)return;ended.Dispose();host=null;if(quitting)Application.Exit();else SetState(state=="error"?"error":"stopped",state=="error"?status.Text:"NetWatch is stopped. Your data is saved.");});};
    host.Start();host.BeginOutputReadLine();host.BeginErrorReadLine();SetState("starting","Starting NetWatch…");
   } catch(Exception ex){if(host!=null){host.Dispose();host=null;}SetState("error",ex.Message);}
  }
  void StopHost(){if(host==null)return;try{host.StandardInput.WriteLine("stop");host.StandardInput.Flush();SetState("stopping","Finishing checks and saving your data…");}catch(Exception ex){SetState("error",ex.Message);}}
- void OpenDashboard(){try{Process.Start(new ProcessStartInfo("http://127.0.0.1:4317"){UseShellExecute=true});}catch(Exception ex){MessageBox.Show(ex.Message,"Unable to open browser");}}
+ void OpenDashboard(){try{Process.Start(new ProcessStartInfo("http://127.0.0.1:"+dashboardPort){UseShellExecute=true});}catch(Exception ex){MessageBox.Show(ex.Message,"Unable to open browser");}}
  void Quit(){quitting=true;if(host==null)Application.Exit();else StopHost();}
 }

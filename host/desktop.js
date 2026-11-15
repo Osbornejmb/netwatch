@@ -1,9 +1,10 @@
 import { fork } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
+import { loopbackUrl } from './port.js'
 
 // Private parent/child IPC only: no HTTP process-control endpoint.
-const report = (state, message) => process.stdout.write(JSON.stringify({ state, message }) + '\n')
+const report = (state, message, port) => process.stdout.write(JSON.stringify({ state, message, port }) + '\n')
 let errorText = '',
   ready = false,
   stopping = false,
@@ -41,10 +42,16 @@ child.on('message', (message) => {
     ready = true
     clearTimeout(startup)
     if (!stopping) {
-      report('running', `Host running · ICMP ${process.env.NETWATCH_ICMP === '1' ? 'enabled' : 'disabled'}`)
+      report(
+        'running',
+        `Host running · ICMP ${process.env.NETWATCH_ICMP === '1' ? 'enabled' : 'disabled'}`,
+        message.port,
+      )
       healthTimer = setInterval(async () => {
         try {
-          const response = await fetch('http://127.0.0.1:4317/api/v1/health', { signal: AbortSignal.timeout(2000) })
+          const response = await fetch(loopbackUrl(message.port) + '/api/v1/health', {
+            signal: AbortSignal.timeout(2000),
+          })
           const health = await response.json()
           if (!stopping && child.exitCode === null)
             report(
