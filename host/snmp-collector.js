@@ -17,6 +17,7 @@ export function createInterfaceCollector(
     controller,
     stopped = false
   const devices = new Map(),
+    neighbors = new Map(),
     info = {
       state: !enabled ? 'disabled' : platform !== 'win32' ? 'unsupported' : 'starting',
       lastSeenAt: null,
@@ -40,6 +41,7 @@ export function createInterfaceCollector(
     info.errors = 0
     const ids = new Set(targets.map((t) => t.deviceId))
     for (const id of devices.keys()) if (!ids.has(id)) devices.delete(id)
+    for (const id of neighbors.keys()) if (!ids.has(id)) neighbors.delete(id)
     if (!targets.length) {
       info.state = 'idle'
       info.lastSeenAt = stamp()
@@ -91,8 +93,17 @@ export function createInterfaceCollector(
                 : 'snmp_failed',
             )
           store.appendInterfaces(target.deviceId, value, { revision, authorization: target.authorization })
+          const prior = neighbors.get(target.deviceId)
+          if (value.lldp?.checkedAt)
+            neighbors.set(target.deviceId, { ...value.lldp, authorization: target.authorization })
+          else if (prior?.authorization === target.authorization)
+            neighbors.set(target.deviceId, { ...prior, state: 'stale' })
+          else neighbors.delete(target.deviceId)
           devices.set(target.deviceId, { state: 'ok', lastAttemptAt: stamp() })
         } catch (error) {
+          const prior = neighbors.get(target.deviceId)
+          if (prior?.authorization === target.authorization)
+            neighbors.set(target.deviceId, { ...prior, state: 'stale' })
           info.errors++
           devices.set(target.deviceId, {
             state: ['credentials_unavailable', 'snmp_timeout', 'snmp_limit', 'snmp_changed', 'snmp_failed'].includes(
@@ -149,6 +160,18 @@ export function createInterfaceCollector(
     runOnce,
     snapshot: () => ({ ...info, freshness: { staleAfterMs: freshness() } }),
     device: (id) => ({ ...devices.get(id), collectorState: info.state, staleAfterMs: freshness() }),
+    neighbors(id) {
+      const target = store.interfaceTargets().find((row) => row.deviceId === id)
+      if (!target) return { state: 'unconfigured', neighbors: [] }
+      const sample = neighbors.get(id)
+      if (!sample || sample.authorization !== target.authorization) return { state: 'unavailable', neighbors: [] }
+      const age = now() - Date.parse(sample.checkedAt)
+      return {
+        checkedAt: sample.checkedAt,
+        state: stopped || !Number.isFinite(age) || age < 0 || age > freshness() ? 'stale' : sample.state,
+        neighbors: sample.neighbors,
+      }
+    },
     start() {
       if (!stopped && enabled && platform === 'win32' && !timer && !active) void poll()
     },

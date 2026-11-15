@@ -460,6 +460,21 @@
   font-size: 13px;
   overflow-wrap: anywhere;
 }
+.neighbor-review-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.neighbor-review-form label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.neighbor-review-form :is(select, input) {
+  min-height: 44px;
+  width: 100%;
+  min-width: 0;
+}
 .health-neighbors small {
   display: block;
   margin-top: 6px;

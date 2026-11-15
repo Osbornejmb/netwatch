@@ -13,6 +13,7 @@ import { readTopology, writeTopology } from './routes/topology.js'
 import { createSnapshotRoute } from './routes/snapshot.js'
 import { listDiscovered, scanNow, clearDiscovered, addDiscoveredToMap, removeDiscovered } from './routes/discovered.js'
 import { deviceChecks, deviceIncidents, deviceInterfaces } from './routes/devices.js'
+import { applyNeighbor, readNeighbors } from './routes/neighbors.js'
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -114,6 +115,16 @@ export function createRoutes(discovery) {
       pattern: /^\/api\/v1\/devices\/([^/]+)\/interfaces$/,
       handler: deviceInterfaces,
       access: 'viewer',
+    },
+    { method: 'GET', pattern: /^\/api\/v1\/devices\/([^/]+)\/neighbors$/, handler: readNeighbors, access: 'admin' },
+    {
+      method: 'PUT',
+      pattern: /^\/api\/v1\/devices\/([^/]+)\/neighbors$/,
+      handler: applyNeighbor,
+      auditAction: 'topology_applied',
+      access: 'admin',
+      requiresWrite: true,
+      bodyType: 'json',
     },
     { method: 'GET', pattern: /^(?!\/api\/)/, handler: serveStatic, access: 'public' },
   ]

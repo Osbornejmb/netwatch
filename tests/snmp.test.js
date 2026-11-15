@@ -166,9 +166,22 @@ test('encrypted SNMPv3 authPriv exchanges work over isolated loopback UDP and wr
  const columns=[[1,'ifIndex',snmp.ObjectType.Integer],[2,'ifDescr',snmp.ObjectType.OctetString],[5,'ifSpeed',snmp.ObjectType.Gauge],[7,'ifAdminStatus',snmp.ObjectType.Integer],[8,'ifOperStatus',snmp.ObjectType.Integer],[10,'ifInOctets',snmp.ObjectType.Counter],[16,'ifOutOctets',snmp.ObjectType.Counter]]
  mib.registerProvider({name:'fixtureIfTable',type:snmp.MibProviderType.Table,oid:'1.3.6.1.2.1.2.2.1',maxAccess:snmp.MaxAccess['not-accessible'],tableColumns:columns.map(([number,name,type])=>({number,name,type,maxAccess:snmp.MaxAccess['read-only']})),tableIndex:[{columnName:'ifIndex'}]})
  mib.addTableRow('fixtureIfTable',[1,'FastEthernet0/0',100000000,1,1,1234,5678])
+ const lldpColumns=[[1,'timeMark'],[2,'localPort'],[3,'remoteIndex'],[4,'chassisType'],[5,'chassis'],[6,'portType'],[7,'remotePort'],[9,'remoteName']]
+ mib.registerProvider({
+  name:'fixtureLldpTable',type:snmp.MibProviderType.Table,oid:'1.0.8802.1.1.2.1.4.1.1',
+  maxAccess:snmp.MaxAccess['not-accessible'],
+  tableIndex:lldpColumns.slice(0,3).map(([,columnName])=>({columnName})),
+  tableColumns:lldpColumns.map(([number,name])=>({
+   number,name,type:[5,7,9].includes(number)?snmp.ObjectType.OctetString:snmp.ObjectType.Integer,
+   maxAccess:snmp.MaxAccess[number<4?'not-accessible':'read-only'],
+  })),
+ })
+ mib.addTableRow('fixtureLldpTable',[10,3,1,7,'fixture-chassis',5,'Gi1/0/3','Fixture peer'])
  const probe=createSnmpProbe({createSession:(address,credentials,options)=>snmp.createV3Session(address,credentials,{...options,port:socket.address().port})})
  const value=await probe('127.0.0.1',user)
  assert.equal(value.interfaces?.[0].name,'FastEthernet0/0',JSON.stringify(value));assert.equal(value.interfaces[0].inOctets,'1234');assert.equal(value.interfaces[0].counterBits,32)
+ assert.equal(value.lldp.state,'current')
+ assert.equal(value.lldp.neighbors[0].remotePort,'Gi1/0/3')
  const sha256={...user,name:'fixture-sha256',authProtocol:'sha256'}
  agent.getAuthorizer().addUser({...sha256,level:snmp.SecurityLevel.authPriv,authProtocol:snmp.AuthProtocols.sha256,privProtocol:snmp.PrivProtocols.aes});agent.getAuthorizer().getAccessControlModel().setUserAccess(sha256.name,snmp.AccessLevel.ReadOnly)
  assert.equal((await probe('127.0.0.1',sha256)).interfaces?.[0].name,'FastEthernet0/0')

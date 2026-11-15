@@ -4,6 +4,8 @@ The current UI uses one off-white theme across the map, editor, dialogs and Wind
 
 ## Opt-in interface collection (#7, local implementation)
 
+The authenticated read-only SNMP poll also collects bounded LLDP observations for review. Pending observations are held in memory. An admin can save an approved neighbor link against the current inventory revision. Port and LLDP observations leave reachability independent.
+
 The Windows host can run a separate bounded SNMPv3 authPriv collector when NETWATCH_SNMP=1 and an operator enrolls saved-device credentials locally. `net-snmp` is pinned as a host-only protocol dependency. `snmp-probe.js` performs GET/GETBULK only, validates OID order/types/counters and caps rows/requests/time; `snmp-collector.js` separates workers, freshness and diagnostics from ICMP health/incidents. Inventory revisions cancel obsolete work. A repository-owned CurrentUser DPAPI helper protects credentials in a separate host directory; no browser configuration endpoint or credential response exists.
 
 Schema v4 adds explicit SNMP authorization and latest interface samples while preserving prior data. Address/type changes or deletion revoke the target. Restore clears SNMP authorizations; matching local credential enrollment is required again. Rate computation suppresses resets/wrap ambiguity, missing discontinuity evidence and long gaps. Device details lazily poll paginated interfaces only while expanded, retain last-known results on errors, and never infer a device or configured topology link is down from missing SNMP. Cisco 3750/2811 are intended lab targets; physical vendor acceptance remains unverified. See SNMP-INTERFACES.md.
