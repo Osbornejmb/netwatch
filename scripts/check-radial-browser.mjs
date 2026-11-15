@@ -1,3 +1,4 @@
+import { mkdirSync } from 'node:fs'
 import {setSource,refreshNetwork} from './browser-controls.mjs'
 import { createHealthNetwork } from '../tests/fixtures/health-network.js'
 import { hostSnapshot } from '../tests/fixtures/host-snapshot.js'
@@ -6,6 +7,8 @@ import { createScaleNetwork } from '../tests/fixtures/scale-network.js'
 import { validateTopology } from '../src/topology.js'
 import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
+
+mkdirSync(new URL('../.tools/evidence/screenshots/', import.meta.url), { recursive: true })
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--no-sandbox'] })
 const url = process.env.NETWATCH_URL || 'http://127.0.0.1:4173'
@@ -72,7 +75,7 @@ await refreshNetwork(page)
 await page.locator('.react-flow__node[data-id="core-a"] .health-node-up').waitFor()
 assert.equal(await page.locator('.health-path-down').count(),1)
 assert.deepEqual(await positions(),healthPositions,'Health changes must not move radial nodes')
-await page.screenshot({path:fileURLToPath(new URL('../docs/screenshots/radial-desktop.jpg',import.meta.url))})
+await page.screenshot({path:fileURLToPath(new URL('../.tools/evidence/screenshots/radial-desktop.jpg',import.meta.url))})
 const node=page.locator('.react-flow__node[data-id="core-a"]')
 await node.focus();await page.keyboard.press('Enter')
 await page.getByRole('dialog',{name:'CORE-ROUTER-01',exact:true}).waitFor()
@@ -82,7 +85,7 @@ assert.equal(await page.locator('.health-node-connected').count(),3)
 assert.equal(await page.locator('.health-node-muted').count(),10)
 assert.equal(await page.locator('.health-path-highlighted').count(),3)
 assert.ok(await node.locator('.health-node-up.health-node-focus').isVisible())
-await page.screenshot({path:fileURLToPath(new URL('../docs/screenshots/radial-highlight-desktop.jpg',import.meta.url))})
+await page.screenshot({path:fileURLToPath(new URL('../.tools/evidence/screenshots/radial-highlight-desktop.jpg',import.meta.url))})
 await view.click()
 await page.getByLabel('Device status filter').selectOption('down')
 assert.equal(await page.locator('.react-flow__node').count(),1)
@@ -94,7 +97,7 @@ await page.getByRole('button',{name:'Clear connection highlight',exact:true}).cl
 await page.setViewportSize({width:390,height:844})
 await page.locator('.react-flow__controls-fitview').click()
 assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
-await page.screenshot({path:fileURLToPath(new URL('../docs/screenshots/radial-narrow.jpg',import.meta.url))})
+await page.screenshot({path:fileURLToPath(new URL('../.tools/evidence/screenshots/radial-narrow.jpg',import.meta.url))})
 await page.getByRole('link',{name:'Devices',exact:true}).click()
 await view.click()
 assert.equal(await page.getByLabel('Map layout',{exact:true}).inputValue(),'radial')
@@ -104,7 +107,7 @@ await page.getByRole('dialog',{name:'CORE-ROUTER-01',exact:true}).waitFor()
 await page.keyboard.press('Escape')
 await page.getByRole('link',{name:'Network dashboard',exact:true}).click()
 assert.equal(await page.locator('.health-node-connected').count(),3)
-await page.screenshot({path:fileURLToPath(new URL('../docs/screenshots/radial-highlight-narrow.jpg',import.meta.url))})
+await page.screenshot({path:fileURLToPath(new URL('../.tools/evidence/screenshots/radial-highlight-narrow.jpg',import.meta.url))})
 await setSource(page,'browser')
 network = createEditorNetwork()
 assert.equal(await page.locator('.health-node-connected').count(),0)
@@ -122,7 +125,7 @@ const filterBox=await page.getByLabel('Device status filter').boundingBox()
 assert.ok(filterBox.y>=0&&filterBox.y+filterBox.height<=565,'Short-screen View controls must remain reachable')
 await page.getByLabel('Device status filter').selectOption('unknown')
 assert.equal(await page.locator('.react-flow__node').count(),5)
-await page.screenshot({path:fileURLToPath(new URL('../docs/screenshots/radial-controls-narrow.jpg',import.meta.url))})
+await page.screenshot({path:fileURLToPath(new URL('../.tools/evidence/screenshots/radial-controls-narrow.jpg',import.meta.url))})
 assert.equal(await stored(),original)
 await context.close()
 // Large cyclic mesh plus disconnected devices, still display-only.
@@ -153,7 +156,7 @@ assert.match(await p.locator('.health-highlight-status').innerText(),/0 connecte
 await p.getByRole('button',{name:'Clear connection highlight',exact:true}).click()
 const persisted=JSON.parse(await p.evaluate(()=>localStorage.getItem('netwatch-topology-v1')))
 assert.deepEqual(persisted.nodes.map(node=>node.position),fixture.nodes.map(node=>node.position))
-await p.screenshot({path:fileURLToPath(new URL('../docs/screenshots/radial-101-narrow.jpg',import.meta.url))})
+await p.screenshot({path:fileURLToPath(new URL('../.tools/evidence/screenshots/radial-101-narrow.jpg',import.meta.url))})
 await large.close()
 assert.deepEqual(errors,[])
 console.log('PASS: radial/tidy restoration, custom center, stable filters/health, direct-peer highlight/persistence/clear, popup focus, desktop/narrow/short-screen, storage isolation, editor positions, 101 devices/180 links with isolate')

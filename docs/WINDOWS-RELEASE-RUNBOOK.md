@@ -50,7 +50,7 @@ Record sustained failure, recovery, incident history and independent healthy-dev
 
 ## Release sign-off
 
-For isolated storage/API load validation, run `node scripts/check-host-load.mjs --fixtures`. It seeds 100 documentation-address devices, 100,000 checks and 10,000 resolved incidents in a temporary database, then simulates two one-second readers and individual-result writes. It launches no collector and probes no address. Results go to host-load-results.json. This covers retained-history/API costs, not 100 real Windows ping helpers, browser CPU or a sustained deployment. Existing v3 databases gain the latest-check index automatically at startup; allow startup time and additional disk space for index creation, preserving a pre-update backup.
+For isolated storage/API load validation, run `node scripts/check-host-load.mjs --fixtures`. It seeds 100 documentation-address devices, 100,000 checks and 10,000 resolved incidents in a temporary database, then simulates two one-second readers and individual-result writes. It launches no collector and probes no address. Results go to `.tools/evidence/host-load-results.json`. This covers retained-history/API costs, not 100 real Windows ping helpers, browser CPU or a sustained deployment. Existing v3 databases gain the latest-check index automatically at startup; allow startup time and additional disk space for index creation, preserving a pre-update backup.
 
 The owner has no approved multi-device test inventory available yet; 100 devices is a planning target, not a verified deployment count. By the owner's explicit decision on 2026-11-13, real multi-device capacity testing is deferred and does not block this local release. It remains required before making a production-capacity claim.
 

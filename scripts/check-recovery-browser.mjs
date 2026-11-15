@@ -1,7 +1,10 @@
+import { mkdirSync } from 'node:fs'
 import { createEditorNetwork } from '../tests/fixtures/editor-network.js'
 import { fileURLToPath } from 'node:url'
 import { readFile } from 'node:fs/promises'
 import assert from 'node:assert/strict'
+
+mkdirSync(new URL('../.tools/evidence/screenshots/', import.meta.url), { recursive: true })
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--no-sandbox'] })
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
@@ -151,11 +154,11 @@ await page.waitForFunction(() => {
   return nodes.length === 0 && nodes.every(node => node.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }))
 })
 await page.evaluate(() => window.scrollTo(0, 0))
-await page.screenshot({path:fileURLToPath(new URL('../docs/screenshots/recovery-desktop.jpg',import.meta.url)),fullPage:true})
+await page.screenshot({path:fileURLToPath(new URL('../.tools/evidence/screenshots/recovery-desktop.jpg',import.meta.url)),fullPage:true})
 await page.setViewportSize({width:390,height:844})
 await page.getByRole('button',{name:'Replace saved map…',exact:true}).click()
 assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
-await page.screenshot({path:fileURLToPath(new URL('../docs/screenshots/recovery-narrow.jpg',import.meta.url)),fullPage:true})
+await page.screenshot({path:fileURLToPath(new URL('../.tools/evidence/screenshots/recovery-narrow.jpg',import.meta.url)),fullPage:true})
 await page.keyboard.press('Escape')
 assert.equal(await stored(),raw)
 assert.deepEqual(errors,[])

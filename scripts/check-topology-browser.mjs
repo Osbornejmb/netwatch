@@ -1,9 +1,12 @@
+import { mkdirSync } from 'node:fs'
 import {setSource,refreshNetwork} from './browser-controls.mjs'
 import { createEditorNetwork } from '../tests/fixtures/editor-network.js'
 import { createHealthNetwork } from '../tests/fixtures/health-network.js'
 import { hostSnapshot } from '../tests/fixtures/host-snapshot.js'
 import {fileURLToPath} from 'node:url'
 import assert from 'node:assert/strict'
+
+mkdirSync(new URL('../.tools/evidence/screenshots/', import.meta.url), { recursive: true })
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH || undefined,args:['--no-sandbox']})
 const context=await browser.newContext({viewport:{width:1440,height:900}})
@@ -86,16 +89,16 @@ await page.getByRole('link',{name:'Network dashboard',exact:true}).click()
 assert.equal(await page.locator('table').count(),0)
 assert.equal(await page.evaluate(()=>localStorage.getItem('netwatch-topology-v1')),original)
 await page.locator('.health-node').first().waitFor()
-await page.screenshot({path:fileURLToPath(new URL('../docs/screenshots/topology-paths.jpg',import.meta.url)),fullPage:true})
+await page.screenshot({path:fileURLToPath(new URL('../.tools/evidence/screenshots/topology-paths.jpg',import.meta.url)),fullPage:true})
 await node('core-a').click()
-await page.screenshot({path:fileURLToPath(new URL('../docs/screenshots/device-popup.jpg',import.meta.url)),fullPage:true})
+await page.screenshot({path:fileURLToPath(new URL('../.tools/evidence/screenshots/device-popup.jpg',import.meta.url)),fullPage:true})
 await page.keyboard.press('Escape')
 await page.setViewportSize({width:390,height:844})
 await page.locator('.react-flow__controls-fitview').click()
 assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
 map=await page.locator('.health-map').boundingBox()
 assert.ok(map.height>250 && map.y+map.height<=845)
-await page.screenshot({path:fileURLToPath(new URL('../docs/screenshots/topology-mobile.jpg',import.meta.url)),fullPage:true})
+await page.screenshot({path:fileURLToPath(new URL('../.tools/evidence/screenshots/topology-mobile.jpg',import.meta.url)),fullPage:true})
 await page.getByRole('link',{name:'Devices',exact:true}).click()
 await page.getByRole('button',{name:'View details for CORE-ROUTER-01',exact:true}).click()
 await page.getByRole('dialog',{name:'CORE-ROUTER-01',exact:true}).waitFor()

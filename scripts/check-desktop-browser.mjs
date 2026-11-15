@@ -1,7 +1,10 @@
+import { mkdirSync } from 'node:fs'
 import { refreshNetwork } from './browser-controls.mjs'
 import assert from 'node:assert/strict'
 import { createHealthNetwork } from '../tests/fixtures/health-network.js'
 import { hostSnapshot } from '../tests/fixtures/host-snapshot.js'
+
+mkdirSync('.tools/evidence/screenshots', { recursive: true })
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH })
 try {
@@ -45,7 +48,7 @@ try {
   assert.ok(await page.locator('.health-node .info-trigger').count() > 0)
   assert.equal(await page.locator('.health-node .node-status[aria-label]').count(), 14)
   assert.equal(await page.locator('.health-path-stale path').first().evaluate(node => node.style.strokeDasharray), '')
-  await page.screenshot({ path: 'docs/screenshots/desktop-after.png', fullPage: true })
+  await page.screenshot({ path: '.tools/evidence/screenshots/desktop-after.png', fullPage: true })
   await page.locator('.health-node').first().evaluate(node => node.closest('.react-flow__node').focus())
   await page.keyboard.press('Enter')
   await page.getByRole('dialog').waitFor()
@@ -67,7 +70,7 @@ try {
     const panel = await page.locator('.backup-panel').boundingBox()
     const nav = await page.locator('.top-menu').boundingBox()
     assert.ok(panel.y >= nav.y + nav.height, `backup covers nav at ${width}`)
-    if (width === 390) await page.screenshot({ path: 'docs/screenshots/devices-narrow-after.png', fullPage: true })
+    if (width === 390) await page.screenshot({ path: '.tools/evidence/screenshots/devices-narrow-after.png', fullPage: true })
     await page.locator('.backup-recovery summary').click()
   }
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -91,7 +94,7 @@ try {
   await page.getByRole('dialog',{name:'Remove device?'}).getByRole('button',{name:'Remove device'}).click()
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('netwatch-topology-v1')).nodes.length === 14)
   assert.ok((await snapshot()).edges.every(edge => edge.source !== 'core-a' && edge.target !== 'core-a'))
-  await page.screenshot({ path: 'docs/screenshots/editor-after.png', fullPage: true })
+  await page.screenshot({ path: '.tools/evidence/screenshots/editor-after.png', fullPage: true })
   await page.evaluate(() => { location.hash = 'inventory' })
   await page.getByRole('heading', { name: 'Devices', exact: true }).waitFor()
   await page.reload()

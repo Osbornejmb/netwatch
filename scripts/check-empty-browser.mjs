@@ -1,5 +1,8 @@
+import { mkdirSync } from 'node:fs'
 import {setSource} from './browser-controls.mjs'
 import assert from 'node:assert/strict'
+
+mkdirSync('.tools/evidence/screenshots', { recursive: true })
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] })
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
@@ -13,10 +16,10 @@ try {
   assert.equal(await page.locator('.react-flow__node').count(), 0)
   assert.deepEqual(await stored(), { schemaVersion: 1, nodes: [], edges: [] })
   assert.equal(await page.getByRole('button', { name: /sample|preview/i }).count(), 0)
-  await page.screenshot({ path: 'docs/screenshots/empty-start-desktop.png' })
+  await page.screenshot({ path: '.tools/evidence/screenshots/empty-start-desktop.png' })
   await page.setViewportSize({ width: 390, height: 844 })
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
-  await page.screenshot({ path: 'docs/screenshots/empty-start-narrow.png' })
+  await page.screenshot({ path: '.tools/evidence/screenshots/empty-start-narrow.png' })
   await page.getByRole('button', { name: 'Create your map' }).click()
   assert.equal(await page.locator('.react-flow__node').count(), 0)
   await page.getByRole('button', { name: 'Add device', exact: true }).click()

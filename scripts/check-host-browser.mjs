@@ -1,5 +1,8 @@
+import { mkdirSync } from 'node:fs'
 import { createEditorNetwork } from '../tests/fixtures/editor-network.js'
 import assert from 'node:assert/strict'
+
+mkdirSync('.tools/evidence', { recursive: true })
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright')
 const base=process.env.NETWATCH_HOST_URL||'http://127.0.0.1:4317'
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']})
@@ -23,9 +26,9 @@ try {
  await host.getByRole('button',{name:'Use this map',exact:true}).click();await preview.getByRole('button',{name:'Confirm replacement'}).click();await host.getByText(/Unable to save/).waitFor();assert.equal((await read()).revision,current.revision+1)
  await host.getByRole('button',{name:'Connect',exact:true}).click();await host.getByText(/Connected ·/).waitFor()
  await host.getByRole('button',{name:'Copy to draft',exact:true}).click();await preview.getByRole('button',{name:'Confirm replacement'}).click();await host.getByText(/Saved network copied/).waitFor()
- await page.screenshot({path:'docs/host-storage-desktop.jpg',fullPage:true})
+ await page.screenshot({path:'.tools/evidence/host-storage-desktop.jpg',fullPage:true})
  await page.setViewportSize({width:390,height:844});await host.scrollIntoViewIfNeeded();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true)
- await host.getByRole('button',{name:'Use this map',exact:true}).click();await preview.getByRole('button',{name:'Cancel',exact:true}).click();await page.screenshot({path:'docs/host-storage-narrow.jpg',fullPage:true})
+ await host.getByRole('button',{name:'Use this map',exact:true}).click();await preview.getByRole('button',{name:'Cancel',exact:true}).click();await page.screenshot({path:'.tools/evidence/host-storage-narrow.jpg',fullPage:true})
  const final=await read();await context.request.put(base+'/api/v1/topology',{headers:{'X-NetWatch-Write':'1'},data:{source:'inventory',baseRevision:final.revision,topology:{schemaVersion:1,nodes:[],edges:[]}}});await host.getByRole('button',{name:'Connect',exact:true}).click();await host.getByText(/Connected ·/).waitFor();await host.getByRole('button',{name:'Copy to draft',exact:true}).click();await preview.getByRole('button',{name:'Confirm replacement'}).click();await page.waitForFunction(()=>document.querySelectorAll('.react-flow__node').length===0)
  await page.route('**/api/v1/topology',route=>route.abort());await host.getByRole('button',{name:'Connect',exact:true}).click();await host.getByText(/Start NetWatch/).waitFor();assert.equal(await host.getByRole('button',{name:'Use this map',exact:true}).isDisabled(),true)
  assert.deepEqual(errors,[])

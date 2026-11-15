@@ -1,3 +1,4 @@
+import { mkdirSync } from 'node:fs'
 import {refreshNetwork} from './browser-controls.mjs'
 import { hostSnapshot } from '../tests/fixtures/host-snapshot.js'
 import { validateTopology } from '../src/topology.js'
@@ -6,6 +7,8 @@ import { fileURLToPath } from 'node:url'
 import { readFile, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import assert from 'node:assert/strict'
+
+mkdirSync(new URL('../.tools/evidence/screenshots/', import.meta.url), { recursive: true })
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--no-sandbox'] })
 // Controlled HTTP observations only; never sent to a collector.
@@ -90,7 +93,7 @@ for (const viewport of [{width:1440,height:900},{width:390,height:844}]) {
   const readablePx=await page.locator('.health-node .device-copy strong').evaluate(node=>parseFloat(getComputedStyle(node).fontSize)*node.getBoundingClientRect().width/node.offsetWidth)
   assert.ok(readablePx>=12,'Focused label must be readable at fit zoom')
   run.focusedLabelPx=Math.round(readablePx*10)/10
-  await page.screenshot({path:fileURLToPath(new URL(`../docs/screenshots/scale-${viewport.width}-readable.jpg`,import.meta.url))})
+  await page.screenshot({path:fileURLToPath(new URL(`../.tools/evidence/screenshots/scale-${viewport.width}-readable.jpg`,import.meta.url))})
   await view.click()
   await page.getByLabel('Search dashboard devices').fill('no-such-device')
   assert.ok(await page.getByText('No matching devices',{exact:true}).isVisible())
@@ -105,7 +108,7 @@ for (const viewport of [{width:1440,height:900},{width:390,height:844}]) {
   const popup=page.getByRole('dialog',{name:'QA-ROUTER-001',exact:true})
   await popup.waitFor()
   assert.match(await popup.innerText(),/Down/)
-  await page.screenshot({path:fileURLToPath(new URL(`../docs/screenshots/scale-${viewport.width}-inspection.jpg`,import.meta.url))})
+  await page.screenshot({path:fileURLToPath(new URL(`../.tools/evidence/screenshots/scale-${viewport.width}-inspection.jpg`,import.meta.url))})
   await page.keyboard.press('Escape')
   await view.click()
   await page.getByLabel('Device status filter').selectOption('all')
@@ -125,7 +128,7 @@ for (const viewport of [{width:1440,height:900},{width:390,height:844}]) {
   await page.mouse.move(panPoint.x,panPoint.y);await page.mouse.down();await page.mouse.move(panPoint.x+55,panPoint.y+45,{steps:8});await page.mouse.up()
   await page.waitForFunction(style=>document.querySelector('.react-flow__viewport').getAttribute('style')!==style,beforePan)
   await page.locator('.react-flow__controls-fitview').click()
-  await page.screenshot({path:fileURLToPath(new URL(`../docs/screenshots/scale-${viewport.width}-overview.jpg`,import.meta.url))})
+  await page.screenshot({path:fileURLToPath(new URL(`../.tools/evidence/screenshots/scale-${viewport.width}-overview.jpg`,import.meta.url))})
   await page.getByRole('link',{name:'Devices',exact:true}).click()
   await view.click()
   await page.getByLabel('Device status filter').selectOption('stale')
@@ -147,6 +150,6 @@ const page=await empty.newPage();await page.goto(url)
 assert.ok(await page.getByText('Your network starts here',{exact:true}).isVisible())
 await empty.close()
 assert.deepEqual(errors,[])
-await writeFile(fileURLToPath(new URL('../docs/scale-results.json',import.meta.url)),JSON.stringify(report,null,2)+'\n')
+await writeFile(fileURLToPath(new URL('../.tools/evidence/scale-results.json',import.meta.url)),JSON.stringify(report,null,2)+'\n')
 console.log('PASS: 100 devices/180 links, full-view default, unknown/multiple-down/stale/empty states, stable counts, filtered-edge endpoints, search, pan/zoom/fit, keyboard inspection, viewport bounds and observation/storage isolation')
 await browser.close()

@@ -6,7 +6,7 @@ The default dashboard remains the network map fitted to the remaining viewport. 
 
 ## Method and environment
 
-Fixture: `tests/fixtures/scale-network.js`; unit contract: `tests/scale.test.js`; browser check: `scripts/check-scale-browser.mjs`; raw results: [scale-results.json](scale-results.json).
+Fixture: `tests/fixtures/scale-network.js`; unit contract: `tests/scale.test.js`; browser check: `scripts/check-scale-browser.mjs`; raw results: `.tools/evidence/scale-results.json`.
 
 Chromium 156.0.8078.79, Linux x64 on a shared managed cloud executor with an AMD EPYC 9V74 CPU. Node exposes 3 logical CPUs and about 10 GiB host memory; the executor cgroup quota is 2 CPU cores and 8 GiB memory. Browser runner and the measured Vite server used Node 22.23.5. These are shared resources, not dedicated benchmark hardware.
 
@@ -34,6 +34,6 @@ Initial render is browser navigation through 100 initialized, visible cards; it 
 
 ## Review images
 
-- [Desktop overview](screenshots/scale-1440-overview.jpg) and [narrow overview](screenshots/scale-390-overview.jpg): whole network, colour distribution and configured links.
-- [Desktop readable card](screenshots/scale-1440-readable.jpg) and [narrow readable card](screenshots/scale-390-readable.jpg): search plus Fit view.
-- [Desktop failure inspection](screenshots/scale-1440-inspection.jpg) and [narrow failure inspection](screenshots/scale-390-inspection.jpg): keyboard-opened popup with readable status, address and peer/path details.
+- Desktop overview (`.tools/evidence/screenshots/scale-1440-overview.jpg`) and narrow overview (`.tools/evidence/screenshots/scale-390-overview.jpg`): whole network, colour distribution and configured links.
+- Desktop readable card (`.tools/evidence/screenshots/scale-1440-readable.jpg`) and narrow readable card (`.tools/evidence/screenshots/scale-390-readable.jpg`): search plus Fit view.
+- Desktop failure inspection (`.tools/evidence/screenshots/scale-1440-inspection.jpg`) and narrow failure inspection (`.tools/evidence/screenshots/scale-390-inspection.jpg`): keyboard-opened popup with readable status, address and peer/path details.

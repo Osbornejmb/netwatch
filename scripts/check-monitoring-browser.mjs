@@ -33,7 +33,7 @@ const refresh = () => refreshNetwork(page)
 const status = async (id, value) => { await node(id).locator(`.health-node-${value}`).waitFor() }
 const inspect = async id => { await node(id).focus(); await page.keyboard.press('Enter'); await page.getByRole('dialog').waitFor() }
 const close = () => page.keyboard.press('Escape')
-mkdirSync('docs/screenshots', { recursive: true })
+mkdirSync('.tools/evidence/screenshots', { recursive: true })
 try {
   await page.goto(base)
   await status('r', 'up'); await status('s', 'up')
@@ -54,7 +54,7 @@ try {
   await close()
   append('r', 'down'); await refresh(); await status('r', 'down'); await status('s', 'up')
   assert.equal(await page.locator('.react-flow__edge.health-path-down').count(), 1)
-  await page.screenshot({ path: 'docs/screenshots/monitoring-desktop.png' })
+  await page.screenshot({ path: '.tools/evidence/screenshots/monitoring-desktop.png' })
   // Preserve observations and let the UI clock age them without a successful response.
   staleAfterMs = 1000; await refresh()
   await page.getByRole('button', { name: 'Monitoring information' }).focus()
@@ -63,7 +63,7 @@ try {
   await page.route('**/api/v1/snapshot', route => route.abort())
   await refresh(); await page.getByText(/Connection lost/).first().waitFor()
   await status('r', 'stale'); await status('s', 'stale')
-  await page.screenshot({ path: 'docs/screenshots/monitoring-disconnected.png' })
+  await page.screenshot({ path: '.tools/evidence/screenshots/monitoring-disconnected.png' })
   await page.unroute('**/api/v1/snapshot'); staleAfterMs = 90000
   append('r', 'up'); append('s', 'up'); await refresh(); await status('r', 'up')
   await inspect('r'); await page.getByRole('button', { name: 'Turn checks off', exact: true }).click()
@@ -82,13 +82,13 @@ try {
   assert.equal(await page.getByRole('button', { name: /sample|preview/i }).count(), 0)
   await page.setViewportSize({ width: 390, height: 844 })
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true)
-  await inspect('r'); await page.screenshot({ path: 'docs/screenshots/monitoring-narrow.png' }); await close()
+  await inspect('r'); await page.screenshot({ path: '.tools/evidence/screenshots/monitoring-narrow.png' }); await close()
   store.write({ source: 'inventory', topology: { ...topology, nodes: topology.nodes.filter(n => n.id !== 'r'), edges: [] }, monitoring: { s: true } }, store.read().revision)
   await refresh(); await node('r').waitFor({ state: 'detached' })
   store.write({ source: 'inventory', topology: { schemaVersion: 1, nodes: [], edges: [] } }, store.read().revision)
   await refresh(); await page.getByText('Your network starts here').waitFor()
   assert.deepEqual(errors, [])
-  writeFileSync('docs/monitoring-results.json', JSON.stringify({ verifiedAt: new Date().toISOString(), platform: process.platform, controlledObservations: true, probes: 0, checks: ['host inventory source', 'filter counts', 'keyboard details and focus trap', 'history pagination and transitions', 'independent failure and recovery', 'disconnect, clock-driven stale, reconnect', 'explicit monitoring disable/enable', 'revision conflict', 'missing address', 'no demo controls', '390px overflow and details', 'deleted device and empty host'], screenshots: ['monitoring-desktop.png', 'monitoring-disconnected.png', 'monitoring-narrow.png'], pageErrors: errors }, null, 2) + '\n')
+  writeFileSync('.tools/evidence/monitoring-results.json', JSON.stringify({ verifiedAt: new Date().toISOString(), platform: process.platform, controlledObservations: true, probes: 0, checks: ['host inventory source', 'filter counts', 'keyboard details and focus trap', 'history pagination and transitions', 'independent failure and recovery', 'disconnect, clock-driven stale, reconnect', 'explicit monitoring disable/enable', 'revision conflict', 'missing address', 'no demo controls', '390px overflow and details', 'deleted device and empty host'], screenshots: ['monitoring-desktop.png', 'monitoring-disconnected.png', 'monitoring-narrow.png'], pageErrors: errors }, null, 2) + '\n')
   console.log('Controlled monitoring browser checks passed; no probes or existing data used.')
 } finally {
   await browser.close(); await new Promise(resolve => server.close(resolve)); store.close(); rmSync(dir, { recursive: true, force: true })

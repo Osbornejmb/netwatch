@@ -11,4 +11,8 @@ data/
 *.sqlite*
 snmp-credentials/
 *.dpapi
-docs/screenshots/redesign-*.png
+/docs/*-results.json
+/docs/screenshots/*
+!/docs/screenshots/desktop-after.png
+!/docs/screenshots/editor-after.png
+!/docs/screenshots/devices-narrow-after.png

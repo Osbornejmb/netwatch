@@ -66,7 +66,7 @@ The host and maintenance command share `<database>.lock`; concurrent maintenance
 
 Automated tests cover restart persistence, independent-connection conflicts, inventory/observation rollback, migration failure/future version rejection, validation and origin/write limits, history pagination/retention/cap, backup/restore and corrupt backups. Browser checks cover explicit transfer, cancel, opt-in/import reset, conflict, load and responsive layouts. Windows process shutdown, file replacement and recovery still require actual Windows validation before release #16.
 
-Windows 10 local validation now covers the real host startup, health/snapshot/history, restart persistence, offline backup, active helper cancellation and database lock release using only temporary databases and authorized loopbacks. Run `node scripts/check-windows-host.mjs --loopback` with port 4317 free; see ICMP-COLLECTOR.md and windows-host-results.json. Shutdown testing invokes the installed SIGINT handler via IPC; physical Ctrl+C delivery and broader crash/disk recovery remain release #16 checks.
+Windows 10 local validation now covers the real host startup, health/snapshot/history, restart persistence, offline backup, active helper cancellation and database lock release using only temporary databases and authorized loopbacks. Run `node scripts/check-windows-host.mjs --loopback` with port 4317 free; see ICMP-COLLECTOR.md for the recorded results. Shutdown testing invokes the installed SIGINT handler via IPC; physical Ctrl+C delivery and broader crash/disk recovery remain release #16 checks.
 
 ## Local incidents (2.4)
 

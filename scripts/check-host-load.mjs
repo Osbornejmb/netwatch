@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir, release } from 'node:os'
 import { join } from 'node:path'
 import { once } from 'node:events'
 import { openStore } from '../host/store.js'
 import { createHost } from '../host/server.js'
 import { createScaleNetwork } from '../tests/fixtures/scale-network.js'
+
+mkdirSync('.tools/evidence', { recursive: true })
 
 // Synthetic storage/API test only. No collector is created and no fixture address is probed.
 if(process.argv[2]!=='--fixtures') throw new Error('Pass --fixtures to run an isolated synthetic storage/API check. No real devices are tested.')
@@ -57,6 +59,6 @@ try {
   report.retainedResolvedIncidents=store.db.prepare('SELECT COUNT(*) n FROM incidents').get().n
   assert.equal(report.retainedChecks,100000);assert.equal(report.retainedResolvedIncidents,10000)
   report.limitations=['No Windows ping helper processes or network timeouts measured','No actual browser rendering in this process','One machine and short run; not a sustained deployment SLA','CPU/RSS include the synthetic HTTP clients and fixture setup process']
-  writeFileSync('docs/host-load-results.json',JSON.stringify(report,null,2)+'\n')
+  writeFileSync('.tools/evidence/host-load-results.json',JSON.stringify(report,null,2)+'\n')
   console.log(JSON.stringify(report,null,2))
 } finally {if(server)await new Promise(resolve=>server.close(resolve));store.close();rmSync(directory,{recursive:true,force:true})}

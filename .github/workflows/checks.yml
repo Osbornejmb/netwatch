@@ -23,7 +23,19 @@ jobs:
         run: npm run desktop:setup
       - name: Windows ICMP loopback smoke (no external targets)
         if: runner.os == 'Windows'
-        run: node scripts/check-windows-icmp.mjs --loopback
+        run: |
+          New-Item -ItemType Directory -Force .tools/evidence | Out-Null
+          node scripts/check-windows-icmp.mjs --loopback | Tee-Object .tools/evidence/windows-icmp.txt
       - name: Windows host lifecycle (temporary database, loopbacks only)
         if: runner.os == 'Windows'
-        run: node scripts/check-windows-host.mjs --loopback
+        run: |
+          New-Item -ItemType Directory -Force .tools/evidence | Out-Null
+          node scripts/check-windows-host.mjs --loopback | Tee-Object .tools/evidence/windows-host.txt
+      - name: Upload Windows loopback evidence
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-loopback-evidence
+          path: .tools/evidence/windows-*.txt
+          if-no-files-found: ignore
+          include-hidden-files: true

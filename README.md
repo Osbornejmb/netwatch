@@ -2,6 +2,14 @@
 
 NetWatch is a Windows network-monitoring dashboard with a topology editor, device reachability checks and recent history. A fresh installation starts with an empty network. There are no built-in devices, example addresses, demo statuses or preview mode.
 
+## Screenshots
+
+Screenshots use a test inventory with documentation addresses.
+
+| Dashboard | Edit map | Devices on a narrow screen |
+| --- | --- | --- |
+| <img src="docs/screenshots/desktop-after.png" alt="Network dashboard with connected routers and switches, device status counts, and a Needs attention row" width="380"> | <img src="docs/screenshots/editor-after.png" alt="Draft topology editor with an editable network map and controls for adding device connections" width="380"> | <img src="docs/screenshots/devices-narrow-after.png" alt="Narrow Devices view with stacked status cards and the Backups menu open" width="180"> |
+
 ## Windows setup
 
 Requirements: Windows 10/11, Node.js 22.13 or newer with npm, and the Windows .NET Framework v4 compiler/runtime used by the launcher and checks.

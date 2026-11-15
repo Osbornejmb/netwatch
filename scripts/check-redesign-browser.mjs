@@ -16,7 +16,7 @@ const server=createHost(store,{port:0,collector:{snapshot:()=>({state:'running',
 server.listen(0,'127.0.0.1');await once(server,'listening')
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']})
 const errors=[],report={scope:'Isolated redesign fixtures; no real probes',checks:[],screenshots:[],errors}
-mkdirSync('docs/screenshots',{recursive:true})
+mkdirSync('.tools/evidence/screenshots',{recursive:true})
 const options=async(page,open=true)=>{const details=page.locator('.health-view-options');if(await details.evaluate(el=>el.open)!==open)await details.locator(':scope > summary').click()}
 const verify=async(page)=>{
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No page overflow')
@@ -24,7 +24,7 @@ const verify=async(page)=>{
  assert.deepEqual(whites,[],'Visible UI must use off-white rather than pure white')
  const clipped=await page.locator('.health-node').evaluateAll(nodes=>nodes.flatMap(node=>{const box=node.getBoundingClientRect();return [...node.querySelectorAll(':scope > strong,:scope > .health-address,.health-node-top,.health-status,.health-device-icon')].filter(child=>{const r=child.getBoundingClientRect();return r.left<box.left||r.right>box.right||r.top<box.top||r.bottom>box.bottom}).map(child=>child.className||child.tagName)}));assert.deepEqual(clipped,[],'Device contents stay inside compact shapes')
 }
-const capture=async(page,name)=>{await verify(page);const path='docs/screenshots/redesign-'+name+'.png';await page.screenshot({path,fullPage:true});report.screenshots.push(path)}
+const capture=async(page,name)=>{await verify(page);const path='.tools/evidence/screenshots/redesign-'+name+'.png';await page.screenshot({path,fullPage:true});report.screenshots.push(path)}
 try{
  for(const [size,viewport]of [['desktop',{width:1440,height:960}],['narrow',{width:390,height:844}]]){
   const context=await browser.newContext({viewport}),page=await context.newPage();page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message))
@@ -43,5 +43,5 @@ try{
  }
  const applied=await browser.newContext({viewport:{width:1440,height:960}}),applyPage=await applied.newPage();await applied.addInitScript(()=>localStorage.setItem('netwatch-topology-v1',JSON.stringify({schemaVersion:1,nodes:[{id:'new-device',type:'switch',position:{x:0,y:0},data:{label:'Applied map device',ip:'192.0.2.50'}}],edges:[]})));await applyPage.goto(`http://127.0.0.1:${server.address().port}`);await applyPage.getByRole('link',{name:'Edit map'}).click();await applyPage.locator('.canvas-actions').getByRole('button',{name:'Use this map',exact:true}).click();await applyPage.getByRole('dialog').getByRole('button',{name:'Confirm replacement'}).click();await applyPage.getByRole('link',{name:'Network dashboard',exact:true}).click();await applyPage.locator('.health-map').getByText('Applied map device',{exact:true}).waitFor();assert.equal(store.read().topology.nodes.length,1);assert.equal(store.read().monitoring['new-device'],false,'Applying a new map never enables checks');assert.equal(await applyPage.locator('.backup-recovery > details').evaluate(el=>el.open),false);await applied.close()
  const empty=await browser.newContext({viewport:{width:390,height:844}}),page=await empty.newPage();await page.route('**/api/v1/snapshot',route=>route.abort());await page.goto(`http://127.0.0.1:${server.address().port}`);await page.getByText('Your network starts here',{exact:true}).waitFor();await capture(page,'empty');await empty.close()
- assert.deepEqual(errors,[]);report.checks=['desktop and 390px layouts','no pure-white visible text/surfaces/borders/SVG','up/down/overdue/unknown evidence','search and status filter','keyboard details and focus trap','device list','add-device form and saved draft','backup review cancellation preserves monitored inventory','applying a map updates the dashboard without opening Backups','loading a saved map reviews draft replacement','draft never inherits live checks','disconnected and empty states'];writeFileSync('docs/redesign-results.json',JSON.stringify(report,null,2)+'\n');console.log('Redesign checks passed.')
+ assert.deepEqual(errors,[]);report.checks=['desktop and 390px layouts','no pure-white visible text/surfaces/borders/SVG','up/down/overdue/unknown evidence','search and status filter','keyboard details and focus trap','device list','add-device form and saved draft','backup review cancellation preserves monitored inventory','applying a map updates the dashboard without opening Backups','loading a saved map reviews draft replacement','draft never inherits live checks','disconnected and empty states'];writeFileSync('.tools/evidence/redesign-results.json',JSON.stringify(report,null,2)+'\n');console.log('Redesign checks passed.')
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));store.close();rmSync(directory,{recursive:true,force:true})}

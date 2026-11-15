@@ -6,6 +6,8 @@ import {randomUUID} from 'node:crypto'
 import {once} from 'node:events'
 import {openStore} from '../host/store.js'
 import {createHost} from '../host/server.js'
+
+mkdirSync('.tools/evidence', { recursive: true })
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright')
 // Controlled database fixtures only. No SNMP/ICMP collector or credential vault is created.
 const dir=mkdtempSync(join(tmpdir(),'netwatch-interface-ui-')),store=openStore(join(dir,'db')),authorization=randomUUID()
@@ -39,6 +41,6 @@ try {
  await page.keyboard.press('Tab');assert.ok(await page.evaluate(()=>!!document.activeElement.closest('dialog')))
  await page.unroute('**/api/v1/devices/a/interfaces*');store.authorizeInterfaces('a',null,1);await region.getByRole('button',{name:'Refresh ports'}).click();await region.getByText(/not set up/).waitFor();await region.getByText('No recorded ports.').waitFor()
  assert.deepEqual(errors,[])
- writeFileSync('docs/snmp-browser-results.json',JSON.stringify({scope:'Controlled 55-interface fixture; no real probes or credentials',browser:await browser.version(),checks:['device Up independently of interface Down','unknown/partial interface state','counter-derived rates','pagination','desktop/390px','stale and request failure','keyboard dialog','authorization removal/empty state'],errors},null,2)+'\n')
+ writeFileSync('.tools/evidence/snmp-browser-results.json',JSON.stringify({scope:'Controlled 55-interface fixture; no real probes or credentials',browser:await browser.version(),checks:['device Up independently of interface Down','unknown/partial interface state','counter-derived rates','pagination','desktop/390px','stale and request failure','keyboard dialog','authorization removal/empty state'],errors},null,2)+'\n')
  console.log('Interface browser checks passed; no devices probed.')
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));store.close();rmSync(dir,{recursive:true,force:true})}

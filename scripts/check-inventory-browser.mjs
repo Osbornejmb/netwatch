@@ -1,7 +1,10 @@
+import { mkdirSync } from 'node:fs'
 import { createEditorNetwork } from '../tests/fixtures/editor-network.js'
 import { fileURLToPath } from 'node:url'
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 import assert from 'node:assert/strict'
+
+mkdirSync(new URL('../.tools/evidence/screenshots/', import.meta.url), { recursive: true })
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH || undefined,args:['--no-sandbox']})
 const context=await browser.newContext({viewport:{width:1440,height:1000}})
 await context.addInitScript(network => { if (!localStorage.getItem('netwatch-topology-v1')) localStorage.setItem('netwatch-topology-v1', JSON.stringify(network)) }, createEditorNetwork())
@@ -89,13 +92,13 @@ await page.getByRole('button',{name:'Delete device'}).focus(); await page.keyboa
 await page.getByRole('dialog',{name:'Remove device?'}).getByRole('button',{name:'Remove device'}).click()
 await page.waitForFunction(()=>JSON.parse(localStorage.getItem('netwatch-topology-v1')).nodes.length===5)
 assert.ok((await snapshot()).edges.every(e=>e.source!==added.id&&e.target!==added.id))
-await page.screenshot({path:fileURLToPath(new URL('../docs/screenshots/inventory-desktop.jpg', import.meta.url)),fullPage:true})
+await page.screenshot({path:fileURLToPath(new URL('../.tools/evidence/screenshots/inventory-desktop.jpg', import.meta.url)),fullPage:true})
 await page.setViewportSize({width:390,height:844})
 await page.getByLabel('Selected device',{exact:true}).selectOption('r1')
 await edit.click()
 assert.ok(await page.getByRole('dialog').isVisible())
 assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))
-await page.screenshot({path:fileURLToPath(new URL('../docs/screenshots/inventory-narrow.jpg', import.meta.url)),fullPage:true})
+await page.screenshot({path:fileURLToPath(new URL('../.tools/evidence/screenshots/inventory-narrow.jpg', import.meta.url)),fullPage:true})
 await page.getByRole('button',{name:'Close device dialog'}).focus()
 await page.keyboard.press('Shift+Tab')
 assert.equal(await page.getByRole('button',{name:'Save changes'}).evaluate(e=>e===document.activeElement),true)
