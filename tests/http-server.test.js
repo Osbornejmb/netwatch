@@ -11,7 +11,7 @@ import { createHost, createRoutes } from '../host/server.js'
 import { MAX_BODY, openStore } from '../host/store.js'
 import { fetchWriteToken, writeTokenFixture } from './fixtures/write-token.js'
 
-async function fixture(t, { collector, expose } = {}) {
+async function fixture(t, { collector, expose, remoteAddress } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'netwatch-http-'))
   const store = openStore(join(dir, 'db'))
   const dist = join(dir, 'dist')
@@ -21,7 +21,7 @@ async function fixture(t, { collector, expose } = {}) {
   writeFileSync(join(dist, 'assets', 'config.json'), '{}')
   writeFileSync(join(dist, 'font.woff2'), '')
   writeFileSync(join(dist, 'index.js.map'), '{}')
-  const server = createHost(store, { dist, port: 0, collector })
+  const server = createHost(store, { dist, port: 0, collector, remoteAddress })
   expose?.(store)
   server.listen(0, '127.0.0.1')
   await once(server, 'listening')
@@ -187,4 +187,13 @@ test('viewer snapshot projects dashboard data and omits administrative metadata'
   assert.deepEqual(result.inventory, inventory)
   for (const key of ['discovery', 'snmpEnrollment', 'databasePath']) assert.equal(Object.hasOwn(result, key), false)
   assert.deepEqual(result.collector, { state: 'running', freshness: { staleAfterMs: 90000 } })
+})
+
+test('private remote clients cannot reach public or protected routes before auth is configured', async (t) => {
+  const base = await fixture(t, { remoteAddress: () => '192.168.1.2' })
+  for (const path of ['/', '/api/v1/health']) {
+    const response = await fetch(base + path, { headers: { 'X-Forwarded-For': '127.0.0.1' } })
+    assert.equal(response.status, 403)
+    assert.equal((await response.json()).error.message, 'Remote access is unavailable.')
+  }
 })

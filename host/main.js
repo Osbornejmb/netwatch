@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { openStore } from './store.js'
+import { createLanListeners } from './lan.js'
 import { createHost } from './server.js'
 import { loopbackUrl, readPort } from './port.js'
 import { lock } from './files.js'
@@ -42,17 +43,27 @@ const discovery = createDiscovery(store, {
   probeGate,
   maxPrefix: discoveryPrefix,
 })
-const server = createHost(store, { port, collector, interfaces, discovery })
+const hostOptions = { port, collector, interfaces, discovery }
+const lan =
+  process.env.NETWATCH_LAN === '1'
+    ? createLanListeners({
+        port,
+        createServer: (lanAuthorities) => createHost(store, { ...hostOptions, lanAuthorities }),
+      })
+    : undefined
+const server = createHost(store, { ...hostOptions, lanAuthorities: lan?.authorities })
 server.listen(port, '127.0.0.1', () => {
   if (stopping) {
     server.close()
     return
   }
+  lan?.start()
   collector.start()
   interfaces.start()
   discovery.start()
-  console.log('NetWatch: ' + loopbackUrl(port) + ' (loopback only). Collector: ' + collector.snapshot().state)
-  if (process.connected) process.send({ type: 'ready', port, collector: collector.snapshot().state })
+  console.log('NetWatch: ' + loopbackUrl(port) + ' Collector: ' + collector.snapshot().state)
+  if (process.connected)
+    process.send({ type: 'ready', port, collector: collector.snapshot().state, urls: lan?.urls() ?? [] })
 })
 let stopping = false
 async function shutdown(code = 0) {
@@ -60,7 +71,7 @@ async function shutdown(code = 0) {
   stopping = true
   const closed = new Promise((resolve) => server.close(resolve))
   server.closeAllConnections()
-  await Promise.all([collector.stop(), interfaces.stop(), discovery.stop()])
+  await Promise.all([collector.stop(), interfaces.stop(), discovery.stop(), lan?.stop()])
   await closed
   store.close()
   release()

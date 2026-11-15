@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { invalid, MAX_BODY } from './store.js'
 import { loopbackUrl, readPort } from './port.js'
 import { decodePath, serveStatic } from './routes/static.js'
+import { admitRequest } from './lan.js'
 import { health } from './routes/health.js'
 import { readTopology, writeTopology } from './routes/topology.js'
 import { createSnapshotRoute } from './routes/snapshot.js'
@@ -108,7 +109,15 @@ export function createRoutes(discovery) {
 
 export function createHost(
   store,
-  { port = readPort(), dist = resolve('dist'), collector, interfaces, discovery } = {},
+  {
+    port = readPort(),
+    dist = resolve('dist'),
+    collector,
+    interfaces,
+    discovery,
+    lanAuthorities,
+    remoteAddress = (req) => req.socket.remoteAddress,
+  } = {},
 ) {
   const writeToken = randomBytes(32).toString('hex')
   const expectedToken = Buffer.from(writeToken, 'hex')
@@ -125,13 +134,9 @@ export function createHost(
     }
     try {
       const origin = loopbackUrl(port === 0 ? server.address().port : port)
-      if (req.headers.host !== origin.slice('http://'.length)) {
-        if (/^(?:localhost|\[::1\])(?::\d+)?$/i.test(req.headers.host ?? '')) throw invalid('Use ' + origin + '.', 403)
-        throw invalid('Unexpected host.', 403)
-      }
-      if (req.headers.origin && req.headers.origin !== origin) throw invalid('Unexpected origin.', 403)
-      if (req.headers['sec-fetch-site'] && !['same-origin', 'none'].includes(req.headers['sec-fetch-site']))
-        throw invalid('Cross-site requests are disabled.', 403)
+      const authorities = new Set([origin.slice(7), ...(lanAuthorities?.() ?? [])])
+      const source = admitRequest(req, origin, authorities, remoteAddress(req))
+      if (source === 'remote') throw invalid('Remote access is unavailable.', 403)
       let url
       try {
         url = new URL(req.url, origin)
@@ -157,6 +162,8 @@ export function createHost(
         const response = {}
         const result = await handler({
           store,
+          source,
+          role: 'admin',
           collector,
           interfaces,
           discovery,
