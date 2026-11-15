@@ -55,7 +55,7 @@ Remote admin writes require the session CSRF token in X-NetWatch-Write. Loopback
 
 ## Local access configuration
 
-Stop the host and use the same NETWATCH_DB path as the launcher or host. Run npm run auth -- set-admin-password or npm run auth -- set-viewer-password in an interactive terminal. Passwords are entered twice without echo and must be distinct. Use npm run auth -- viewer-mode open (or password or disabled) to choose viewer policy, npm run auth -- status to inspect configuration, and npm run auth -- revoke-sessions to remove sessions. Restart the host after changes. The management CLI shares the host database lock. Remote access requires NETWATCH_LAN=1 and a valid admin password hash. Password mode requires a viewer password for viewer sessions. Disabled mode allows only remote admin sessions.
+Stop the host and use the same NETWATCH_DB path as the launcher or host. Run npm run auth -- set-admin-password or npm run auth -- set-viewer-password in an interactive terminal. Passwords are entered twice without echo and must be distinct. Use npm run auth -- viewer-mode open (or password or disabled) to choose viewer policy, npm run auth -- status to inspect configuration, and npm run auth -- revoke-sessions to remove sessions. Restart the host after CLI changes. The management CLI shares the host database lock. The Windows launcher can apply access changes to its running host through private process IPC. Remote access requires NETWATCH_LAN=1 and a valid admin password hash. Password mode requires a viewer password for viewer sessions. Disabled mode allows only remote admin sessions.
 
 ## SQLite, migrations and retention
 

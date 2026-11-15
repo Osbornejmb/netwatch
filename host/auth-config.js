@@ -21,14 +21,7 @@ export async function manageAuth(
       'Usage: npm run auth -- set-admin-password | set-viewer-password | viewer-mode <open|password|disabled> | status | revoke-sessions.',
     )
   if (command === 'status') {
-    const config = readAuthConfig(db)
-    print(
-      JSON.stringify({
-        viewerMode: config.viewer_mode,
-        viewerConfigured: Boolean(config.viewer_hash),
-        adminConfigured: Boolean(config.admin_hash),
-      }),
-    )
+    print(JSON.stringify(accessStatus(db)))
     return
   }
   let value = mode
@@ -61,6 +54,25 @@ export async function manageAuth(
   )
 }
 
+export function accessStatus(db) {
+  const config = readAuthConfig(db)
+  return {
+    viewerMode: config.viewer_mode,
+    viewerConfigured: Boolean(config.viewer_hash),
+    adminConfigured: Boolean(config.admin_hash),
+  }
+}
+
+export async function manageLauncherAccess(db, request) {
+  const allowed = ['status', 'set-admin-password', 'set-viewer-password', 'viewer-mode', 'revoke-sessions']
+  if (!allowed.includes(request?.command)) throw new Error('Invalid access command.')
+  if (request.command !== 'status') {
+    const answers = [request.password, request.confirm]
+    await manageAuth(db, [request.command, request.mode], { prompt: () => answers.shift(), print() {} })
+  }
+  return accessStatus(db)
+}
+
 async function main() {
   const path = resolve(process.env.NETWATCH_DB || 'data/netwatch.sqlite')
   mkdirSync(dirname(path), { recursive: true })
@@ -68,7 +80,15 @@ async function main() {
   let store
   try {
     store = openStore(path)
-    await manageAuth(store.db, process.argv.slice(2))
+    if (process.argv.length === 3 && process.argv[2] === '--launcher') {
+      let data = ''
+      process.stdin.setEncoding('utf8')
+      for await (const chunk of process.stdin) {
+        data += chunk
+        if (data.length > 4096) throw new Error('Invalid access command.')
+      }
+      console.log(JSON.stringify(await manageLauncherAccess(store.db, JSON.parse(data))))
+    } else await manageAuth(store.db, process.argv.slice(2))
   } finally {
     store?.close()
     release()
@@ -77,7 +97,7 @@ async function main() {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch((error) => {
-    console.error(error.message)
+    console.error(process.argv[2] === '--launcher' ? 'Unable to update access settings.' : error.message)
     process.exitCode = 1
   })
 }

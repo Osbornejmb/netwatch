@@ -34,10 +34,16 @@ const startup = setTimeout(() => {
 }, 15000)
 commands.on('line', (line) => {
   if (line === 'stop') stop()
+  else if (line.length <= 4096 && ready && !stopping && child.connected) {
+    try {
+      child.send({ type: 'access', request: JSON.parse(line) })
+    } catch {}
+  }
 })
 commands.on('close', stop)
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, stop)
 child.on('message', (message) => {
+  if (message?.type === 'access' && !stopping) process.stdout.write(JSON.stringify(message) + '\n')
   if (message?.type === 'ready') {
     ready = true
     clearTimeout(startup)
@@ -47,7 +53,9 @@ child.on('message', (message) => {
         `Host running · ICMP ${process.env.NETWATCH_ICMP === '1' ? 'enabled' : 'disabled'}`,
         message.port,
       )
+      child.send({ type: 'access', request: { command: 'status' } })
       healthTimer = setInterval(async () => {
+        if (!stopping && child.connected) child.send({ type: 'access', request: { command: 'status' } })
         try {
           const response = await fetch(loopbackUrl(message.port) + '/api/v1/health', {
             signal: AbortSignal.timeout(2000),

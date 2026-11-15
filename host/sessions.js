@@ -19,6 +19,7 @@ export function createSessions(db, { lan, now = Date.now } = {}) {
   let config
   let readAt = -Infinity
   let busy = false
+  let generation = 0
   const empty = { count: 0, last: -Infinity, next: -Infinity, attempts: [] }
   let global = empty
   const failures = new Map()
@@ -122,6 +123,7 @@ export function createSessions(db, { lan, now = Date.now } = {}) {
     if (source === 'local') return { role: 'admin' }
     const settings = configAt(true)
     if (!remoteEnabled(lan, settings)) throw invalid('Remote access is unavailable.', 403)
+    const generationAtLogin = generation
     const role = body?.role
     const password = body?.password
     const open = role === 'viewer' && settings.viewer_mode === 'open'
@@ -157,12 +159,16 @@ export function createSessions(db, { lan, now = Date.now } = {}) {
         if (record(ip, { ...entry, attempts: previous.attempts }, end)) throw limited(600)
         throw invalid('Invalid credentials', 401)
       }
-      if (hash && needsRehash(hash))
+      if (generationAtLogin !== generation) throw invalid('Invalid credentials', 401)
+      if (hash && needsRehash(hash)) {
+        const upgraded = await hashPassword(password)
+        if (generationAtLogin !== generation) throw invalid('Invalid credentials', 401)
         db.prepare('UPDATE auth_config SET ' + column + '=?, updated_at=? WHERE singleton=1 AND ' + column + '=?').run(
-          await hashPassword(password),
+          upgraded,
           new Date(now()).toISOString(),
           hash,
         )
+      }
       failures.delete(ip)
       global = empty
       return issue(role, ip, res, session)
@@ -171,6 +177,10 @@ export function createSessions(db, { lan, now = Date.now } = {}) {
     }
   }
   return {
+    invalidate() {
+      generation++
+      readAt = -Infinity
+    },
     enabled: () => remoteEnabled(lan, configAt()),
     inspect,
     current,

@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { openStore } from './store.js'
 import { createLanListeners } from './lan.js'
+import { manageLauncherAccess } from './auth-config.js'
 import { createSessions } from './sessions.js'
 import { createHost } from './server.js'
 import { loopbackUrl, readPort } from './port.js'
@@ -70,6 +71,7 @@ server.listen(port, '127.0.0.1', () => {
 const sessionCleanup = setInterval(() => auth.purge(), 60000)
 sessionCleanup.unref()
 let stopping = false
+let accessUpdate
 async function shutdown(code = 0) {
   if (stopping) return
   stopping = true
@@ -78,6 +80,7 @@ async function shutdown(code = 0) {
   server.closeAllConnections()
   await Promise.all([collector.stop(), interfaces.stop(), discovery.stop(), lan?.stop()])
   await closed
+  await accessUpdate
   store.close()
   release()
   process.exitCode = code
@@ -87,6 +90,27 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => void shutdo
 if (process.send) {
   process.on('message', (message) => {
     if (message?.type === 'shutdown') void shutdown()
+    if (message?.type !== 'access' || stopping) return
+    if (accessUpdate) {
+      if (message.request?.command !== 'status' && process.connected)
+        process.send({ type: 'access', error: 'Wait for the current change and try again.' })
+      return
+    }
+    accessUpdate = (async () => {
+      try {
+        const result = await manageLauncherAccess(store.db, message.request)
+        if (message.request?.command !== 'status') auth.invalidate()
+        auth.purge()
+        const sessions = store.db
+          .prepare('SELECT role, ip, last_seen_at AS lastSeen FROM sessions ORDER BY last_seen_at DESC')
+          .all()
+        if (process.connected) process.send({ type: 'access', ...result, sessions, urls: lan?.urls() ?? [] })
+      } catch {
+        if (process.connected) process.send({ type: 'access', error: 'Unable to update access settings.' })
+      }
+    })().finally(() => {
+      accessUpdate = undefined
+    })
   })
   process.on('disconnect', () => void shutdown())
 }
