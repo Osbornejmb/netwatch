@@ -21,6 +21,7 @@ import { mapCard, mapEdgeTypes } from './nodes/MapEdge'
 import { nextFreePosition } from './nodes/placement'
 
 import { readTopology, writeTopology, validateTopology } from './topology'
+import UplinkControls from './UplinkControls'
 
 const viewFromHash = (hash) =>
   ({
@@ -45,6 +46,20 @@ export default function App({ viewer = false, remote = false, accessControls }) 
   const [nodes, setNodes, onNodesChange] = useNodesState(saved.topology.nodes)
   const [editorSizes, setEditorSizes] = useState({})
   const [edges, setEdges, onEdgesChange] = useEdgesState(saved.topology.edges)
+  const [draftGroups, setDraftGroups] = useState(saved.topology.groups ?? [])
+  const groups = useMemo(() => {
+    const links = new Map(edges.map((edge) => [edge.id, edge]))
+    const routers = new Set(nodes.filter((node) => node.type === 'router').map((node) => node.id))
+    return draftGroups
+      .map((group) => ({
+        ...group,
+        links: group.links.filter((id) => routers.has(links.get(id)?.source) || routers.has(links.get(id)?.target)),
+      }))
+      .filter((group) => {
+        const members = group.links.flatMap((id) => [links.get(id).source, links.get(id).target])
+        return group.links.length >= 2 && new Set(members.filter((id) => routers.has(id))).size >= 2
+      })
+  }, [draftGroups, edges, nodes])
   const [currentView, setView] = useState(() => viewFromHash(location.hash))
   const view = viewer ? 'dashboard' : currentView
   const [dashboardView, setDashboardView] = useState({ source: 'host', layout: 'radial', centerId: '' })
@@ -81,7 +96,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
   useEffect(() => {
     if (viewer || autosavePaused) return
     try {
-      writeTopology(localStorage, { nodes, edges })
+      writeTopology(localStorage, { nodes, edges, groups })
       setStorageError('')
     } catch {
       setBackupNotice('')
@@ -90,7 +105,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
       )
       setAutosavePaused(true)
     }
-  }, [nodes, edges, autosavePaused, viewer])
+  }, [nodes, edges, groups, autosavePaused, viewer])
 
   const importTopology = async (event) => {
     const file = event.target.files?.[0]
@@ -233,7 +248,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
 
   const exportTopology = () => {
     download(
-      JSON.stringify({ exportedAt: new Date().toISOString(), ...validateTopology({ nodes, edges }) }, null, 2),
+      JSON.stringify({ exportedAt: new Date().toISOString(), ...validateTopology({ nodes, edges, groups }) }, null, 2),
       'netwatch-topology.json',
       'application/json',
     )
@@ -245,7 +260,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
 
   const persistCurrent = () => {
     try {
-      writeTopology(localStorage, { nodes, edges })
+      writeTopology(localStorage, { nodes, edges, groups })
       setStorageError('')
       setAutosavePaused(false)
       setRecovery(null)
@@ -265,6 +280,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
       setImportGeneration((value) => value + 1)
       setNodes(pendingAction.topology.nodes)
       setEdges(pendingAction.topology.edges)
+      setDraftGroups(pendingAction.topology.groups ?? [])
       setSelectedNode(null)
       setQuery('')
       setBackupNotice(
@@ -393,6 +409,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
           <Dashboard
             nodes={nodes}
             edges={edges}
+            groups={groups}
             viewer={viewer}
             remote={remote}
             viewOptions={viewer ? { ...dashboardView, source: 'host' } : dashboardView}
@@ -590,6 +607,18 @@ export default function App({ viewer = false, remote = false, accessControls }) 
                 onRemoveLink={removeConnection}
               />
             </details>
+            <details className="editor-tools">
+              <summary>Uplinks & redundancy</summary>
+              <UplinkControls
+                nodes={nodes}
+                edges={edges}
+                groups={groups}
+                onGroups={setDraftGroups}
+                onUplink={(id, uplink) =>
+                  setEdges((current) => current.map((edge) => (edge.id === id ? { ...edge, uplink } : edge)))
+                }
+              />
+            </details>
           </section>
         )}
         <div hidden={view !== 'editor'} className="editor-network-settings">
@@ -598,10 +627,12 @@ export default function App({ viewer = false, remote = false, accessControls }) 
             importGeneration={importGeneration}
             nodes={nodes}
             edges={edges}
+            groups={groups}
             paused={autosavePaused}
             onLoad={(topology) => {
               setNodes(topology.nodes)
               setEdges(topology.edges)
+              setDraftGroups(topology.groups ?? [])
               setSelectedNode(null)
             }}
           />

@@ -28,6 +28,7 @@ All API responses are JSON with no-store. Errors use `{ "error": { "code": "requ
 
 - `GET /api/v1/health`: `{apiVersion:1, ready:true, collector:{state:"disabled", ...}}`. The listener starts only after migrations and retention cleanup succeed. Startup/database failure leaves no ready listener. Collector readiness is independent; disabled/unsupported/degraded collection does not mean devices are down.
 - `GET /api/v1/topology`: `{revision:0, updatedAt:"ISO UTC", topology:{schemaVersion:1,nodes:[],edges:[]}, monitoring:{}}`. Stable inventory IDs and v1 topology match the existing export contract; monitoring maps device IDs to booleans and is separate from topology/observations.
+  Topology v1 optionally supports `edge.uplink` with `label`, `source`, and `target`. Each port has a `label` and an interface `index` (positive integer or null). Optional `topology.groups` holds up to 100 records with `id`, `name`, and 2–16 distinct router link IDs in `links`.
 Write clients read the 64-character hex token from the `netwatch-write-token` meta tag in the host-served index and send it in `X-NetWatch-Write` for topology PUTs and discovery POSTs. The host rejects the old header value `1` and prior launches’ tokens with HTTP 403. Reload the dashboard after restarting the host before retrying a write.
 
 The token blocks callers that only know the header name or old value. A local process with access to the loopback origin can read the index and obtain the token. Remote clients receive a separate CSRF token after login.
@@ -41,6 +42,8 @@ The token blocks callers that only know the header name or old value. A local pr
 Snapshot responses carry a weak ETag. Send it in `If-None-Match` on the next request. An unchanged inventory, latest observation and incident state, collector, and discovery state produces HTTP 304 with an empty body. A 304 confirms connectivity without advancing individual check timestamps. The ETag also changes when a new host process starts.
 
 The snapshot additionally includes `inventory` with the complete GET topology shape (`revision`, `updatedAt`, `topology`, `monitoring`), read in the same database transaction as observations. This additive field prevents a new address or deleted device from receiving evidence from a different inventory revision. Disabled devices display unknown health while retained history stays available. The UI ages checks every second, including during API failure, preserving the last successful snapshot and timestamp.
+
+When mapped port evidence is available, snapshots include `uplinkStaleAfterMs` and `uplinkPorts` rows keyed by connection ID. A row may contain `source` and/or `target` values with `checkedAt`, `admin`, and `oper`. This excludes credentials, port descriptions, and unrelated ports. Port collection and authorization changes invalidate the snapshot ETag.
 
 History additionally returns `revision`, read transactionally with checks; the dashboard rejects a page for a different selected inventory revision. Details fetch 25 rows at a time and display at most 200, with explicit refresh, error and empty states. Adjacent retained status changes are labelled without inferring continuity or uptime. Changing the selected device, inventory revision or latest check cancels obsolete requests and restarts from the newest page.
 

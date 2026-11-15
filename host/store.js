@@ -414,7 +414,7 @@ export function openStore(
         .map((n) => ({ deviceId: n.id, address: n.data.ip, type: n.type, authorization: targets.get(n.id) }))
     },
     authorizeInterfaces(id, authorization, revision) {
-      return transaction(() => {
+      transaction(() => {
         const state = readState()
         if (state.revision !== revision) throw invalid('Inventory changed.', 409)
         if (!state.topology.nodes.some((n) => n.id === id && n.data.ip))
@@ -425,12 +425,13 @@ export function openStore(
         db.prepare('DELETE FROM interface_samples WHERE device_id=?').run(id)
         if (authorization !== null) db.prepare('INSERT INTO snmp_targets VALUES(?,?)').run(id, authorization)
       })
+      observationVersion++
     },
     appendInterfaces(id, value, { revision, authorization } = {}) {
       const clean = validateInterfaces(value),
         time = Date.parse(clean.checkedAt)
       if (time > now() || time < now() - 180000) throw invalid('Invalid interface time.')
-      return transaction(() => {
+      transaction(() => {
         if (
           readState().revision !== revision ||
           db.prepare('SELECT authorization FROM snmp_targets WHERE device_id=?').get(id)?.authorization !==
@@ -450,6 +451,7 @@ export function openStore(
           'INSERT INTO interface_samples VALUES(?,?,?) ON CONFLICT(device_id) DO UPDATE SET checked_at=excluded.checked_at,payload=excluded.payload',
         ).run(id, time, JSON.stringify(payload))
       })
+      observationVersion++
     },
     interfaces(id, { after = 0, limit = 50 } = {}) {
       return transaction(() => {
@@ -586,7 +588,7 @@ export function openStore(
         return { revision: state.revision, checks, nextBefore: rows.length > limit ? checks.at(-1).id : null }
       }, true)
     },
-    snapshot() {
+    snapshot({ uplinkPorts = false } = {}) {
       return transaction(() => {
         const state = readState()
         const latest = new Map(
@@ -596,8 +598,33 @@ export function openStore(
             .map((row) => [row.device_id, row]),
         )
         const observations = state.topology.nodes.map((node) => latest.get(node.id)).filter(Boolean)
+        const ports = []
+        if (
+          uplinkPorts &&
+          state.topology.edges.some((edge) => edge.uplink?.source.index || edge.uplink?.target.index)
+        ) {
+          const samples = new Map(
+            db
+              .prepare('SELECT device_id, payload FROM interface_samples JOIN snmp_targets USING(device_id)')
+              .all()
+              .map(({ device_id: id, payload }) => {
+                const { checkedAt, interfaces } = JSON.parse(payload)
+                return [id, { checkedAt, ports: new Map(interfaces.map((row) => [row.index, row])) }]
+              }),
+          )
+          for (const edge of state.topology.edges) {
+            const evidence = { id: edge.id }
+            for (const side of ['source', 'target']) {
+              const sample = samples.get(edge[side])
+              const row = sample?.ports.get(edge.uplink?.[side].index)
+              if (row) evidence[side] = { checkedAt: sample.checkedAt, admin: row.admin, oper: row.oper }
+            }
+            if (evidence.source || evidence.target) ports.push(evidence)
+          }
+        }
         return {
           inventory: structuredClone(state),
+          ...(ports.length && { uplinkPorts: ports }),
           activeIncidents: db
             .prepare('SELECT * FROM incidents WHERE resolved_at IS NULL ORDER BY id DESC')
             .all()

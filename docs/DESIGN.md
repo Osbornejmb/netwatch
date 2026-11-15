@@ -1,5 +1,7 @@
 # Dashboard design direction
 
+Uplinks & redundancy keeps configuration within the draft editor. Device details display mapped port status separately from reachability. The dashboard shows redundancy groups in a collapsible section only when groups are configured.
+
 The admin-only Network neighbors panel opens on demand in saved-device details. It shows the observation time, reported ports, and whether the evidence is current. Operators review each proposal, choose a saved peer or name a new unmonitored device, and explicitly save or dismiss the link.
 
 Discovery shows route-check progress and reports newly saved router links at scan completion.

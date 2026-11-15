@@ -9,6 +9,7 @@ import useLayoutDrag from './useLayoutDrag'
 import { uniqueConnections } from './connections'
 import { formatCheckTime, collectorLabel } from './monitoring'
 import { tidyLayout, radialLayout, connectedDevices } from './radial'
+import { redundancyState, uplinkLabels, uplinkState } from './uplinks'
 
 import { nodeDimensions } from './nodes/dimensions'
 import { NodeHandles } from './nodes/DeviceNode'
@@ -59,6 +60,7 @@ const NO_CHECKS = {}
 export default function Dashboard({
   nodes: inventory,
   edges: inventoryEdges,
+  groups: draftGroups = [],
   showInventory = false,
   onEdit,
   viewer = false,
@@ -99,6 +101,16 @@ export default function Dashboard({
     ? { nodes: live.inventory.topology.nodes, edges: live.inventory.topology.edges, checks: live.checks }
     : { nodes: inventory, edges: inventoryEdges, checks: NO_CHECKS }
   const edges = useMemo(() => uniqueConnections(sourceEdges), [sourceEdges])
+  const groups = live ? (live.inventory.topology.groups ?? []) : draftGroups
+  const paths = new Map(
+    sourceEdges.map((edge) => [
+      edge.id,
+      {
+        edge,
+        state: uplinkState(edge, live?.uplinkPorts?.get(edge.id), now, live?.uplinkStaleAfterMs),
+      },
+    ]),
+  )
   const effectiveCenterId = nodes.some((node) => node.id === centerId) ? centerId : ''
   const layoutNodes = useMemo(
     () => (mapLayout === 'radial' ? radialLayout(nodes, edges, effectiveCenterId) : tidyLayout(nodes, edges)),
@@ -183,7 +195,16 @@ export default function Dashboard({
         .filter((edge) => edge.source === selected.id || edge.target === selected.id)
         .map((edge) => {
           const device = devicesById.get(edge.source === selected.id ? edge.target : edge.source)
-          return { id: edge.id, device, label: edge.label, health: connectionHealth(selected.health, device?.health) }
+          return {
+            id: edge.id,
+            device,
+            label: edge.label,
+            health: connectionHealth(selected.health, device?.health),
+            uplink: edge.uplink,
+            portStatus: uplinkLabels[paths.get(edge.id)?.state],
+            localPort: edge.uplink?.[edge.source === selected.id ? 'source' : 'target'],
+            peerPort: edge.uplink?.[edge.source === selected.id ? 'target' : 'source'],
+          }
         })
         .filter((item) => item.device)
     : []
@@ -362,6 +383,34 @@ export default function Dashboard({
                   {openIncidents.has(node.id) ? ' · Open outage' : ''}
                 </button>
               ))}
+            </div>
+          </details>
+        )}
+        {groups.length > 0 && (
+          <details className="health-attention redundancy-details">
+            <summary>Redundancy groups ({groups.length})</summary>
+            <div className="redundancy-summary">
+              <p>Group status uses observed port states. Failover requires a separate check.</p>
+              {groups.map((group) => {
+                const members = group.links.map((id) => paths.get(id))
+                return (
+                  <div key={group.id}>
+                    <strong>
+                      {group.name} · {redundancyState(members.map((member) => member?.state ?? 'unknown'))}
+                    </strong>
+                    <ul>
+                      {members.map((member, index) => (
+                        <li key={group.links[index]}>
+                          {member?.edge.uplink?.label ||
+                            `${devicesById.get(member?.edge.source)?.data.label ?? 'Unknown device'} ↔ ${devicesById.get(member?.edge.target)?.data.label ?? 'Unknown device'}`}
+                          {' · '}
+                          {uplinkLabels[member?.state ?? 'unknown']}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )
+              })}
             </div>
           </details>
         )}

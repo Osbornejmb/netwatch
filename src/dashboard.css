@@ -678,6 +678,18 @@
   overflow: auto;
   padding: 4px 4px 8px;
 }
+.redundancy-details summary {
+  color: inherit;
+}
+.health-attention > .redundancy-summary {
+  display: block;
+  max-height: min(45dvh, 320px);
+  padding: 8px 12px;
+}
+.redundancy-summary ul {
+  margin: 4px 0 12px;
+  padding-left: 20px;
+}
 .health-title {
   display: flex;
   align-items: center;

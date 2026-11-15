@@ -1,4 +1,5 @@
 import { normalizeAddress } from './inventory.js'
+import { connectionKey } from './connections.js'
 
 export const STORAGE_KEY = 'netwatch-topology-v1'
 
@@ -43,6 +44,8 @@ export function validateTopology(value) {
     }
   })
   const edgeIds = new Set()
+  const routerIds = new Set(nodes.filter((node) => node.type === 'router').map((node) => node.id))
+  const routerLinks = new Map()
   const edges = value.edges.map((edge) => {
     if (
       !edge ||
@@ -60,6 +63,8 @@ export function validateTopology(value) {
       throw new Error('Invalid link: check unique IDs and existing, distinct endpoints.')
     }
     edgeIds.add(edge.id)
+    if (routerIds.has(edge.source) || routerIds.has(edge.target)) routerLinks.set(edge.id, edge)
+    const uplink = edge.uplink === undefined ? undefined : validateUplink(edge.uplink)
     return {
       id: edge.id,
       source: edge.source,
@@ -67,9 +72,57 @@ export function validateTopology(value) {
       label: edge.label || 'Link',
       sourceHandle: edge.sourceHandle ?? null,
       targetHandle: edge.targetHandle ?? null,
+      ...(uplink && { uplink }),
     }
   })
-  return { schemaVersion: 1, nodes, edges }
+  const groups = value.groups === undefined ? [] : value.groups
+  if (!Array.isArray(groups) || groups.length > 100) throw new Error('Invalid redundancy groups.')
+  const groupIds = new Set()
+  const cleanGroups = groups.map((group) => {
+    if (
+      !group ||
+      typeof group.id !== 'string' ||
+      !group.id ||
+      group.id.length > 100 ||
+      groupIds.has(group.id) ||
+      typeof group.name !== 'string' ||
+      !group.name.trim() ||
+      group.name.length > 80 ||
+      !Array.isArray(group.links) ||
+      group.links.length < 2 ||
+      group.links.length > 16 ||
+      new Set(group.links).size !== group.links.length ||
+      group.links.some((id) => !routerLinks.has(id))
+    )
+      throw new Error('Each redundancy group needs a name and 2–16 distinct router links.')
+    const links = group.links.map((id) => routerLinks.get(id))
+    const routers = new Set(links.flatMap(({ source, target }) => [source, target]).filter((id) => routerIds.has(id)))
+    if (routers.size < 2 || new Set(links.map(connectionKey)).size !== links.length)
+      throw new Error('Choose different connections that include at least two routers.')
+    groupIds.add(group.id)
+    return { id: group.id, name: group.name.trim(), links: [...group.links] }
+  })
+  return { schemaVersion: 1, nodes, edges, ...(cleanGroups.length && { groups: cleanGroups }) }
+}
+
+export function validateUplink(value) {
+  const text = (input) => {
+    if (typeof input !== 'string' || input.length > 80 || /[\p{Cc}\p{Cf}]/u.test(input))
+      throw new Error('Use labels of up to 80 characters.')
+    return input.trim()
+  }
+  const port = (input) => {
+    if (
+      !input ||
+      (input.index !== null && (!Number.isInteger(input.index) || input.index < 1 || input.index > 2147483647))
+    )
+      throw new Error('Use a valid interface index.')
+    return { label: text(input.label), index: input.index }
+  }
+  const uplink = { label: text(value?.label), source: port(value.source), target: port(value.target) }
+  return uplink.label || uplink.source.label || uplink.target.label || uplink.source.index || uplink.target.index
+    ? uplink
+    : undefined
 }
 
 export function readTopology(storage, fallback) {

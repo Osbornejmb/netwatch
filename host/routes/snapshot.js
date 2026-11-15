@@ -1,12 +1,16 @@
 import { createHash } from 'node:crypto'
 
 export function createSnapshotRoute(instance) {
-  return ({ store, collector, discovery, requestHeaders, response, role }) => {
+  return ({ store, collector, interfaces, discovery, requestHeaders, response, role }) => {
     const status = collector?.snapshot()
     const viewer = role === 'viewer'
     const discoveryStatus = viewer ? undefined : (discovery?.snapshot() ?? { state: 'disabled' })
+    const portCollector = interfaces?.snapshot?.()
+    const portFreshness = ['running', 'degraded'].includes(portCollector?.state)
+      ? portCollector.freshness?.staleAfterMs
+      : undefined
     const version = createHash('sha256')
-      .update(JSON.stringify([store.snapshotVersion(), status, discoveryStatus, viewer]))
+      .update(JSON.stringify([store.snapshotVersion(), status, discoveryStatus, viewer, portFreshness]))
       .digest('base64url')
     // The wall-clock generatedAt field can advance while the represented state is unchanged.
     const tag = '"' + instance + '.' + version + '"'
@@ -20,7 +24,8 @@ export function createSnapshotRoute(instance) {
       response.status = 304
       return
     }
-    const result = store.snapshot()
+    const result = store.snapshot({ uplinkPorts: portFreshness > 0 })
+    const portEvidence = result.uplinkPorts && { uplinkPorts: result.uplinkPorts, uplinkStaleAfterMs: portFreshness }
     if (status) {
       result.collector = status
       result.freshness = status.freshness
@@ -33,9 +38,10 @@ export function createSnapshotRoute(instance) {
         observations: result.observations,
         inventory: result.inventory,
         activeIncidents: result.activeIncidents,
+        ...portEvidence,
       }
     }
     result.discovery = discoveryStatus
-    return result
+    return { ...result, ...portEvidence }
   }
 }

@@ -4,6 +4,8 @@ The current UI uses one off-white theme across the map, editor, dialogs and Wind
 
 ## Opt-in interface collection (#7, local implementation)
 
+Configured uplinks bind source and target interface indexes to saved links. The dashboard snapshot projects fresh-capable port status and timestamps for mapped links from authorized IF-MIB samples. The browser ages those samples independently from device reachability and derives the state of each configured redundancy group. See SNMP-INTERFACES.md.
+
 The authenticated read-only SNMP poll also collects bounded LLDP observations for review. Pending observations are held in memory. An admin can save an approved neighbor link against the current inventory revision. Port and LLDP observations leave reachability independent.
 
 The Windows host can run a separate bounded SNMPv3 authPriv collector when NETWATCH_SNMP=1 and an operator enrolls saved-device credentials locally. `net-snmp` is pinned as a host-only protocol dependency. `snmp-probe.js` performs GET/GETBULK only, validates OID order/types/counters and caps rows/requests/time; `snmp-collector.js` separates workers, freshness and diagnostics from ICMP health/incidents. Inventory revisions cancel obsolete work. A repository-owned CurrentUser DPAPI helper protects credentials in a separate host directory; no browser configuration endpoint or credential response exists.

@@ -129,7 +129,7 @@ export default function DeviceInterfaces({ deviceId, revision, remote, viewer })
               <li key={row.index}>
                 <strong>{row.name || row.description || `Interface ${row.index}`}</strong>
                 <span>
-                  {current ? '' : 'Last known · '}
+                  Index {row.index} · {current ? '' : 'Last known · '}
                   {OPER[row.oper] || 'Unknown'} · {ADMIN[row.admin] || 'Setting unknown'}
                 </span>
                 <span>
