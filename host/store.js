@@ -132,11 +132,21 @@ const MIGRATIONS = [
                        FROM (SELECT DISTINCT device_id FROM checks) AS devices);`)
     },
   },
+  {
+    version: 7,
+    up(db, now) {
+      db.exec(`CREATE TABLE auth_config (singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+        viewer_mode TEXT NOT NULL CHECK(viewer_mode IN ('open','password','disabled')), viewer_hash TEXT, admin_hash TEXT, updated_at TEXT);
+        CREATE TABLE sessions (id_hash TEXT PRIMARY KEY NOT NULL, role TEXT NOT NULL CHECK(role IN ('viewer','admin')),
+        csrf_hash TEXT NOT NULL, created_at INTEGER NOT NULL, last_seen_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, ip TEXT NOT NULL);`)
+      db.prepare("INSERT INTO auth_config VALUES(1,'password',NULL,NULL,?)").run(new Date(now()).toISOString())
+    },
+  },
 ]
 
 export function openStore(
   path,
-  { now = () => Date.now(), migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6 } = {},
+  { now = () => Date.now(), migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7 } = {},
 ) {
   const db = new DatabaseSync(path)
   db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=3000;')
@@ -145,7 +155,7 @@ export function openStore(
     db.close()
     throw new Error('Database schema is newer than this host. Use a compatible host; do not delete the database.')
   }
-  const hooks = [migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6]
+  const hooks = [migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6, migrateV7]
   try {
     for (const migration of MIGRATIONS) {
       if (migration.version <= version) continue

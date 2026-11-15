@@ -9,7 +9,7 @@ export function validateDatabase(path) {
   const db = new DatabaseSync(path, { readOnly: true })
   try {
     const version = db.prepare('PRAGMA user_version').get().user_version
-    if (db.prepare('PRAGMA integrity_check').get().integrity_check !== 'ok' || ![1, 2, 3, 4, 5, 6].includes(version))
+    if (db.prepare('PRAGMA integrity_check').get().integrity_check !== 'ok' || ![1, 2, 3, 4, 5, 6, 7].includes(version))
       throw new Error('Invalid or unsupported backup database.')
     const rows = db.prepare('SELECT * FROM inventory').all()
     if (
@@ -190,7 +190,9 @@ export function restoreDatabase(path, source) {
         Math.max(current, incoming) + 1,
         new Date().toISOString(),
       )
-      if (db.prepare('PRAGMA user_version').get().user_version >= 4) db.exec('DELETE FROM snmp_targets')
+      const version = db.prepare('PRAGMA user_version').get().user_version
+      if (version >= 4) db.exec('DELETE FROM snmp_targets')
+      if (version >= 7) db.exec('DELETE FROM sessions')
       db.exec('PRAGMA wal_checkpoint(TRUNCATE)')
     } finally {
       db.close()
