@@ -4,7 +4,7 @@
 
 NetWatch is a local-first Windows network monitoring dashboard. Its job is to show which devices are up, down, stale, or not yet monitored on a readable network map. The topology editor supports that dashboard; it is not the main screen.
 
-Stack: React 18, Vite 6, plain JavaScript (ESM, no TypeScript), React Flow (`@xyflow/react`), Lucide, Tailwind. Host: Node >= 22.13 using built-in `node:sqlite` and pinned host-only `net-snmp`. No linter or formatter is configured.
+Stack: React 18, Vite 6, plain JavaScript (ESM, no TypeScript), React Flow (`@xyflow/react`), Lucide, Tailwind. Host: Node >= 22.13 using built-in `node:sqlite` and pinned host-only `net-snmp`. ESLint and Prettier cover host/ and src/.
 
 **Implemented:** dashboard and topology editor, browser-local topology with JSON backup/restore and recovery, loopback Node API + SQLite store with explicit browser transfer (`docs/HOST-API.md`), opt-in bounded Windows ICMP collector (`docs/ICMP-COLLECTOR.md`).
 **Issue #6 implementation:** dashboard snapshot polling, host freshness, per-device authorization and bounded history; merged through PR #30; see WORKLOG.md for verification and remaining release work. **Local incidents:** persistent outage/recovery history and dashboard attention; external delivery remains deferred. **SNMP interfaces:** opt-in SNMPv3 and Windows DPAPI enrollment are implemented on the current branch; Cisco hardware verification remains pending. **Not implemented:** external alerts, LLDP, BGP, authentication, remote access, Windows service packaging. Never describe a planned feature as implemented. Docs can lag the code: confirm status with `git log` and the code, and never hardcode test counts or PR/issue states from memory.
@@ -26,7 +26,7 @@ Stack: React 18, Vite 6, plain JavaScript (ESM, no TypeScript), React Flow (`@xy
 | Browser regression checks | `node scripts/check-<name>-browser.mjs` (optional, see below) |
 
 - `npm run dev:lan` binds 0.0.0.0. Use it only when the user explicitly asks for trusted-LAN development.
-- Browser checks are not part of `npm test` or CI. They need an external Playwright: set `PLAYWRIGHT_MODULE`, `CHROMIUM_PATH`, and `NETWATCH_URL` (default `http://127.0.0.1:4173`, the preview). `check-host-browser.mjs` uses `NETWATCH_HOST_URL` (default :4317); `check-scale-browser.mjs` uses `NETWATCH_SCALE_URL` (default :5173, dev server).
+- Browser checks run separately from `npm test` in the Linux CI job. For local runs, install Chromium with `npx playwright install chromium` and set `PLAYWRIGHT_MODULE`, `CHROMIUM_PATH`, and `NETWATCH_URL` (default `http://127.0.0.1:4173`, the preview). `check-host-browser.mjs` uses `NETWATCH_HOST_URL` (default :4317); `check-scale-browser.mjs` uses `NETWATCH_SCALE_URL` (default :5173, dev server).
 - Environment: `NETWATCH_DB` (absolute DB path, default `data/netwatch.sqlite`), `NETWATCH_ICMP=1` (enable the collector, default off). Do not set `NETWATCH_ICMP=1` or opt real devices in unless the user authorized specific targets.
 - PowerShell users may need `npm.cmd`.
 

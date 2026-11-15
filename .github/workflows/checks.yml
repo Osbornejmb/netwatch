@@ -8,14 +8,18 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
+        node: [22, lts/*]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm audit --audit-level=high
       - run: npm test
       - run: npm run build
       - name: Compile Windows tray launcher
@@ -35,7 +39,48 @@ jobs:
         if: always() && runner.os == 'Windows'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: windows-loopback-evidence
+          name: windows-loopback-evidence-${{ strategy.job-index }}
           path: .tools/evidence/windows-*.txt
+          if-no-files-found: ignore
+          include-hidden-files: true
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PLAYWRIGHT_MODULE: playwright
+      NETWATCH_URL: http://127.0.0.1:4173
+      NETWATCH_SCALE_URL: http://127.0.0.1:4173
+      NETWATCH_HOST_URL: http://127.0.0.1:4317
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Run fixture-based browser checks
+        shell: bash
+        run: |
+          export CHROMIUM_PATH="$(node --input-type=module -e 'import { chromium } from "playwright"; console.log(chromium.executablePath())')"
+          export NETWATCH_DB="$RUNNER_TEMP/netwatch-browser.sqlite"
+          ./node_modules/.bin/vite preview --host 127.0.0.1 --strictPort &
+          preview_pid=$!
+          node host/main.js &
+          host_pid=$!
+          trap 'kill "$preview_pid" "$host_pid" 2>/dev/null || true' EXIT
+          curl --fail --retry 10 --retry-connrefused --retry-delay 1 "$NETWATCH_URL/" >/dev/null
+          curl --fail --retry 10 --retry-connrefused --retry-delay 1 "$NETWATCH_HOST_URL/api/v1/health" >/dev/null
+          # Windows release-device validation needs a real, explicitly authorized device.
+          for script in scripts/check-*-browser.mjs; do
+            node "$script"
+          done
+      - name: Upload fixture browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fixture-browser-evidence
+          path: .tools/evidence/
           if-no-files-found: ignore
           include-hidden-files: true

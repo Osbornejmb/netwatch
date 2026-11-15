@@ -79,6 +79,8 @@ This enables the collector for devices you separately authorize; it does not add
 
 ## Development and verification
 
+NetWatch uses the experimental `node:sqlite` API in Node.js 22. Before upgrading Node, verify the host and its migrations with the test suite against the target Node version.
+
 ```powershell
 npm.cmd test
 npm.cmd run build
