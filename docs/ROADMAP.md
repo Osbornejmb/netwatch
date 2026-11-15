@@ -10,6 +10,8 @@ M1 + M2 deliver the local monitoring MVP. SNMP/LLDP, BGP collection, and remote 
 
 **Critical path:** #13 → #1 → #4 → #5 → #28 → #6 → #11 → #16. Local tray/desktop controls (#28) are brought forward before live dashboard integration. Inventory editing (#2), recovery (#3), and map evidence (#15) must also be complete before the release gate #16. Authentication #10 can be brought forward after #4/#6 if remote access becomes urgent, without waiting for SNMP.
 
+Hourly latency rollups are a possible later feature for long-term trends. Live observations, sampled checks and outage records use their own retention rules.
+
 ## Recommended solo order
 
 | Order | Issue | Deliverable | Required before starting |

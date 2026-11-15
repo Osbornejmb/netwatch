@@ -31,6 +31,12 @@ const normalizeDiscoveryName = (value) => {
   return value
 }
 
+export const HISTORY_SAMPLE_MS = 60_000
+export const HISTORY_MAX_PER_DEVICE = 5_000
+export const HISTORY_MAX_ROWS = 1_000_000
+const RETENTION_MS = 30 * 86400000
+const LATEST_INDEX = 'CREATE INDEX IF NOT EXISTS checks_device_latest ON checks(device_id,checked_at DESC,seq DESC)'
+
 export const MAX_BODY = 5 * 1024 * 1024
 export function invalid(message, status = 400) {
   return Object.assign(new Error(message), { status })
@@ -112,17 +118,34 @@ const MIGRATIONS = [
       )
     },
   },
+  {
+    version: 6,
+    up(db) {
+      db.exec(LATEST_INDEX)
+      db.exec(`CREATE TABLE latest_check (device_id TEXT PRIMARY KEY NOT NULL,
+        status TEXT NOT NULL CHECK(status IN ('up','down','unknown')), checked_at INTEGER NOT NULL,
+        outcome TEXT NOT NULL CHECK(outcome IN ('reachable','unreachable')), reason TEXT NOT NULL,
+        latency_ms REAL CHECK(latency_ms IS NULL OR (outcome='reachable' AND latency_ms >= 0 AND latency_ms <= 1500)));
+        INSERT INTO latest_check
+          SELECT device_id,status,checked_at,outcome,reason,latency_ms FROM checks
+          WHERE seq IN (SELECT (SELECT seq FROM checks WHERE device_id=devices.device_id ORDER BY checked_at DESC,seq DESC LIMIT 1)
+                       FROM (SELECT DISTINCT device_id FROM checks) AS devices);`)
+    },
+  },
 ]
 
-export function openStore(path, { now = () => Date.now(), migrate, migrateV2, migrateV3, migrateV4, migrateV5 } = {}) {
+export function openStore(
+  path,
+  { now = () => Date.now(), migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6 } = {},
+) {
   const db = new DatabaseSync(path)
   db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=3000;')
   const version = db.prepare('PRAGMA user_version').get().user_version
-  if (version > 5) {
+  if (version > MIGRATIONS.at(-1).version) {
     db.close()
     throw new Error('Database schema is newer than this host. Use a compatible host; do not delete the database.')
   }
-  const hooks = [migrate, migrateV2, migrateV3, migrateV4, migrateV5]
+  const hooks = [migrate, migrateV2, migrateV3, migrateV4, migrateV5, migrateV6]
   try {
     for (const migration of MIGRATIONS) {
       if (migration.version <= version) continue
@@ -132,9 +155,7 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
       db.exec('PRAGMA user_version=' + migration.version + '; COMMIT')
     }
     // Older databases can lack this index even if their schema version is current.
-    db.exec(
-      'BEGIN IMMEDIATE; CREATE INDEX IF NOT EXISTS checks_device_latest ON checks(device_id,checked_at DESC,seq DESC); COMMIT',
-    )
+    db.exec('BEGIN IMMEDIATE; ' + LATEST_INDEX + '; COMMIT')
   } catch (error) {
     try {
       db.exec('ROLLBACK')
@@ -148,40 +169,70 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
     openedAt: new Date(r.opened_at).toISOString(),
     resolvedAt: r.resolved_at === null ? null : new Date(r.resolved_at).toISOString(),
   })
-  const transaction = (fn) => {
-    db.exec('BEGIN IMMEDIATE')
+  let cachedInventory
+  const transaction = (fn, readOnly = false) => {
+    db.exec(readOnly ? 'BEGIN' : 'BEGIN IMMEDIATE')
     try {
       const result = fn()
       db.exec('COMMIT')
       return result
     } catch (e) {
       db.exec('ROLLBACK')
+      cachedInventory = undefined
       throw e
     }
   }
-  const read = () => {
-    const row = db.prepare('SELECT * FROM inventory').get()
-    return { ...JSON.parse(row.payload), revision: row.revision, updatedAt: row.updated_at }
+  const readRevision = db.prepare('SELECT revision FROM inventory')
+  const readInventory = db.prepare('SELECT * FROM inventory')
+  const revision = () => readRevision.get().revision
+  const readState = () => {
+    if (cachedInventory && revision() === cachedInventory.revision) return cachedInventory
+    const row = readInventory.get()
+    cachedInventory = { ...JSON.parse(row.payload), revision: row.revision, updatedAt: row.updated_at }
+    return cachedInventory
   }
-  const cleanup = () => {
-    db.prepare('DELETE FROM incidents WHERE resolved_at < ?').run(now() - 30 * 86400000)
+  const latestCheck = db.prepare('SELECT * FROM latest_check WHERE device_id=?')
+  const latestSample = db.prepare(
+    'SELECT checked_at FROM checks WHERE device_id=? ORDER BY checked_at DESC,seq DESC LIMIT 1',
+  )
+  const insertSample = db.prepare(
+    'INSERT INTO checks(device_id,status,checked_at,outcome,reason,latency_ms) VALUES(?,?,?,?,?,?)',
+  )
+  const updateLatest = db.prepare(`INSERT INTO latest_check VALUES(?,?,?,?,?,?) ON CONFLICT(device_id) DO UPDATE SET
+    status=excluded.status, checked_at=excluded.checked_at, outcome=excluded.outcome, reason=excluded.reason, latency_ms=excluded.latency_ms`)
+  const trimDevice = db.prepare(`DELETE FROM checks WHERE seq IN (SELECT seq FROM checks WHERE device_id=?
+    ORDER BY checked_at DESC,seq DESC LIMIT -1 OFFSET ?)`)
+  const countHistory = db.prepare('SELECT COUNT(*) AS count FROM checks')
+  const trimNetwork = () => {
+    const excess = countHistory.get().count - HISTORY_MAX_ROWS
+    if (excess > 0)
+      db.prepare('DELETE FROM checks WHERE seq IN (SELECT seq FROM checks ORDER BY checked_at,seq LIMIT ?)').run(excess)
+  }
+  const trimIncidentCount = () =>
     db.exec(
       'DELETE FROM incidents WHERE id IN (SELECT id FROM incidents WHERE resolved_at IS NOT NULL ORDER BY id DESC LIMIT -1 OFFSET 10000)',
     )
-    db.prepare('DELETE FROM checks WHERE checked_at < ?').run(now() - 30 * 86400000)
-    const excess = db.prepare('SELECT COUNT(*) AS count FROM checks').get().count - 100000
-    if (excess > 0)
-      db.prepare('DELETE FROM checks WHERE seq IN (SELECT seq FROM checks ORDER BY seq LIMIT ?)').run(excess)
-    db.prepare('DELETE FROM discovered_devices WHERE last_seen < ?').run(now() - 30 * 86400000)
+  const cleanupDiscovery = () => {
+    db.prepare('DELETE FROM discovered_devices WHERE last_seen < ?').run(now() - RETENTION_MS)
     db.exec(
       'DELETE FROM discovered_devices WHERE rowid IN (SELECT rowid FROM discovered_devices ORDER BY last_seen DESC LIMIT -1 OFFSET 10000)',
     )
   }
+  const prune = () => {
+    const cutoff = now() - RETENTION_MS
+    db.prepare('DELETE FROM incidents WHERE resolved_at < ?').run(cutoff)
+    trimIncidentCount()
+    db.prepare('DELETE FROM checks WHERE checked_at < ?').run(cutoff)
+    for (const node of readState().topology.nodes) trimDevice.run(node.id, HISTORY_MAX_PER_DEVICE)
+    trimNetwork()
+    cleanupDiscovery()
+  }
+  const cleanup = () => transaction(prune)
   const write = (input, revision, hook) => {
     const clean = inventory(input)
     if (!Number.isSafeInteger(revision) || revision < 0) throw invalid('A nonnegative baseRevision is required.')
     return transaction(() => {
-      const previous = read()
+      const previous = readState()
       if (previous.revision !== revision)
         throw invalid('Inventory changed. Preview the current host inventory before saving again.', 409)
       db.prepare('UPDATE inventory SET revision=revision+1,updated_at=?,payload=? WHERE singleton=1').run(
@@ -193,18 +244,34 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
       for (const n of previous.topology.nodes)
         if (allowed.get(n.id) !== `${n.type}:${n.data.ip}`) {
           db.prepare('DELETE FROM checks WHERE device_id=?').run(n.id)
+          db.prepare('DELETE FROM latest_check WHERE device_id=?').run(n.id)
           db.prepare('DELETE FROM incidents WHERE device_id=?').run(n.id)
           db.prepare('DELETE FROM snmp_targets WHERE device_id=?').run(n.id)
           db.prepare('DELETE FROM interface_samples WHERE device_id=?').run(n.id)
         }
+      cachedInventory = undefined
       hook?.(db)
-      return read()
+      prune()
+      return structuredClone(readState())
     })
   }
-  cleanup()
+  try {
+    cleanup()
+  } catch (error) {
+    db.close()
+    throw error
+  }
+  const cleanupTimer = setInterval(() => {
+    try {
+      cleanup()
+    } catch (error) {
+      console.warn('NetWatch history cleanup failed:', error.message)
+    }
+  }, 10 * 60_000).unref()
   return {
-    read,
-    revision: () => db.prepare('SELECT revision FROM inventory').get().revision,
+    read: () => structuredClone(readState()),
+    revision,
+    cleanup,
     discoveryCounts: () =>
       db
         .prepare(
@@ -274,7 +341,7 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
             (seen.size ? [...seen].map(() => '?').join(',') : 'SELECT ip FROM discovered_devices WHERE 0') +
             ')',
         ).run(...seen)
-        cleanup()
+        cleanupDiscovery()
       })
     },
     discoveryAction(id, action, savedDeviceId = null) {
@@ -299,7 +366,7 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
       return write(input, revision, hook)
     },
     interfaceTargets() {
-      const state = read(),
+      const state = readState(),
         targets = new Map(
           db
             .prepare('SELECT * FROM snmp_targets')
@@ -312,7 +379,7 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
     },
     authorizeInterfaces(id, authorization, revision) {
       return transaction(() => {
-        const state = read()
+        const state = readState()
         if (state.revision !== revision) throw invalid('Inventory changed.', 409)
         if (!state.topology.nodes.some((n) => n.id === id && n.data.ip))
           throw invalid('Saved device with an address required.')
@@ -329,7 +396,7 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
       if (time > now() || time < now() - 180000) throw invalid('Invalid interface time.')
       return transaction(() => {
         if (
-          read().revision !== revision ||
+          readState().revision !== revision ||
           db.prepare('SELECT authorization FROM snmp_targets WHERE device_id=?').get(id)?.authorization !==
             authorization
         )
@@ -350,7 +417,7 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
     },
     interfaces(id, { after = 0, limit = 50 } = {}) {
       return transaction(() => {
-        const state = read()
+        const state = readState()
         if (!state.topology.nodes.some((n) => n.id === id)) throw invalid('Device not found.', 404)
         if (!Number.isSafeInteger(after) || after < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 200)
           throw invalid('Invalid interface pagination.')
@@ -373,8 +440,10 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
       if (!Array.isArray(observations) || observations.length > 2000)
         throw invalid('At most 2000 observations per batch.')
       return transaction(() => {
-        const state = read()
+        const state = readState()
         if (revision !== undefined && revision !== state.revision) throw invalid('Inventory changed during probe.', 409)
+        const sampledDevices = new Set()
+        let resolvedIncident = false
         for (const o of observations) {
           const time = typeof o?.checkedAt === 'string' ? Date.parse(o.checkedAt) : NaN
           if (
@@ -383,7 +452,7 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
             !Number.isFinite(time) ||
             new Date(time).toISOString() !== o.checkedAt ||
             time > now() ||
-            time < now() - 30 * 86400000
+            time < now() - RETENTION_MS
           )
             throw invalid('Invalid or unauthorized observation.')
           const outcome = o.outcome ?? (o.status === 'up' ? 'reachable' : o.status === 'down' ? 'unreachable' : null)
@@ -398,28 +467,45 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
             reason.length > 80
           )
             throw invalid('Invalid reachability result or latency.')
-          const latest = db.prepare('SELECT MAX(checked_at) time FROM checks WHERE device_id=?').get(o.deviceId).time
-          db.prepare(
-            'INSERT INTO checks(device_id,status,checked_at,outcome,reason,latency_ms) VALUES(?,?,?,?,?,?)',
-          ).run(o.deviceId, o.status, time, outcome, reason, latency)
-          // Only current confirmed results change incidents; pending checks and service errors cannot resolve outages.
-          if (latest === null || time >= latest) {
+          const latest = latestCheck.get(o.deviceId)
+          const fields = [o.deviceId, o.status, time, outcome, reason, latency]
+          let incidentChanged = false
+          // Older results can contribute history but cannot replace current evidence or change outages.
+          if (!latest || time >= latest.checked_at) {
+            updateLatest.run(...fields)
             if (o.status === 'down' && outcome === 'unreachable')
-              db.prepare(
-                'INSERT INTO incidents(device_id,opened_at) SELECT ?,? WHERE NOT EXISTS (SELECT 1 FROM incidents WHERE device_id=? AND resolved_at IS NULL)',
-              ).run(o.deviceId, time, o.deviceId)
-            if (o.status === 'up' && outcome === 'reachable')
-              db.prepare(
-                'UPDATE incidents SET resolved_at=? WHERE device_id=? AND resolved_at IS NULL AND opened_at<=?',
-              ).run(time, o.deviceId, time)
+              incidentChanged =
+                db
+                  .prepare(
+                    'INSERT INTO incidents(device_id,opened_at) SELECT ?,? WHERE NOT EXISTS (SELECT 1 FROM incidents WHERE device_id=? AND resolved_at IS NULL)',
+                  )
+                  .run(o.deviceId, time, o.deviceId).changes > 0
+            if (o.status === 'up' && outcome === 'reachable') {
+              incidentChanged =
+                db
+                  .prepare(
+                    'UPDATE incidents SET resolved_at=? WHERE device_id=? AND resolved_at IS NULL AND opened_at<=?',
+                  )
+                  .run(time, o.deviceId, time).changes > 0
+              resolvedIncident ||= incidentChanged
+            }
+          }
+          const changed =
+            !latest || o.status !== latest.status || outcome !== latest.outcome || reason !== latest.reason
+          const lastStored = changed || incidentChanged ? undefined : latestSample.get(o.deviceId)
+          if (changed || incidentChanged || !lastStored || time - lastStored.checked_at >= HISTORY_SAMPLE_MS) {
+            insertSample.run(...fields)
+            sampledDevices.add(o.deviceId)
           }
         }
-        cleanup()
+        for (const id of sampledDevices) trimDevice.run(id, HISTORY_MAX_PER_DEVICE)
+        if (sampledDevices.size) trimNetwork()
+        if (resolvedIncident) trimIncidentCount()
       })
     },
     incidents(id, { before, limit = 25 } = {}) {
       return transaction(() => {
-        const state = read()
+        const state = readState()
         if (!state.topology.nodes.some((n) => n.id === id)) throw invalid('Device not found.', 404)
         if (
           !Number.isSafeInteger(limit) ||
@@ -428,17 +514,16 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
           (before !== undefined && (!Number.isSafeInteger(before) || before < 1))
         )
           throw invalid('Invalid incident pagination.')
-        cleanup()
         const rows = db
           .prepare('SELECT * FROM incidents WHERE device_id=? AND id<? ORDER BY id DESC LIMIT ?')
           .all(id, before ?? Number.MAX_SAFE_INTEGER, limit + 1)
         const incidents = rows.slice(0, limit).map(incidentRow)
         return { revision: state.revision, incidents, nextBefore: rows.length > limit ? incidents.at(-1).id : null }
-      })
+      }, true)
     },
     history(id, { before, limit = 50 } = {}) {
       return transaction(() => {
-        const state = read()
+        const state = readState()
         if (!state.topology.nodes.some((n) => n.id === id)) throw invalid('Device not found.', 404)
         if (
           !Number.isSafeInteger(limit) ||
@@ -447,7 +532,6 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
           (before !== undefined && (!Number.isSafeInteger(before) || before < 1))
         )
           throw invalid('Invalid history pagination.')
-        cleanup()
         const rows = db
           .prepare('SELECT * FROM checks WHERE device_id=? AND seq < ? ORDER BY seq DESC LIMIT ?')
           .all(id, before ?? Number.MAX_SAFE_INTEGER, limit + 1)
@@ -461,16 +545,20 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
           latencyMs: r.latency_ms,
         }))
         return { revision: state.revision, checks, nextBefore: rows.length > limit ? checks.at(-1).id : null }
-      })
+      }, true)
     },
     snapshot() {
       return transaction(() => {
-        cleanup()
-        const state = read()
-        const latest = db.prepare('SELECT * FROM checks WHERE device_id=? ORDER BY checked_at DESC,seq DESC LIMIT 1')
+        const state = readState()
+        const latest = new Map(
+          db
+            .prepare('SELECT * FROM latest_check')
+            .all()
+            .map((row) => [row.device_id, row]),
+        )
         const observations = state.topology.nodes.map((node) => latest.get(node.id)).filter(Boolean)
         return {
-          inventory: state,
+          inventory: structuredClone(state),
           activeIncidents: db
             .prepare('SELECT * FROM incidents WHERE resolved_at IS NULL ORDER BY id DESC')
             .all()
@@ -487,9 +575,12 @@ export function openStore(path, { now = () => Date.now(), migrate, migrateV2, mi
             latencyMs: r.latency_ms,
           })),
         }
-      })
+      }, true)
     },
-    close: () => db.close(),
+    close() {
+      clearInterval(cleanupTimer)
+      db.close()
+    },
     db,
   }
 }

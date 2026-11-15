@@ -23,6 +23,7 @@ try {
   store.db.exec('BEGIN')
   const insert=store.db.prepare("INSERT INTO checks(device_id,status,checked_at,outcome,reason,latency_ms) VALUES(?,'up',?,'reachable','fixture',1)")
   for(let i=0;i<100000;i++)insert.run(topology.nodes[i%100].id,now-1000000+i*10)
+  store.db.exec("INSERT INTO latest_check SELECT device_id,status,MAX(checked_at),outcome,reason,latency_ms FROM checks GROUP BY device_id")
   const incident=store.db.prepare('INSERT INTO incidents(device_id,opened_at,resolved_at) VALUES(?,?,?)')
   for(let i=0;i<10000;i++)incident.run(topology.nodes[i%100].id,now-200000+i,now-100000+i)
   store.db.exec('COMMIT');report.seedMs=Math.round(performance.now()-started)

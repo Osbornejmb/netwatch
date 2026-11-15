@@ -2,14 +2,14 @@ import { DatabaseSync } from 'node:sqlite'
 import { resolve } from 'node:path'
 import { copyFileSync, renameSync, rmSync, existsSync } from 'node:fs'
 import { lock, mustNotExist } from './files.js'
-import { inventory } from './store.js'
+import { HISTORY_MAX_ROWS, inventory } from './store.js'
 import { validateInterfaces } from './interfaces.js'
 
 export function validateDatabase(path) {
   const db = new DatabaseSync(path, { readOnly: true })
   try {
     const version = db.prepare('PRAGMA user_version').get().user_version
-    if (db.prepare('PRAGMA integrity_check').get().integrity_check !== 'ok' || ![1, 2, 3, 4, 5].includes(version))
+    if (db.prepare('PRAGMA integrity_check').get().integrity_check !== 'ok' || ![1, 2, 3, 4, 5, 6].includes(version))
       throw new Error('Invalid or unsupported backup database.')
     const rows = db.prepare('SELECT * FROM inventory').all()
     if (
@@ -22,23 +22,26 @@ export function validateDatabase(path) {
       throw new Error('Invalid inventory metadata.')
     const state = inventory({ source: 'inventory', ...JSON.parse(rows[0].payload) })
     const ids = new Set(state.topology.nodes.map((n) => n.id))
-    let count = 0
-    for (const row of db.prepare('SELECT * FROM checks').iterate()) {
+    const validateReachability = (row) => {
       if (
-        'outcome' in row &&
-        (!['reachable', 'unreachable'].includes(row.outcome) ||
-          (row.latency_ms !== null &&
-            (!Number.isFinite(row.latency_ms) ||
-              row.latency_ms < 0 ||
-              row.latency_ms > 1500 ||
-              row.outcome !== 'reachable')) ||
-          typeof row.reason !== 'string' ||
-          !row.reason ||
-          row.reason.length > 80)
+        !['reachable', 'unreachable'].includes(row.outcome) ||
+        (row.latency_ms !== null &&
+          (!Number.isFinite(row.latency_ms) ||
+            row.latency_ms < 0 ||
+            row.latency_ms > 1500 ||
+            row.outcome !== 'reachable')) ||
+        typeof row.reason !== 'string' ||
+        !row.reason ||
+        row.reason.length > 80
       )
         throw new Error('Invalid reachability data in backup.')
+    }
+    const historyLimit = version >= 6 ? HISTORY_MAX_ROWS : 100000
+    let count = 0
+    for (const row of db.prepare('SELECT * FROM checks').iterate()) {
+      if ('outcome' in row) validateReachability(row)
       if (
-        ++count > 100000 ||
+        ++count > historyLimit ||
         !ids.has(row.device_id) ||
         !['up', 'down', 'unknown'].includes(row.status) ||
         !Number.isSafeInteger(row.checked_at) ||
@@ -47,6 +50,21 @@ export function validateDatabase(path) {
         row.seq < 1
       )
         throw new Error('Invalid history in backup.')
+    }
+    if (version >= 6) {
+      const devices = new Set()
+      for (const row of db.prepare('SELECT * FROM latest_check').iterate()) {
+        validateReachability(row)
+        if (
+          !ids.has(row.device_id) ||
+          devices.has(row.device_id) ||
+          !['up', 'down', 'unknown'].includes(row.status) ||
+          !Number.isSafeInteger(row.checked_at) ||
+          row.checked_at > Date.now()
+        )
+          throw new Error('Invalid latest observation in backup.')
+        devices.add(row.device_id)
+      }
     }
     if (version >= 3) {
       const active = new Set()

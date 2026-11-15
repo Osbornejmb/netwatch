@@ -46,9 +46,9 @@ test('shutdown waits for helper preparation and aborted child close before relea
 test('healthy, transient loss, sustained failure and recovery persist raw outcomes separately from policy status',async t=>{
  const {store}=setup(t);const results=[up,down,up,down,down,down,up];const c=collector(store,async()=>results.shift())
  const statuses=[]
- for(let i=0;i<7;i++){await c.runOnce();statuses.push(store.history('d0').checks[0].status)}
+ for(let i=0;i<7;i++){await c.runOnce();statuses.push(store.snapshot().observations[0].status)}
  assert.deepEqual(statuses,['up','up','up','up','down','down','up'])
- const checks=store.history('d0').checks;assert.equal(checks[0].latencyMs,2);assert.equal(checks[1].latencyMs,null);assert.equal(checks[2].outcome,'unreachable');assert.equal(checks[2].status,'down')
+ const checks=store.history('d0').checks;assert.equal(checks[0].latencyMs,2);assert.equal(checks[1].latencyMs,null);assert.equal(checks[2].outcome,'unreachable');assert.equal(checks[2].status,'up');assert.equal(checks.length,6)
  assert.ok(c.snapshot().lastSuccessfulCycleAt);assert.equal(c.snapshot().errors,0);await c.stop()
 })
 test('initial packet loss stays unknown until threshold; process/permission errors do not become device down',async t=>{
@@ -103,7 +103,7 @@ test('Windows adapter validates targets and uses fixed argv, bounded output/time
 })
 test('v1 schema migration preserves inventory/history; interrupted v2 migration rolls back; backups restore latency data',t=>{
  const {store,path,dir}=setup(t);store.close();const old=new DatabaseSync(path)
- old.exec(`DROP TABLE discovered_devices;DROP TABLE interface_samples;DROP TABLE snmp_targets;DROP TABLE incidents;DROP TABLE checks;CREATE TABLE checks(seq INTEGER PRIMARY KEY AUTOINCREMENT,device_id TEXT NOT NULL,status TEXT NOT NULL,checked_at INTEGER NOT NULL);CREATE INDEX checks_device_time ON checks(device_id,seq);CREATE INDEX checks_time ON checks(checked_at);PRAGMA user_version=1;`)
+ old.exec(`DROP TABLE latest_check;DROP TABLE discovered_devices;DROP TABLE interface_samples;DROP TABLE snmp_targets;DROP TABLE incidents;DROP TABLE checks;CREATE TABLE checks(seq INTEGER PRIMARY KEY AUTOINCREMENT,device_id TEXT NOT NULL,status TEXT NOT NULL,checked_at INTEGER NOT NULL);CREATE INDEX checks_device_time ON checks(device_id,seq);CREATE INDEX checks_time ON checks(checked_at);PRAGMA user_version=1;`)
  old.prepare('INSERT INTO checks VALUES(1,?,?,?)').run('d0','up',Date.now());old.close()
  const legacy=join(dir,'legacy-backup');backupDatabase(path,legacy)
  assert.throws(()=>openStore(path,{migrateV2:()=>{throw new Error('interrupted')}}),/interrupted/)
@@ -116,7 +116,7 @@ test('v1 schema migration preserves inventory/history; interrupted v2 migration 
 test('v1 migration never reuses history IDs after the newest rows were deleted',t=>{
  const {store,path}=setup(t);store.close()
  const old=new DatabaseSync(path)
- old.exec(`DROP TABLE discovered_devices;DROP TABLE interface_samples;DROP TABLE snmp_targets;DROP TABLE incidents;DROP TABLE checks;CREATE TABLE checks(seq INTEGER PRIMARY KEY AUTOINCREMENT,device_id TEXT NOT NULL,status TEXT NOT NULL,checked_at INTEGER NOT NULL);PRAGMA user_version=1;`)
+ old.exec(`DROP TABLE latest_check;DROP TABLE discovered_devices;DROP TABLE interface_samples;DROP TABLE snmp_targets;DROP TABLE incidents;DROP TABLE checks;CREATE TABLE checks(seq INTEGER PRIMARY KEY AUTOINCREMENT,device_id TEXT NOT NULL,status TEXT NOT NULL,checked_at INTEGER NOT NULL);PRAGMA user_version=1;`)
  old.prepare('INSERT INTO checks VALUES(500,?,?,?)').run('d0','up',Date.now())
  old.exec('DELETE FROM checks');old.close()
  const migrated=openStore(path)

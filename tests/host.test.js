@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { openStore, MAX_BODY } from '../host/store.js'
+import { openStore, MAX_BODY, HISTORY_SAMPLE_MS, HISTORY_MAX_PER_DEVICE, HISTORY_MAX_ROWS } from '../host/store.js'
 import { createHost } from '../host/server.js'
 import { backupDatabase, restoreDatabase, validateDatabase } from '../host/maintenance.js'
 import { lock } from '../host/files.js'
@@ -45,7 +45,7 @@ test('observations require opt-in; bad batches rollback; snapshots retain timest
  assert.throws(()=>store.append([{deviceId:'toString',status:'up',checkedAt:new Date(now).toISOString()}]))
  assert.throws(()=>store.append([null]))
 })
-test('snapshot chooses newest timestamp then sequence, including after adding the index to an existing v3 database',t=>{
+test('snapshot chooses newest timestamp then sequence, including after rebuilding the index on open',t=>{
  const now=Date.now();const {store,path}=fixture(t,{now:()=>now});store.write(input({r1:true,s1:true}),0)
  store.append([{deviceId:'r1',status:'up',checkedAt:new Date(now-1000).toISOString()},{deviceId:'r1',status:'down',checkedAt:new Date(now-2000).toISOString()}])
  assert.equal(store.snapshot().observations.find(o=>o.deviceId==='r1').status,'up')
@@ -53,7 +53,7 @@ test('snapshot chooses newest timestamp then sequence, including after adding th
  assert.equal(store.snapshot().observations.length,1);assert.equal(store.snapshot().observations[0].status,'down')
  const saved=store.read(),history=store.history('r1');store.db.exec('DROP INDEX checks_device_latest');store.close()
  const reopened=openStore(path,{now:()=>now});try {
- assert.equal(reopened.db.prepare('PRAGMA user_version').get().user_version,5)
+ assert.equal(reopened.db.prepare('PRAGMA user_version').get().user_version,6)
  assert.deepEqual(reopened.read(),saved);assert.deepEqual(reopened.history('r1'),history)
  assert.equal(reopened.snapshot().observations[0].status,'down')
  assert.ok(reopened.db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='checks_device_latest'").get())
@@ -62,21 +62,31 @@ test('snapshot chooses newest timestamp then sequence, including after adding th
 
 test('history pagination has stable cursors, bounds and retention; restart removes old rows',t=>{
  let now=Date.now();const {store,path}=fixture(t,{now:()=>now});store.write(input({r1:true}),0)
- store.append(Array.from({length:5},(_,i)=>({deviceId:'r1',status:'up',checkedAt:new Date(now-i*1000).toISOString()})))
+ store.append(Array.from({length:5},(_,i)=>({deviceId:'r1',status:'up',reason:'fixture-'+i,checkedAt:new Date(now-i*1000).toISOString()})))
  const first=store.history('r1',{limit:2});const second=store.history('r1',{limit:2,before:first.nextBefore});assert.equal(first.checks.length,2);assert.ok(second.checks.every(c=>c.id<first.nextBefore))
  assert.throws(()=>store.history('r1',{limit:201}));assert.throws(()=>store.history('r1',{before:0}));assert.throws(()=>store.history('missing'),e=>e.status===404)
  now+=31*86400000;store.close();const reopened=openStore(path,{now:()=>now});assert.equal(reopened.history('r1').checks.length,0);reopened.close()
 })
-test('history total cap bounds growth',t=>{
- const {store}=fixture(t);store.write(input({r1:true}),0)
- store.db.exec('BEGIN');const insert=store.db.prepare("INSERT INTO checks(device_id,status,checked_at,outcome,reason) VALUES(?,?,?,'reachable','legacy')");for(let i=0;i<100005;i++)insert.run('r1','up',Date.now());store.db.exec('COMMIT')
- store.snapshot();assert.equal(store.db.prepare('SELECT COUNT(*) n FROM checks').get().n,100000)
+test('cleanup trims devices first, then evicts the network-wide oldest rows', t=>{
+ const now=Date.now(), {store}=fixture(t,{now:()=>now})
+ const extra=Array.from({length:199},(_,i)=>({...topology.nodes[1],id:'bulk'+i,data:{...topology.nodes[1].data,ip:''}}))
+ store.write({source:'inventory',topology:{...topology,nodes:[...topology.nodes,...extra]}},0)
+ store.db.prepare(`WITH RECURSIVE samples(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM samples WHERE i<?),
+   devices(id) AS (SELECT 'r1' UNION ALL SELECT 'bulk'||(i-1) FROM samples WHERE i<=199)
+   INSERT INTO checks(device_id,status,checked_at,outcome,reason)
+   SELECT id,'up',?+i,'reachable','fixture' FROM devices CROSS JOIN samples`).run(HISTORY_MAX_PER_DEVICE,now-10000)
+ const oldest=store.db.prepare("INSERT INTO checks(device_id,status,checked_at,outcome,reason) VALUES(?,'up',?,'reachable','extra')")
+ oldest.run('r1',now-11000);oldest.run('s1',now-12000);oldest.run('s1',now-11500)
+ store.cleanup()
+ assert.equal(store.db.prepare('SELECT COUNT(*) n FROM checks').get().n,HISTORY_MAX_ROWS)
+ assert.equal(store.db.prepare("SELECT COUNT(*) n FROM checks WHERE device_id='r1'").get().n,HISTORY_MAX_PER_DEVICE)
+ assert.equal(store.db.prepare("SELECT COUNT(*) n FROM checks WHERE reason='extra'").get().n,0)
 })
 test('failed initial migration rolls back schema; future schemas are rejected without modification',t=>{
  const dir=mkdtempSync(join(tmpdir(),'netwatch-migration-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));const path=join(dir,'db')
  assert.throws(()=>openStore(path,{migrate:()=>{throw new Error('migration interrupted')}}),/interrupted/)
- const db=new DatabaseSync(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,0);assert.equal(db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name='inventory'").get().n,0);db.exec('PRAGMA user_version=6');db.close()
- assert.throws(()=>openStore(path),/newer/);const check=new DatabaseSync(path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,6);check.close()
+ const db=new DatabaseSync(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,0);assert.equal(db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name='inventory'").get().n,0);db.exec('PRAGMA user_version=7');db.close()
+ assert.throws(()=>openStore(path),/newer/);const check=new DatabaseSync(path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,7);check.close()
 })
 test('offline backup/restore validates data, advances revision and rejects corrupt backups and active locks',t=>{
  const {dir,path,store}=fixture(t);store.write(input({r1:true}),0);store.append([{deviceId:'r1',status:'up',checkedAt:new Date().toISOString()}]);store.close()
@@ -116,10 +126,10 @@ test('ordered migrations upgrade v1 through v5 and preserve existing data', asyn
   await t.test('version '+version, sub=>{
    const dir=mkdtempSync(join(tmpdir(),'netwatch-migration-')),path=join(dir,'db')
    sub.after(()=>rmSync(dir,{recursive:true,force:true}))
-   if(version<5){
+   {
     const stop=Error('fixture version reached')
     assert.throws(()=>openStore(path,{['migrateV'+(version+1)]:()=>{throw stop}}),{message:stop.message})
-   }else openStore(path).close()
+   }
    const db=new DatabaseSync(path)
    try{
     assert.equal(db.prepare('PRAGMA user_version').get().user_version,version)
@@ -128,21 +138,100 @@ test('ordered migrations upgrade v1 through v5 and preserve existing data', asyn
     else db.prepare("INSERT INTO checks VALUES(31,'r1','up',?,'reachable','fixture',4)").run(time)
     if(version>=3)db.prepare("INSERT INTO incidents VALUES(2,'r1',?,?)").run(time-100,time)
     if(version>=4)db.exec("INSERT INTO snmp_targets VALUES('r1','00000000-0000-0000-0000-000000000001')")
-    if(version>=5)db.prepare("INSERT INTO discovered_devices VALUES('fixture','192.0.2.2',NULL,NULL,'neighbor',?,?,'new',NULL,0)").run(time,time)
+    if(version>=5)db.prepare("INSERT INTO discovered_devices VALUES('00000000-0000-0000-0000-000000000002','192.0.2.2',NULL,NULL,'neighbor',?,?,'new',NULL,0)").run(time,time)
    }finally{db.close()}
-   const migrated=openStore(path)
+   const restored=join(dir,'restored')
+   assert.equal(validateDatabase(path),3)
+   restoreDatabase(restored,path)
+   const migrated=openStore(restored)
    try{
-    assert.equal(migrated.db.prepare('PRAGMA user_version').get().user_version,5)
-    assert.equal(migrated.revision(),3)
+    assert.equal(migrated.db.prepare('PRAGMA user_version').get().user_version,6)
+    assert.equal(migrated.revision(),4)
     assert.deepEqual(migrated.read().topology,topology)
     const [row]=migrated.history('r1').checks
     assert.equal(row.id,31)
+    assert.equal(migrated.snapshot().observations[0].status,'up')
     assert.equal(row.reason,version===1?'legacy':'fixture')
     if(version>=3)assert.equal(migrated.incidents('r1').incidents[0].id,2)
-    if(version>=4)assert.equal(migrated.interfaces('r1').configured,true)
-    if(version>=5)assert.equal(migrated.discovered().devices[0].id,'fixture')
+    if(version>=4)assert.equal(migrated.interfaces('r1').configured,false)
+    if(version>=5)assert.equal(migrated.discovered().devices[0].id,'00000000-0000-0000-0000-000000000002')
     assert.ok(migrated.db.prepare("SELECT name FROM sqlite_master WHERE name='checks_device_latest'").get())
    }finally{migrated.close()}
   })
  }
+})
+test('stable observations are sampled while live timestamps, latency, and incident transitions stay current',t=>{
+ let now=Date.now()-600000
+ const {store,path}=fixture(t,{now:()=>now})
+ store.write(input({r1:true}),0)
+ const append=(status='up',outcome='reachable',reason='reply',latencyMs=1,time=now)=>
+  store.append([{deviceId:'r1',checkedAt:new Date(time).toISOString(),status,outcome,reason,latencyMs}])
+ append()
+ const start=now
+ for(let i=1;i<=18;i++){now+=10000;append('up','reachable','reply',i)}
+ const stable=store.history('r1').checks
+ assert.deepEqual(stable.map(row=>Date.parse(row.checkedAt)),[start+3*HISTORY_SAMPLE_MS,start+2*HISTORY_SAMPLE_MS,start+HISTORY_SAMPLE_MS,start])
+ now+=10000;append('up','reachable','reply',9)
+ assert.equal(store.history('r1').checks.length,4)
+ assert.equal(store.snapshot().observations[0].latencyMs,9)
+ assert.equal(Date.parse(store.snapshot().observations[0].checkedAt),now)
+ now+=10000;append('up','unreachable','loss',null)
+ now+=10000;append('down','unreachable','loss',null)
+ assert.equal(store.snapshot().activeIncidents.length,1)
+ now+=10000;append('down','unreachable','no_route',null)
+ now+=10000;append('up','reachable','reply',2,now-15000)
+ assert.equal(store.snapshot().activeIncidents.length,1)
+ assert.equal(store.snapshot().observations[0].status,'down')
+ now+=10000;append()
+ assert.equal(store.snapshot().activeIncidents.length,0)
+ assert.equal(store.incidents('r1').incidents.length,1)
+ assert.equal(store.history('r1').checks.length,9)
+ now+=10000;append('up','reachable','reply',14)
+ store.close()
+ const reopened=openStore(path,{now:()=>now})
+ try {
+  assert.equal(reopened.snapshot().observations[0].latencyMs,14)
+  assert.equal(reopened.history('r1').checks.length,9)
+  const next=input({r1:true});next.topology.nodes[0].data.ip='192.0.2.2'
+  reopened.write(next,1)
+  assert.equal(reopened.snapshot().observations.length,0)
+  assert.equal(reopened.history('r1').checks.length,0)
+ } finally {reopened.close()}
+})
+
+test('v6 backfill takes newest timestamp then sequence and validates the latest rows in backups',t=>{
+ const now=Date.now(),{store,path}=fixture(t,{now:()=>now})
+ store.write(input({r1:true}),0);store.close()
+ const legacy=new DatabaseSync(path)
+ try {
+  legacy.exec('DROP TABLE latest_check; PRAGMA user_version=5')
+  const insert=legacy.prepare("INSERT INTO checks(device_id,status,checked_at,outcome,reason) VALUES('r1',?,?,'unreachable',?)")
+  insert.run('up',now-100,'tied older');insert.run('unknown',now-1000,'old timestamp');insert.run('down',now-100,'tied newer');insert.run('up',now-1100,'late insert')
+ }finally{legacy.close()}
+ const migrated=openStore(path,{now:()=>now})
+ try{
+  assert.equal(migrated.snapshot().observations[0].reason,'tied newer')
+  assert.equal(migrated.history('r1').checks.length,4)
+  assert.equal(validateDatabase(path),1)
+  migrated.db.exec("UPDATE latest_check SET device_id='unknown_device'")
+  assert.throws(()=>validateDatabase(path),/Invalid latest observation/)
+  migrated.db.prepare("UPDATE latest_check SET device_id='r1', checked_at=?").run(now+86400000)
+  assert.throws(()=>validateDatabase(path),/Invalid latest observation/)
+ }finally{migrated.close()}
+})
+
+test('WAL reads succeed while a separate writer holds the write lock',t=>{
+ const {store,path}=fixture(t)
+ store.write(input({r1:true}),0)
+ store.append([{deviceId:'r1',status:'up',checkedAt:new Date().toISOString()}])
+ const writer=new DatabaseSync(path)
+ try {
+  writer.exec('BEGIN IMMEDIATE; UPDATE inventory SET revision=revision+1')
+  assert.equal(store.snapshot().inventory.revision,1)
+  assert.equal(store.history('r1').checks.length,1)
+  assert.equal(store.incidents('r1').incidents.length,0)
+  writer.exec('COMMIT')
+  assert.equal(store.revision(),2)
+  assert.equal(store.snapshot().inventory.revision,2)
+ } finally {writer.close()}
 })

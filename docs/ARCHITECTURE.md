@@ -39,7 +39,7 @@ A failed storage read pauses autosave until the user explicitly replaces the sav
 
 ## Dashboard observations
 
-Snapshots use the additive v3 `checks_device_latest` index and select one newest timestamp/sequence per inventory device. This bounds observation lookup by inventory size rather than scanning the full 100,000-check history for every one-second reader. Run `node scripts/check-host-load.mjs --fixtures` for the synthetic retained-history experiment; it excludes probe-helper and real-browser costs and is not a device-capacity guarantee.
+Snapshots read one `latest_check` row per device from the v6 table in a single query. New checks always advance current evidence, while history keeps transitions and periodic samples. Run `node scripts/check-host-load.mjs --fixtures` for a synthetic retained-history experiment.
 
 `src/monitoring.js` validates and serially polls GET snapshot every second with a 10-second deadline; `useMonitoring.js` retains last-known data through failures and cancels obsolete requests when switching sources, refreshing or unmounting. The snapshot includes inventory and observations from one database transaction. Saved host inventory is the default live view; browser edits remain separate and never inherit host checks. No background inventory writes occur. Unchanged inventory revisions preserve node references and temporary host drag positions across polls.
 
@@ -47,7 +47,7 @@ Snapshots use the additive v3 `checks_device_latest` index and select one newest
 
 Device details enable/disable only saved host devices using the snapshot revision and complete saved host inventory, preserving other devices and rejecting conflicts without retry. A missing address prevents authorization. `DeviceHistory.jsx` fetches 25 checks per page up to 200 displayed, validates device IDs/sequence/revision, cancels obsolete requests and labels adjacent retained transitions in local time. New checks reset pagination to the newest page. No uptime percentage or continuity is inferred. History is collapsible; service/errors use everyday language.
 
-System fonts replace the starter's Google Fonts import so the dashboard does not need a font CDN at runtime. `src/dashboard.css` contains the light dashboard tokens; the editor retains its original dark workspace. The dashboard itself adds no runtime dependencies. Host SQLite schema v5 (with transactional v1/v2/v3/v4 migration) is separate from the unchanged browser v1 JSON contract.
+System fonts replace the starter's Google Fonts import so the dashboard does not need a font CDN at runtime. `src/dashboard.css` contains the light dashboard tokens; the editor retains its original dark workspace. The dashboard itself adds no runtime dependencies. Host SQLite schema v6 (with ordered transactional migrations) is separate from the unchanged browser v1 JSON contract.
 
 ## Device selection
 
