@@ -2,6 +2,7 @@
 AppId=NetWatch.Desktop
 AppName=NetWatch
 AppVersion={#NetWatchVersion}
+VersionInfoVersion={#NetWatchVersion}
 DefaultDirName={localappdata}\Programs\NetWatch
 DisableDirPage=yes
 DisableProgramGroupPage=yes
@@ -22,3 +23,9 @@ Source: "{#NetWatchPayload}\*"; DestDir: "{app}"; Flags: ignoreversion recursesu
 
 [Icons]
 Name: "{userprograms}\NetWatch"; Filename: "{app}\NetWatch.exe"; WorkingDir: "{app}"
+
+[Tasks]
+Name: sharing; Description: "Set up access from another PC on my private network"; GroupDescription: "Choose how to use NetWatch"; Flags: unchecked
+
+[Run]
+Filename: "{app}\NetWatch.exe"; Parameters: "--setup-sharing"; Tasks: sharing; Flags: skipifsilent; StatusMsg: "Preparing access from another PC..."

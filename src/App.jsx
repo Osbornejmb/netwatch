@@ -35,14 +35,13 @@ const viewFromHash = (hash) =>
 
 const nodeTypes = { router: RouterNode, switch: SwitchNode }
 
-export default function App({ viewer = false, operator = false, remote = false, accessControls }) {
-  const readOnly = viewer || operator
+export default function App({ viewer = false, remote = false, accessControls }) {
   const saved = useMemo(
     () =>
-      readOnly
+      viewer
         ? { topology: { nodes: [], edges: [] } }
         : readTopology({ getItem: (key) => localStorage.getItem(key) }, { nodes: [], edges: [] }),
-    [readOnly],
+    [viewer],
   )
   const [nodes, setNodes, onNodesChange] = useNodesState(saved.topology.nodes)
   const [editorSizes, setEditorSizes] = useState({})
@@ -61,9 +60,9 @@ export default function App({ viewer = false, operator = false, remote = false, 
         return group.links.length >= 2 && new Set(members.filter((id) => routers.has(id))).size >= 2
       })
   }, [draftGroups, edges, nodes])
-  const role = viewer ? 'viewer' : operator ? 'operator' : 'admin'
+  const role = viewer ? 'viewer' : 'admin'
   const [currentView, setView] = useState(() => viewFromHash(allowedHash(location.hash, role)))
-  const view = viewer || (operator && currentView === 'editor') ? 'dashboard' : currentView
+  const view = viewer ? 'dashboard' : currentView
   const [dashboardView, setDashboardView] = useState({ source: 'host', layout: 'radial', centerId: '' })
   useEffect(() => {
     const navigate = () => {
@@ -96,7 +95,7 @@ export default function App({ viewer = false, operator = false, remote = false, 
   const [importGeneration, setImportGeneration] = useState(0)
 
   useEffect(() => {
-    if (readOnly || autosavePaused) return
+    if (viewer || autosavePaused) return
     try {
       writeTopology(localStorage, { nodes, edges, groups })
       setStorageError('')
@@ -107,7 +106,7 @@ export default function App({ viewer = false, operator = false, remote = false, 
       )
       setAutosavePaused(true)
     }
-  }, [nodes, edges, groups, autosavePaused, readOnly])
+  }, [nodes, edges, groups, autosavePaused, viewer])
 
   const importTopology = async (event) => {
     const file = event.target.files?.[0]
@@ -340,16 +339,14 @@ export default function App({ viewer = false, operator = false, remote = false, 
             </a>
             {!viewer && (
               <>
-                {!operator && (
-                  <a
-                    href="#topology"
-                    aria-label="Edit map"
-                    aria-current={view === 'editor' ? 'page' : undefined}
-                    onClick={() => setView('editor')}
-                  >
-                    Edit map
-                  </a>
-                )}
+                <a
+                  href="#topology"
+                  aria-label="Edit map"
+                  aria-current={view === 'editor' ? 'page' : undefined}
+                  onClick={() => setView('editor')}
+                >
+                  Edit map
+                </a>
                 <a
                   href="#inventory"
                   aria-label="Devices"
@@ -374,7 +371,7 @@ export default function App({ viewer = false, operator = false, remote = false, 
               Access log
             </button>
           )}
-          {!readOnly && (
+          {!viewer && (
             <section className="backup-recovery" aria-label="Map backup and recovery">
               <details open={storageError || importError ? true : undefined}>
                 <summary aria-label="Map backup and recovery">
@@ -433,15 +430,15 @@ export default function App({ viewer = false, operator = false, remote = false, 
         {showAccessLog && <AccessLog onClose={() => setShowAccessLog(false)} />}
 
         {view === 'discovered' ? (
-          <DiscoveredDevices remote={remote} canEdit={!readOnly} />
+          <DiscoveredDevices remote={remote} />
         ) : view !== 'editor' ? (
           <Dashboard
             nodes={nodes}
             edges={edges}
             groups={groups}
-            viewer={readOnly}
+            viewer={viewer}
             remote={remote}
-            viewOptions={readOnly ? { ...dashboardView, source: 'host' } : dashboardView}
+            viewOptions={viewer ? { ...dashboardView, source: 'host' } : dashboardView}
             setViewOptions={setDashboardView}
             showInventory={view === 'inventory'}
             onEdit={() => {

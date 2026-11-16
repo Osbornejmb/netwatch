@@ -6,16 +6,24 @@ export function readTlsOptions(
   certPath = process.env.NETWATCH_TLS_CERT,
   keyPath = process.env.NETWATCH_TLS_KEY,
   dist = resolve('dist'),
+  pfxPath = process.env.NETWATCH_TLS_PFX,
 ) {
-  if (certPath === undefined && keyPath === undefined) return
-  if (!certPath || !keyPath) throw new Error('Set both NETWATCH_TLS_CERT and NETWATCH_TLS_KEY to enable HTTPS.')
-  if (existsSync(dist) && existsSync(keyPath)) {
-    const locations = [relative(dist, keyPath), relative(realpathSync(dist), realpathSync(keyPath))]
+  if (certPath === undefined && keyPath === undefined && pfxPath === undefined) return
+  if (pfxPath && (certPath !== undefined || keyPath !== undefined))
+    throw new Error('Choose one HTTPS certificate setup.')
+  if (!pfxPath && (!certPath || !keyPath))
+    throw new Error('Set both NETWATCH_TLS_CERT and NETWATCH_TLS_KEY to enable HTTPS.')
+  const privatePath = pfxPath || keyPath
+  if (existsSync(dist) && existsSync(privatePath)) {
+    const locations = [relative(dist, privatePath), relative(realpathSync(dist), realpathSync(privatePath))]
     if (locations.some((location) => !isAbsolute(location) && location !== '..' && !location.startsWith('..' + sep)))
       throw new Error('Keep the HTTPS private key outside the static build directory.')
   }
   try {
-    const options = { cert: readFileSync(certPath), key: readFileSync(keyPath), minVersion: 'TLSv1.2' }
+    const options = {
+      ...(pfxPath ? { pfx: readFileSync(pfxPath) } : { cert: readFileSync(certPath), key: readFileSync(keyPath) }),
+      minVersion: 'TLSv1.2',
+    }
     createSecureContext(options)
     return options
   } catch {

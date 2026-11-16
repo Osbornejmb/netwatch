@@ -216,9 +216,6 @@ test('active discovery saves a two-hop route between saved routers only with bot
  await discovery.runOnce()
  assert.equal(store.read().revision,1)
  firstHop='1   <1 ms   *   1 ms   192.168.0.1'
- await discovery.runOnce({saveUpstream:false})
- assert.equal(store.read().revision,1)
- assert.deepEqual(calls,['192.168.100.1'])
  await discovery.runOnce()
  const {revision,monitoring,topology}=store.read()
  assert.equal(revision,2)

@@ -1,5 +1,25 @@
 # Working checkpoint
 
+## Current status (2026-11-16) — local scan recovery in 0.1.3
+
+- A local dashboard tab left open across a host restart refreshes its write token and retries a scan rejected for the stale token. The dashboard distinguishes scan cooldown, expired access, disabled discovery, and unavailable results.
+- All 158 tests and the local and remote admin discovery browser checks passed. Built installer 0.1.3. The running installation was left on 0.1.2.
+
+## Current status (2026-11-16) — installed build 0.1.2
+
+- Built and installed NetWatch 0.1.2. Windows reports launcher build 0.1.2.0. The installer uses the package version in its filename and Windows metadata, and the build script rejects a duplicate version in the release folder.
+- Backed up the current database before installation. Verified the installer preserved the saved settings and the installed code successfully migrated a copy of the current inventory. The host was left stopped for manual startup.
+
+## Current status (2026-11-16) — viewer and admin access
+
+- Removed operator sign-in and moved discovery and scans to admin access. The database upgrade removes former operator credentials and sessions while preserving audit entries and existing viewer and admin access.
+- All 158 tests passed using an isolated port for launcher tests. The browser check verified viewer navigation, admin discovery, and redacted audit export. Rebuilt the Windows installer. The updated installer has not been applied to the live host.
+
+## Current status (2026-11-16) — installer sharing setup (#12)
+
+- Installer 0.1.1 offers optional sharing setup before the first launch. Choose password-protected viewing or read-only viewing without a password. Setup prepares a connection file, and the host starts manually. Other PCs on the private network use a browser and trust the saved public connection file once.
+- All 157 tests passed, including certificate creation, reuse and repair, the local dashboard origin, and read-only viewer sign-in. A disposable installation verified the bundled sharing helper, manual host lifecycle, and uninstall with the test database preserved. Interactive setup and a physical second-PC browser remain unverified.
+
 ## Current status (2026-11-16) — standalone Windows installer (#12)
 
 - Built the per-user x64 installer with Node.js, production dashboard, host dependencies, and precompiled ICMP and DPAPI helpers. Setup adds a Start menu shortcut. The host remains manually started.

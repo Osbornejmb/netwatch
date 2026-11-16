@@ -6,6 +6,8 @@ The per-user launcher runs the NetWatch host in the signed-in Windows account. O
 
 Run `NetWatch-<version>-Windows-x64-Setup.exe` on Windows 10 or 11 x64. Setup bundles Node.js, the built dashboard, host dependencies and precompiled Windows helpers. It installs to `%LOCALAPPDATA%\Programs\NetWatch` for the current user and adds a Start menu shortcut. The installer is unsigned.
 
+Starting with 0.1.1, the installer can prepare secure sharing before the first launch. Select **Set up access from another PC on my private network**, then choose whether viewers need a password. Setup prepares the connection file. Install NetWatch on the host PC only. Follow [Connect another PC](REMOTE-ACCESS.md#windows-installer-setup) to open the dashboard in a browser.
+
 To update, quit NetWatch, back up the database and run the new installer. The installed launcher uses the same `%LOCALAPPDATA%\NetWatch\desktop.json` and database path as the source launcher. To roll back, quit NetWatch, uninstall the current version, install the earlier package and restore a compatible database backup if the schema changed. To uninstall, quit NetWatch and remove it from **Settings → Apps**. Settings, databases, credentials and backups stay in the per-user data directory.
 
 For terminal maintenance from the installed program folder, use `.\node.exe host/maintenance.js`, `.\node.exe host/auth-config.js` or `.\node.exe host/snmp-config.js` in place of the corresponding npm command. Use the database path shown in the launcher as `NETWATCH_DB`.
@@ -13,6 +15,8 @@ For terminal maintenance from the installed program folder, use `.\node.exe host
 ### Build the installer
 
 On a Windows build machine with Node.js 22.13+, npm, the .NET Framework compiler and [Inno Setup](https://jrsoftware.org/inno-setup/downloads), run these commands from the checkout. Use a current Node.js LTS release. The builder downloads the official x64 runtime matching the build machine's Node version and checks its SHA-256 checksum.
+
+Bump the version in `package.json` and `package-lock.json` before building a new installer. The installer filename, Windows version information, and installed launcher use that version. Setup builds in the release folder keep their original filenames.
 
 ```powershell
 npm.cmd ci

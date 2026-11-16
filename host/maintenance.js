@@ -11,7 +11,7 @@ export function validateDatabase(path) {
     const version = db.prepare('PRAGMA user_version').get().user_version
     if (
       db.prepare('PRAGMA integrity_check').get().integrity_check !== 'ok' ||
-      ![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(version)
+      ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10].includes(version)
     )
       throw new Error('Invalid or unsupported backup database.')
     const rows = db.prepare('SELECT * FROM inventory').all()

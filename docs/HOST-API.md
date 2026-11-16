@@ -1,6 +1,6 @@
 # Local host API and database (2.1)
 
-Current schema is SQLite `user_version=9`. The v5→v6 migration backfills `latest_check` from the newest timestamp and sequence per device. The v8→v9 migration adds the optional operator password hash and role while preserving existing sessions and inventory.
+Current schema is SQLite `user_version=10`. The v5→v6 migration backfills `latest_check` from the newest timestamp and sequence per device. The v9→v10 migration removes the former operator credential and sessions. Viewer and admin access, inventory, and audit history are preserved.
 
 Requires Node 22.13+ (built-in node:sqlite; Node 22 prints an experimental SQLite warning). No external database server or runtime package is required. This API serves the loopback dashboard and optional authenticated clients on a private network.
 
@@ -22,7 +22,7 @@ The dashboard defaults to saved host inventory and consumes the snapshot every s
 
 ## Versioned API
 
-Existing routes declare access levels in the host route table. Static GETs outside /api/ are public. Health, snapshots and device details are viewer routes. Operators and admins can read discovery results and request a scan. Operator scans do not write upstream links. Topology and other discovery writes are admin routes. Loopback keeps admin access without signing in. Remote users need a session for nonpublic routes.
+Existing routes declare access levels in the host route table. Static GETs outside /api/ are public. Health, snapshots and device details are viewer routes. Discovery results and scans, topology editing, and discovery writes require admin access. Loopback keeps admin access without signing in. Remote users need a session for nonpublic routes.
 
 All API responses are JSON with no-store. Errors use `{ "error": { "code": "request_rejected", "message": "..." } }`; conflicts use `revision_conflict`, unexpected failures `internal_error` with a generic message. HTTP 400 covers invalid input, 401 covers missing sessions and invalid credentials, 403 covers admission or authorization failures, and 404 covers missing routes or devices. Revision mismatches use 409, oversized bodies 413, unsupported content types 415, temporary rate limits 429, and unexpected failures 500.
 
@@ -57,11 +57,11 @@ HTTP is the loopback-only default. Set NETWATCH_TLS_CERT and NETWATCH_TLS_KEY to
 
 Requests are admitted by the real socket peer. Loopback, RFC1918 IPv4, IPv6 link-local and IPv6 ULA peers qualify. IPv4-mapped peers are classified by their IPv4 address. Production binds only loopback and private IPv4 interfaces. Host must match a listener or configured hostname and port. If present, Origin must use the matching transport and an allowed authority, and Sec-Fetch-Site must be same-origin or none.
 
-- GET /api/v1/auth/session returns authenticated, role, source, viewerMode, operatorConfigured and remoteEnabled. Authenticated remote sessions receive csrfToken and expiresAt. Open mode issues a viewer session here or on the SPA shell.
+- GET /api/v1/auth/session returns authenticated, role, source, viewerMode and remoteEnabled. Authenticated remote sessions receive csrfToken and expiresAt. Open mode issues a viewer session here or on the SPA shell.
 - POST /api/v1/auth/login accepts JSON with role and password. A successful login returns role, csrfToken and expiresAt and replaces the prior session. The cookie uses HttpOnly, SameSite=Strict and Path=/.
 - POST /api/v1/auth/logout is bodyless. It invalidates the remote session and clears its cookie.
 
-Remote admin and operator writes require the session CSRF token in X-NetWatch-Write. Loopback writes retain the per-launch token. Remote protected requests without a session receive 401. Requests below the required role receive 403. Login backoff uses 429 and Retry-After. Admin and operator sessions expire after 30 minutes idle or 12 hours absolute, with a separate limit of five for each role. Viewer sessions expire after eight hours idle or seven days absolute, with a limit of 20. New sessions evict the oldest at each limit. All responses include Referrer-Policy, X-Frame-Options and Cross-Origin-Resource-Policy. API responses use Cache-Control: no-store.
+Remote admin writes require the session CSRF token in X-NetWatch-Write. Loopback writes retain the per-launch token. Remote protected requests without a session receive 401. Requests below the required role receive 403. Login backoff uses 429 and Retry-After. Admin sessions expire after 30 minutes idle or 12 hours absolute, with a limit of five. Viewer sessions expire after eight hours idle or seven days absolute, with a limit of 20. New sessions evict the oldest at each limit. All responses include Referrer-Policy, X-Frame-Options and Cross-Origin-Resource-Policy. API responses use Cache-Control: no-store.
 
 ## Access log
 
@@ -71,7 +71,7 @@ GET /api/v1/audit is loopback-only. It accepts limit (1–200, default 50) and b
 
 ## Local access configuration
 
-Stop the host and use the same NETWATCH_DB path as the launcher or host. Run npm run auth -- set-admin-password, npm run auth -- set-viewer-password or npm run auth -- set-operator-password in an interactive terminal. Passwords are entered twice without echo and must be distinct. Use npm run auth -- viewer-mode open (or password or disabled) to choose viewer policy, npm run auth -- status to inspect configuration, and npm run auth -- revoke-sessions to remove sessions. Restart the host after CLI changes. The management CLI shares the host database lock. The Windows launcher can apply access changes to its running host through private process IPC. Remote access requires NETWATCH_LAN=1, a valid HTTPS certificate and key, and a configured admin password. Password mode requires a viewer password for viewer sessions. Viewer snapshots omit discovery and administrative diagnostics. Disabled viewer mode permits configured operator and admin sessions. The local CLI can clear operator access with npm run auth -- disable-operator.
+Stop the host and use the same NETWATCH_DB path as the launcher or host. Run npm run auth -- set-admin-password or npm run auth -- set-viewer-password in an interactive terminal. Passwords are entered twice without echo and must be distinct. Use npm run auth -- viewer-mode open (or password or disabled) to choose viewer policy, npm run auth -- status to inspect configuration, and npm run auth -- revoke-sessions to remove sessions. Restart the host after CLI changes. The management CLI shares the host database lock. The Windows launcher can apply access changes to its running host through private process IPC. Remote access requires NETWATCH_LAN=1, a valid HTTPS certificate and key, and a configured admin password. Password mode requires a viewer password for viewer sessions. Viewer snapshots omit discovery and administrative diagnostics. Disabled viewer mode permits admin sessions.
 
 ## SQLite, migrations and retention
 

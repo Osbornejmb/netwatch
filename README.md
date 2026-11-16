@@ -16,6 +16,8 @@ Download `NetWatch-<version>-Windows-x64-Setup.exe` from the [latest GitHub rele
 
 Setup installs for your Windows account and adds a **NetWatch** Start menu shortcut. Open it, click **Start**, then **Open dashboard**. Before starting, select **Check devices on next start** if you want reachability checks for devices you authorize.
 
+Install NetWatch on one PC. In installer 0.1.1 or newer, select **Set up access from another PC on my private network** during Setup. Choose **Require a viewing password** or **No viewer password**. Setup prepares a secure connection. Click **Start** on the NetWatch PC. Other PCs open the dashboard in a browser. [Connect another PC](docs/REMOTE-ACCESS.md#windows-installer-setup)
+
 See the [Windows launcher guide](docs/WINDOWS-LAUNCHER.md) for building the installer, updating, uninstalling and keeping your data. To build and run from source, use the steps below.
 
 ### Setup from source
@@ -107,7 +109,7 @@ The Vite development UI is browser-only and does not run the monitoring host. Us
 
 ## Remaining work
 
-NetWatch supports viewer, operator, and admin roles, local password recovery, and redacted audit export (#10). Private-network access is opt-in and requires direct HTTPS (#12). Per-user accounts, SSO, automatic certificate provisioning and second-PC release verification remain open. Local outages and SNMP interfaces are available. Admins can review LLDP neighbor proposals under saved device details. Hardware verification, optional chat notifications and broader redundancy work remain pending.
+NetWatch supports viewer and admin roles, local password recovery, and redacted audit export (#10). Private-network access is opt-in and requires direct HTTPS (#12). Per-user accounts, SSO, automatic certificate provisioning and second-PC release verification remain open. Local outages and SNMP interfaces are available. Admins can review LLDP neighbor proposals under saved device details. Hardware verification, optional chat notifications and broader redundancy work remain pending.
 
 See [ROADMAP.md](docs/ROADMAP.md), [Windows launcher](docs/WINDOWS-LAUNCHER.md), [monitoring policy](docs/ICMP-COLLECTOR.md), and [WORKLOG.md](docs/WORKLOG.md) for details and evidence.
 

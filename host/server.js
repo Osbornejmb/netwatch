@@ -72,13 +72,13 @@ export function createRoutes(discovery) {
       bodyType: 'json',
     },
     { method: 'GET', pattern: /^\/api\/v1\/snapshot$/, handler: createSnapshotRoute(randomUUID()), access: 'viewer' },
-    { method: 'GET', pattern: /^\/api\/v1\/discovered$/, handler: listDiscovered, access: 'operator' },
+    { method: 'GET', pattern: /^\/api\/v1\/discovered$/, handler: listDiscovered, access: 'admin' },
     {
       method: 'POST',
       pattern: /^\/api\/v1\/discovered\/scan-now$/,
       handler: scanNow(discovery),
       auditAction: 'discovery_scan',
-      access: 'operator',
+      access: 'admin',
       requiresWrite: true,
       bodyType: 'Scan',
     },
@@ -185,13 +185,9 @@ export function createHost(
         if (source === 'remote' && access !== 'public') {
           if (access === 'local') throw invalid('Change this on the NetWatch PC.', 403)
           if (!role) throw invalid('Sign in to NetWatch.', 401)
-          if (
-            access !== 'viewer' &&
-            !(access === 'operator' && ['operator', 'admin'].includes(role)) &&
-            !(access === 'admin' && role === 'admin')
-          ) {
+          if (access === 'admin' && role !== 'admin') {
             if (auditAction)
-              audit?.record(role === 'operator' ? 'operator_write_blocked' : 'viewer_write_blocked', {
+              audit?.record('viewer_write_blocked', {
                 source,
                 ip,
                 role,

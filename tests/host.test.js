@@ -53,7 +53,7 @@ test('snapshot chooses newest timestamp then sequence, including after rebuildin
  assert.equal(store.snapshot().observations.length,1);assert.equal(store.snapshot().observations[0].status,'down')
  const saved=store.read(),history=store.history('r1');store.db.exec('DROP INDEX checks_device_latest');store.close()
  const reopened=openStore(path,{now:()=>now});try {
- assert.equal(reopened.db.prepare('PRAGMA user_version').get().user_version,9)
+ assert.equal(reopened.db.prepare('PRAGMA user_version').get().user_version,10)
  assert.deepEqual(reopened.read(),saved);assert.deepEqual(reopened.history('r1'),history)
  assert.equal(reopened.snapshot().observations[0].status,'down')
  assert.ok(reopened.db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='checks_device_latest'").get())
@@ -85,8 +85,8 @@ test('cleanup trims devices first, then evicts the network-wide oldest rows', t=
 test('failed initial migration rolls back schema; future schemas are rejected without modification',t=>{
  const dir=mkdtempSync(join(tmpdir(),'netwatch-migration-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));const path=join(dir,'db')
  assert.throws(()=>openStore(path,{migrate:()=>{throw new Error('migration interrupted')}}),/interrupted/)
- const db=new DatabaseSync(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,0);assert.equal(db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name='inventory'").get().n,0);db.exec('PRAGMA user_version=10');db.close()
- assert.throws(()=>openStore(path),/newer/);const check=new DatabaseSync(path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,10);check.close()
+ const db=new DatabaseSync(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,0);assert.equal(db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name='inventory'").get().n,0);db.exec('PRAGMA user_version=11');db.close()
+ assert.throws(()=>openStore(path),/newer/);const check=new DatabaseSync(path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,11);check.close()
 })
 test('offline backup/restore validates data, advances revision and rejects corrupt backups and active locks',t=>{
  const {dir,path,store}=fixture(t);store.write(input({r1:true}),0);store.append([{deviceId:'r1',status:'up',checkedAt:new Date().toISOString()}]);store.close()
@@ -120,27 +120,30 @@ test('loopback API enforces origin, host, write intent, payload bounds, error sh
  const chunked=await new Promise((resolve,reject)=>{const req=http.request(base+'/api/v1/topology',{method:'PUT',headers:{'Content-Type':'application/json','X-NetWatch-Write':token,'Transfer-Encoding':'chunked'}},res=>{res.resume();resolve(res.statusCode)});req.on('error',reject);req.end(' '.repeat(MAX_BODY+1))});assert.equal(chunked,413)
  assert.equal((await fetch(base+'/api/v1/checks',{method:'POST'})).status,404)
 })
-test('v9 adds optional operator access without discarding existing sessions or audit history', t => {
+test('v10 removes operator credentials and sessions while preserving other access and audit history', t => {
  const dir=mkdtempSync(join(tmpdir(),'netwatch-auth-v9-')),path=join(dir,'db')
  t.after(()=>rmSync(dir,{recursive:true,force:true}))
  const stop=Error('fixture version reached')
- assert.throws(()=>openStore(path,{migrateV9:()=>{throw stop}}),{message:stop.message})
+ assert.throws(()=>openStore(path,{migrateV10:()=>{throw stop}}),{message:stop.message})
  const previous=new DatabaseSync(path)
- previous.exec("INSERT INTO sessions VALUES('legacy','admin','csrf',1,1,2,'192.0.2.1'); INSERT INTO audit_log(at,source,role,action) VALUES(1,'local','admin','login_success');")
+ previous.exec("UPDATE auth_config SET admin_hash='existing-admin', viewer_hash='existing-viewer', operator_hash='former-operator'; INSERT INTO sessions VALUES('legacy','admin','csrf',1,1,2,'192.0.2.1'),('viewer','viewer','csrf',1,1,2,'192.0.2.2'),('operator','operator','csrf',1,1,2,'192.0.2.3'); INSERT INTO audit_log(at,source,role,action) VALUES(1,'remote','operator','login_success');")
  previous.close()
  const migrated=openStore(path)
  try {
-  assert.equal(migrated.db.prepare('SELECT operator_hash FROM auth_config').get().operator_hash,null)
+  assert.throws(()=>migrated.db.prepare('SELECT operator_hash FROM auth_config'),/no such column/)
+  assert.deepEqual({...migrated.db.prepare('SELECT admin_hash, viewer_hash FROM auth_config').get()},{admin_hash:'existing-admin',viewer_hash:'existing-viewer'})
   assert.equal(migrated.db.prepare('SELECT role FROM sessions WHERE id_hash=?').get('legacy').role,'admin')
   assert.equal(migrated.db.prepare('SELECT action FROM audit_log').get().action,'login_success')
-  migrated.db.exec("INSERT INTO sessions VALUES('operator','operator','csrf',1,1,2,'192.0.2.2')")
+  assert.equal(migrated.db.prepare('SELECT role FROM audit_log').get().role,'operator')
+  assert.equal(migrated.db.prepare('SELECT role FROM sessions WHERE id_hash=?').get('viewer').role,'viewer')
+  assert.throws(()=>migrated.db.exec("INSERT INTO sessions VALUES('operator','operator','csrf',1,1,2,'192.0.2.3')"),/CHECK constraint/)
   assert.equal(migrated.db.prepare('SELECT COUNT(*) AS count FROM sessions').get().count,2)
  } finally { migrated.close() }
 })
 
-test('ordered migrations upgrade v1 through v8 and preserve existing data', async t => {
+test('ordered migrations upgrade v1 through v9 and preserve existing data', async t => {
  const time=Date.now()
- for(let version=1;version<=8;version++){
+ for(let version=1;version<=9;version++){
   await t.test('version '+version, sub=>{
    const dir=mkdtempSync(join(tmpdir(),'netwatch-migration-')),path=join(dir,'db')
    sub.after(()=>rmSync(dir,{recursive:true,force:true}))
@@ -164,7 +167,7 @@ test('ordered migrations upgrade v1 through v8 and preserve existing data', asyn
    restoreDatabase(restored,path)
    const migrated=openStore(restored)
    try{
-    assert.equal(migrated.db.prepare('PRAGMA user_version').get().user_version,9)
+    assert.equal(migrated.db.prepare('PRAGMA user_version').get().user_version,10)
     assert.equal(migrated.revision(),4)
     assert.deepEqual(migrated.read().topology,topology)
     const [row]=migrated.history('r1').checks
