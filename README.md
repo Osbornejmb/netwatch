@@ -70,9 +70,9 @@ The launcher stores data under `%LOCALAPPDATA%\NetWatch\data\netwatch.sqlite`; i
 
 ## Start and stop
 
-For another PC to open the dashboard, enable **Allow other PCs on this network** in the Windows launcher, set an admin password under **Remote access**, choose a viewer mode, and start the host. Use a URL shown by the launcher. Plain HTTP exposes passwords and session data to anyone who can intercept LAN traffic. Configure direct HTTPS before signing in from another PC on a network you do not fully trust. See [Remote access](docs/REMOTE-ACCESS.md).
+To share the dashboard, follow the [direct HTTPS setup](docs/REMOTE-ACCESS.md#direct-https), enable **Allow other PCs on this network**, set an admin password, choose a viewer mode, and click **Start**. Open the HTTPS URL shown in **Remote access** on the other PC.
 
-Closing the browser or hiding the control window keeps monitoring running. **Stop** stops the host; **Quit** stops it and exits the tray app. The PC must remain awake, connected and signed in. Automatic boot startup and unattended Windows service operation are not implemented.
+Closing the browser or hiding the control window keeps monitoring running. **Stop** stops the host; **Quit** stops it and exits the tray app. The PC must remain awake, connected and signed in. Start NetWatch manually after signing in. Setup creates an optional desktop shortcut.
 
 For a terminal-based setup, build once and run:
 
@@ -99,7 +99,7 @@ The Vite development UI is browser-only and does not run the monitoring host. Us
 
 ## Remaining work
 
-NetWatch supports viewer, operator, and admin roles, local password recovery, and redacted audit export (#10). Private-network access is opt-in and supports direct HTTPS (#12). Per-user accounts, SSO, automatic certificate provisioning, unattended Windows service packaging and second-PC release verification remain open. Local outages and SNMP interfaces are available. Admins can review LLDP neighbor proposals under saved device details. Hardware verification, external notifications and broader redundancy work remain pending.
+NetWatch supports viewer, operator, and admin roles, local password recovery, and redacted audit export (#10). Private-network access is opt-in and requires direct HTTPS (#12). Per-user accounts, SSO, automatic certificate provisioning and second-PC release verification remain open. Local outages and SNMP interfaces are available. Admins can review LLDP neighbor proposals under saved device details. Hardware verification, optional chat notifications and broader redundancy work remain pending.
 
 See [ROADMAP.md](docs/ROADMAP.md), [Windows launcher](docs/WINDOWS-LAUNCHER.md), [monitoring policy](docs/ICMP-COLLECTOR.md), and [WORKLOG.md](docs/WORKLOG.md) for details and evidence.
 
@@ -107,6 +107,6 @@ See [ROADMAP.md](docs/ROADMAP.md), [Windows launcher](docs/WINDOWS-LAUNCHER.md),
 
 In device details, expand **Incidents** to see outages and recovery times; **View checks** opens the recent check history. Two failed checks open an outage, and the next reply confirms recovery. Repeated failures keep one outage open. **View options → Needs attention** includes open outages. Paused or disconnected monitoring leaves incidents open until a reply confirms recovery; check freshness and monitoring state before acting.
 
-Incidents survive host restart. Resolved incidents are kept for up to 30 days, with a 10,000-record network-wide limit. Removing a device or replacing its address/type removes its old incident evidence. Existing databases upgrade automatically; back up before upgrading. Only new confirmed results create incidents after upgrade. External email/chat notifications remain planned and send nothing.
+Incidents survive host restart. Resolved incidents are kept for up to 30 days, with a 10,000-record network-wide limit. Removing a device or replacing its address/type removes its old incident evidence. Existing databases upgrade automatically; back up before upgrading. Only new confirmed results create incidents after upgrade. Optional chat notifications remain planned.
 
 The dashboard summary counts and Status filter narrow the displayed devices; Needs attention includes down/overdue devices and open outages. Edit map adds new devices to the next free grid cell. Removing a device asks for confirmation. Routers fit their content in an oblong shape; long names use a tooltip. Devices uses cards on narrow screens, and Backups opens below navigation. Dashboard/Edit map/Devices links support reload and browser Back/Forward.

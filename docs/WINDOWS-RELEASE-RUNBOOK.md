@@ -1,13 +1,13 @@
 # Windows local release runbook — issue #16
 
-This runbook covers one awake, signed-in Windows host and local browsers. Remote access, authentication and an unattended Windows service remain #10/#12. Do not expose port 4317 or the Vite server to the LAN.
+This runbook covers one awake, signed-in Windows host and local browsers. Keep LAN sharing off during these local checks. For the manually started HTTPS LAN deployment (#12), follow [Remote access](REMOTE-ACCESS.md).
 
 ## Install and first start
 
 1. Use a permanent checkout of the intended release commit. Record the commit, Windows build, `node --version` and `npm --version`. Node 22.13+ and the Windows .NET Framework v4 compiler/runtime are required.
 2. Run `npm.cmd ci`, `npm.cmd test`, and `npm.cmd run build`. A failed check is a release blocker to investigate, not a reason to delete data or bypass checks.
 3. For the interactive app, run `npm.cmd run desktop:setup -- --desktop-shortcut`. Quit an existing tray app before replacing its executable. Re-running setup preserves its database path and ICMP preference. It does not migrate an unrelated checkout database.
-4. Open the shortcut. Confirm the displayed data location. First installations start empty; verify that no fixture devices appear. Existing installations preserve their devices/history.
+4. Open the shortcut and confirm the host shows **Stopped** before you click **Start**. Confirm the displayed data location. First installations start empty; verify that no fixture devices appear. Existing installations preserve their devices/history.
 5. Start with ICMP disabled. Start/Open dashboard should show the local dashboard at `http://127.0.0.1:4317`. Confirm that closing the browser leaves the host running.
 6. Add only owner-approved devices in Topology editor. Export the browser map as a backup. Use Backup → Local host storage → Check host → Save to host, review and confirm replacement. Verify stable IDs/counts; editor additions and imports initially have monitoring disabled. Loading a host map replaces the browser working copy only after review.
 7. Enable local discovery only after approval for the attached network. Review discovered devices before adding them to the map. Explicit Add to map enables normal checks for the saved device; the global ICMP collector must still be separately enabled, and discovery's optional sweep never creates saved-device observations.

@@ -96,7 +96,7 @@ public class NetWatch : Form {
    message=settings.icmp?"NetWatch is running. Device checks are on.":"NetWatch is running. Device checks are paused.";
    if(settings.lan&&accessInfo!=null&&!accessInfo.adminConfigured)message+="\nSet an admin password under Remote access.";
   }
-  else if(next=="error")message="NetWatch could not continue. Check that another copy is not already running and that your saved data is available.";
+  else if(next=="error")message=message!=null&&message.Contains("HTTPS")?"Check the HTTPS certificate and key. See Direct HTTPS in the Remote access guide.":"NetWatch could not continue. Check that another copy is not already running and that your saved data is available.";
   status.Text=message;status.AccessibleName="NetWatch status: "+message;tray.Text="NetWatch: "+next;
   bool idle=host==null;
   start.Enabled=trayStart.Enabled=idle&&!quitting;stop.Enabled=trayStop.Enabled=!idle&&next!="stopping";

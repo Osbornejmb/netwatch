@@ -31,7 +31,7 @@ The host still binds only to `127.0.0.1:4317`. This is independent of `NETWATCH_
 
 Credentials are protected with Windows DPAPI **CurrentUser**, using a repository-owned .NET helper compiled locally with the existing Framework compiler. Plaintext passes only through bounded stdin/stdout pipes and process memory, never shell arguments. Protected profiles live in `snmp-credentials` beside the database, under a hash of the absolute database path, with hashed device filenames; the directory and `.dpapi` files are gitignored. Moving a database requires re-enrollment. A profile is bound to a random database authorization token, device ID/type and literal address. Missing, mismatched or unreadable profiles fail closed and do not cause device Down.
 
-Only the same Windows account/profile can decrypt these files. This does not protect against compromise of that account. Do not copy profiles into exports or source control. A future Windows service account will need its own credential enrollment; switching accounts is not transparent. See [Microsoft DPAPI documentation](https://learn.microsoft.com/en-us/dotnet/standard/security/how-to-use-data-protection).
+Only the same Windows account/profile can decrypt these files. This does not protect against compromise of that account. Do not copy profiles into exports or source control. Changing the Windows account that runs NetWatch requires re-enrolling the credentials under that account. See [Microsoft DPAPI documentation](https://learn.microsoft.com/en-us/dotnet/standard/security/how-to-use-data-protection).
 
 SQLite backups contain interface observations and non-secret authorization identifiers, not usernames/passwords or protected credential files. Restore deliberately clears SNMP authorization, preserving last-known interface observations as non-current; re-enter credentials locally to resume polling. Replacing a profile may fail closed if interrupted between protected-file and database updates; retry enrollment. Inventory and reachability history are preserved.
 
@@ -52,7 +52,7 @@ Rates require two samples 1–180 seconds apart, increasing agent uptime, identi
 
 ## Verification and remaining acceptance
 
-`tests/snmp.test.js` uses deterministic OID/Counter64 fixtures, a 2811-style FastEthernet table in a real authPriv loopback agent, fake bounded collectors, temporary databases and synthetic DPAPI credentials. It covers read-only requests, truncation, malformed/partial tables, wrong credentials, timeouts/abort, counter/rate rules, migration rollback, backup restore/revocation, API bounds, and credential redaction. These fixtures do not establish Cisco vendor support.
+`tests/snmp.test.js` uses deterministic OID/Counter64 fixtures, a 2811-style FastEthernet table in a real authPriv loopback agent, fake bounded collectors, temporary databases and synthetic DPAPI credentials. It covers read-only requests, truncation, malformed/partial tables, wrong credentials, timeouts/abort, counter/rate rules, migration rollback, backup restore/revocation, API bounds, and credential redaction. Run the DPAPI test under the signed-in Windows profile. A sandbox without access to that profile can fail during credential protection. These fixtures do not establish Cisco vendor support.
 
 `scripts/check-interfaces-browser.mjs` checks independent device Up/interface Down, unknown fields, rates, 55-row pagination, stale/error states, keyboard use, revocation and desktop/390px layouts. It never instantiates collectors or credentials. Screenshots remain local under `.tools/interface-screenshots`.
 

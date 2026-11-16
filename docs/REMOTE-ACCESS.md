@@ -2,7 +2,7 @@
 
 NetWatch listens on loopback by default. Enable private-network sharing on the NetWatch PC before opening the dashboard from another PC. Other PCs need only a browser.
 
-NetWatch serves the dashboard over HTTP by default. Anyone able to intercept traffic can read passwords, session cookies, CSRF tokens, device addresses and dashboard data. Use direct HTTPS before signing in on a network you do not fully trust. Keep NetWatch private and never port-forward its port.
+Local-only NetWatch serves the dashboard over HTTP by default. LAN sharing requires direct HTTPS with a certificate trusted by the viewing PCs. Keep NetWatch private and never port-forward its port.
 
 ## Access and limits
 
@@ -25,16 +25,15 @@ Admin and operator sessions expire after 30 minutes idle or 12 hours total. View
    npm.cmd ci
    npm.cmd run build
    npm.cmd run desktop:setup -- --desktop-shortcut
-   Start-Process (Join-Path $env:LOCALAPPDATA 'NetWatch\NetWatch.exe')
    ~~~
 
-2. Open **Remote access** and set an admin password. Use a unique password of 12–128 characters. Pick **Password**, **Open (no password)** or **Disabled** under **Viewers**. Set a different viewer password for Password mode.
+2. Configure [Direct HTTPS](#direct-https), then start the launcher from the PowerShell window with the certificate and key settings. Open **Remote access** and set an admin password. Use a unique password of 12–128 characters. Pick **Password**, **Open (no password)** or **Disabled** under **Viewers**. Set a different viewer password for Password mode.
 3. Enable **Allow other PCs on this network**, then click **Start**. If Windows asks about firewall access for Node, allow **Private networks** only. The launcher runs without elevation and does not edit firewall rules.
 4. Open **Remote access** again and copy a reachable URL. Paste it into the second PC's browser. Prefer a resolvable hostname covered by your certificate, or reserve the private address with your router's DHCP settings.
 
 ## Terminal setup and operations
 
-Stop the tray host first. Use its database path if you want to share its existing inventory.
+Stop the tray host first. Set both [HTTPS file settings](#direct-https) in the same terminal before enabling LAN sharing. Use its database path if you want to share its existing inventory.
 
 ~~~powershell
 $env:NETWATCH_DB = Join-Path $env:LOCALAPPDATA 'NetWatch\data\netwatch.sqlite'
@@ -62,7 +61,7 @@ npm.cmd run auth -- revoke-sessions
 After restarting the host, query the local access log from another terminal on the NetWatch PC.
 
 ~~~powershell
-curl.exe http://127.0.0.1:4317/api/v1/audit
+curl.exe https://127.0.0.1:4317/api/v1/audit
 ~~~
 
 Reopen the browser after a host restart to refresh the admin write token. Database restore clears sessions and may restore older password hashes and viewer policy from the backup. Check the configuration before turning LAN sharing back on. Protect the database and its backups because they contain hashes, inventory and the access log.
@@ -80,7 +79,13 @@ $env:NETWATCH_TLS_CERT = Join-Path $certDir 'netwatch.pem'
 $env:NETWATCH_TLS_KEY = Join-Path $certDir 'netwatch-key.pem'
 ~~~
 
-Start NetWatch from that terminal, or quit and reopen the launcher from that terminal so it inherits both variables. HTTPS replaces HTTP on the same port for both loopback and LAN listeners. The host accepts TLS 1.2 or later and sends Secure session cookies and HSTS. An unreadable file, incomplete pair, or invalid certificate/key prevents startup.
+Quit any open launcher, then open it from that terminal so it inherits both variables. Click **Start** in the launcher to run the host.
+
+~~~powershell
+Start-Process (Join-Path $env:LOCALAPPDATA 'NetWatch\NetWatch.exe')
+~~~
+
+HTTPS replaces HTTP on the same port for both loopback and LAN listeners. The host accepts TLS 1.2 or later and sends Secure session cookies and HSTS. An unreadable file, incomplete pair, or invalid certificate/key prevents startup.
 
 On each Windows viewing PC, verify the CA certificate came from the NetWatch PC, then import only the public *rootCA.pem* from the directory reported by *mkcert -CAROOT*. Keep *rootCA-key.pem* and the NetWatch server key private. Trusting the CA lets it authenticate other sites as well. Your organization may require a managed trust store or separate browser import.
 
@@ -112,7 +117,7 @@ npm run build
 npm run lint
 ~~~
 
-On the NetWatch PC, quit the installed tray app. Make a disposable launcher and database by running these commands in one PowerShell window. This setup omits the desktop shortcut and leaves the installed launcher and its database in place.
+On the NetWatch PC, quit the installed tray app and set both HTTPS file settings. Make a disposable launcher and database by running these commands in one PowerShell window. This setup omits the desktop shortcut and leaves the installed launcher and its database in place.
 
 ~~~powershell
 $netwatchOriginalAppData = $env:LOCALAPPDATA
@@ -123,26 +128,26 @@ try {
 } finally { $env:LOCALAPPDATA = $netwatchOriginalAppData }
 ~~~
 
-Leave ICMP and active discovery off during authentication tests. Verify the checkbox persists after Quit and reopen, the two password fields mask text and reject underlength or mismatched entries, and a new host with no admin password shows a warning. Verify the firewall prompt is Private only, the session list and access log update, and **Sign out all remote sessions** invalidates the second PC's admin session. Inspect listener addresses with these commands.
+Verify the launcher opens with the host stopped and starts only after you click **Start**. Leave ICMP and active discovery off during authentication tests. Verify the checkbox persists after Quit and reopen, the two password fields mask text and reject underlength or mismatched entries, and a new host with no admin password shows a warning. Verify the firewall prompt is Private only, the session list and access log update, and **Sign out all remote sessions** invalidates the second PC's admin session. Inspect listener addresses with these commands.
 
 ~~~powershell
 Get-NetConnectionProfile
 Get-NetTCPConnection -State Listen -LocalPort 4317 | Select-Object LocalAddress, LocalPort
-curl.exe -sS http://127.0.0.1:4317/api/v1/auth/session
-curl.exe -sS http://127.0.0.1:4317/api/v1/audit
+curl.exe -sS https://127.0.0.1:4317/api/v1/auth/session
+curl.exe -sS https://127.0.0.1:4317/api/v1/audit
 node --test tests/lan.test.js tests/sessions.test.js tests/tls.test.js
 ~~~
 
 Expect localhost and private IPv4 listeners only. The LAN tests inject public socket peers and prove that forwarding headers cannot make a public peer private. If you have an isolated routed lab client that already has a nonprivate source address, use curl with its bound source address and expect 403 if the firewall permits the connection. Do not open an internet route for this test. A routed RFC1918 client is eligible by design.
 
 ~~~powershell
-curl.exe --interface 192.0.2.2 -sS -i http://192.168.1.20:4317/api/v1/health
+curl.exe --interface 192.0.2.2 -sS -i https://192.168.1.20:4317/api/v1/health
 ~~~
 
 On the second PC, replace the example URL with the copied one. Open it as viewer, inspect the Dashboard and device details, and confirm each restricted hash returns to Dashboard. Sign in as admin to open Edit map and apply an inventory change to the disposable database, then sign out. Run the browser test from a checkout with Chromium available, using only disposable test passwords. In Open viewer mode omit NETWATCH_VIEWER_PASSWORD.
 
 ~~~powershell
-$env:NETWATCH_URL = 'http://192.168.1.20:4317'
+$env:NETWATCH_URL = 'https://192.168.1.20:4317'
 foreach ($route in 'topology','inventory','discovered') { Start-Process "$env:NETWATCH_URL/#$route" }
 curl.exe -sS -o NUL -w '%{http_code}' "$env:NETWATCH_URL/api/v1/topology"
 curl.exe -sS -o NUL -w '%{http_code}' -H 'Host: unrelated.example:4317' "$env:NETWATCH_URL/api/v1/auth/session"
@@ -155,12 +160,11 @@ try { node scripts/check-remote-browser.mjs } finally {
 }
 ~~~
 
-The anonymous topology request returns 401 and the unexpected Host request returns 403. To test write denial with curl as an authenticated viewer, read the viewer session cookie value from the browser's cookie inspector on the disposable host. Enter it with PowerShell 7's masked prompt. Use the cookie name for your transport, netwatch_session for HTTP or __Host-netwatch_session for HTTPS. Pipe the config to curl so the cookie is kept out of URLs and command-line arguments.
+The anonymous topology request returns 401 and the unexpected Host request returns 403. To test write denial with curl as an authenticated viewer, read the viewer session cookie value from the browser's cookie inspector on the disposable host. Enter it with PowerShell 7's masked prompt. Use the __Host-netwatch_session cookie. Pipe the config to curl so the cookie is kept out of URLs and command-line arguments.
 
 ~~~powershell
 $cookie = Read-Host 'Disposable viewer cookie value' -MaskInput
-$cookieName = 'netwatch_session'
-if ($env:NETWATCH_URL.StartsWith('https://')) { $cookieName = '__Host-netwatch_session' }
+$cookieName = '__Host-netwatch_session'
 try {
   ('cookie = "{0}={1}"' -f $cookieName,$cookie) | curl.exe --config - -sS -o NUL -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data '{}' "$env:NETWATCH_URL/api/v1/topology"
   ('cookie = "{0}={1}"' -f $cookieName,$cookie) | curl.exe --config - -sS -o NUL -w '%{http_code}' -X POST "$env:NETWATCH_URL/api/v1/discovered/clear"
