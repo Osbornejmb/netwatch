@@ -9,12 +9,7 @@ export function setSession(value) {
 
 export const getSession = () => session
 export const csrf = () => (session?.source === 'remote' ? session.csrfToken : undefined)
-export const allowedHash = (hash, role) => {
-  if (role === 'viewer') return '#dashboard'
-  if (role === 'operator' && !['#dashboard', '#inventory', '#devices', '#discovered'].includes(hash))
-    return '#dashboard'
-  return hash
-}
+export const allowedHash = (hash, role) => (role === 'viewer' ? '#dashboard' : hash)
 
 export async function hostFetch(path, options) {
   const active = session

@@ -1,4 +1,5 @@
 import { mkdirSync } from 'node:fs'
+import { randomBytes } from 'node:crypto'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { hashPassword, readAuthConfig, validPassword, verifyPassword, viewerModes } from './auth.js'
@@ -12,14 +13,14 @@ export async function manageAuth(
   [command, mode, ...extra],
   { prompt = (question) => secret(question, /^[^\p{C}]+$/u, 129), print = console.log } = {},
 ) {
-  const passwordRole = ['admin', 'viewer', 'operator'].find((role) => command === 'set-' + role + '-password')
+  const passwordRole = ['admin', 'viewer'].find((role) => command === 'set-' + role + '-password')
   if (
     extra.length ||
     (command === 'viewer-mode' ? !viewerModes.includes(mode) : mode !== undefined) ||
-    (!passwordRole && !['viewer-mode', 'status', 'revoke-sessions', 'disable-operator'].includes(command))
+    (!passwordRole && !['viewer-mode', 'status', 'revoke-sessions'].includes(command))
   )
     throw new Error(
-      'Usage: npm run auth -- set-admin-password | set-viewer-password | set-operator-password | disable-operator | viewer-mode <open|password|disabled> | status | revoke-sessions.',
+      'Usage: npm run auth -- set-admin-password | set-viewer-password | viewer-mode <open|password|disabled> | status | revoke-sessions.',
     )
   if (command === 'status') {
     print(JSON.stringify(accessStatus(db)))
@@ -27,17 +28,13 @@ export async function manageAuth(
   }
   let value = mode
   let column = 'viewer_mode'
-  if (command === 'disable-operator') {
-    column = 'operator_hash'
-    value = null
-  }
   if (passwordRole) {
     const password = await prompt('New password: ')
     if (!validPassword(password)) throw new Error('Use a password between 12 and 128 characters.')
     if (password !== (await prompt('Confirm password: '))) throw new Error('Passwords do not match.')
     const config = readAuthConfig(db)
     column = passwordRole + '_hash'
-    for (const other of ['viewer_hash', 'operator_hash', 'admin_hash']) {
+    for (const other of ['viewer_hash', 'admin_hash']) {
       if (other !== column && (await verifyPassword(password, config[other])))
         throw new Error('Use a different password for each access role.')
     }
@@ -68,7 +65,6 @@ export function accessStatus(db) {
   return {
     viewerMode: config.viewer_mode,
     viewerConfigured: Boolean(config.viewer_hash),
-    operatorConfigured: Boolean(config.operator_hash),
     adminConfigured: Boolean(config.admin_hash),
   }
 }
@@ -78,9 +74,8 @@ export async function manageLauncherAccess(db, request) {
     'lan-preference',
     'status',
     'set-admin-password',
+    'prepare-viewer-access',
     'set-viewer-password',
-    'set-operator-password',
-    'disable-operator',
     'viewer-mode',
     'revoke-sessions',
   ]
@@ -88,6 +83,12 @@ export async function manageLauncherAccess(db, request) {
   if (request.command === 'lan-preference') {
     if (!['enabled', 'disabled'].includes(request.mode)) throw new Error('Invalid LAN preference.')
     createAudit(db).record('access_settings_changed', { detail: 'lan:' + request.mode })
+  } else if (request.command === 'prepare-viewer-access') {
+    if (!readAuthConfig(db).admin_hash) {
+      // The host requires admin credentials even when the installer only sets a viewing password.
+      const password = randomBytes(32).toString('base64url')
+      await manageAuth(db, ['set-admin-password'], { prompt: () => password, print() {} })
+    }
   } else if (request.command !== 'status') {
     const answers = [request.password, request.confirm]
     await manageAuth(db, [request.command, request.mode], { prompt: () => answers.shift(), print() {} })

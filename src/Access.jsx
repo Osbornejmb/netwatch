@@ -67,29 +67,16 @@ export default function Access() {
   if (session.authenticated && !form) {
     const remote = session.source === 'remote'
     const viewer = session.role === 'viewer'
-    const operator = session.role === 'operator'
     return (
       <App
         key={session.role}
         viewer={viewer}
-        operator={operator}
         remote={remote}
         accessControls={
           remote && (
             <div className="access-controls">
-              <span>{viewer ? 'Viewing remotely' : operator ? 'Operator (remote)' : 'Admin (remote)'}</span>
-              {viewer && session.operatorConfigured && (
-                <button
-                  className="health-button"
-                  onClick={() => {
-                    setError('')
-                    setForm('operator')
-                  }}
-                >
-                  Operator sign in
-                </button>
-              )}
-              {(viewer || operator) && (
+              <span>{viewer ? 'Viewing remotely' : 'Admin (remote)'}</span>
+              {viewer && (
                 <button
                   className="health-button"
                   onClick={() => {
@@ -125,7 +112,7 @@ export default function Access() {
         {session.message && <p role="status">{session.message}</p>}
         {needsPassword && (
           <label>
-            {role === 'admin' ? 'Admin password' : role === 'operator' ? 'Operator password' : 'Viewer password'}
+            {role === 'admin' ? 'Admin password' : 'Viewer password'}
             <input name="password" type="password" autoComplete="current-password" required maxLength={128} />
           </label>
         )}
@@ -133,36 +120,17 @@ export default function Access() {
         <button className="button primary" disabled={busy}>
           {busy ? 'Signing in…' : role === 'viewer' ? 'View dashboard' : 'Sign in'}
         </button>
-        {role !== 'operator' && session.operatorConfigured && (
+        {session.authenticated || session.viewerMode !== 'disabled' ? (
           <button
             type="button"
             className="button secondary"
             disabled={busy}
             onClick={() => {
               setError('')
-              setForm('operator')
+              setForm(role === 'viewer' ? 'admin' : session.authenticated ? null : 'viewer')
             }}
           >
-            Operator sign in
-          </button>
-        )}
-        {role === 'operator' || session.authenticated || session.viewerMode !== 'disabled' ? (
-          <button
-            type="button"
-            className="button secondary"
-            disabled={busy}
-            onClick={() => {
-              setError('')
-              setForm(role === 'viewer' ? 'admin' : role === 'operator' || session.authenticated ? null : 'viewer')
-            }}
-          >
-            {role === 'viewer'
-              ? 'Admin sign in'
-              : session.authenticated
-                ? 'Back to dashboard'
-                : role === 'operator'
-                  ? 'Other sign-in options'
-                  : 'View dashboard'}
+            {role === 'viewer' ? 'Admin sign in' : session.authenticated ? 'Back to dashboard' : 'View dashboard'}
           </button>
         ) : null}
       </form>

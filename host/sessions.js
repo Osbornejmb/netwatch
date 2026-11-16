@@ -6,12 +6,10 @@ const minute = 60000
 const hour = 60 * minute
 const limits = {
   viewer: [8 * hour, 168 * hour, 20],
-  operator: [30 * minute, 12 * hour, 5],
   admin: [30 * minute, 12 * hour, 5],
 }
 const passwordColumns = new Map([
   ['admin', 'admin_hash'],
-  ['operator', 'operator_hash'],
   ['viewer', 'viewer_hash'],
 ])
 const tokenPattern = /^[a-f0-9]{64}$/
@@ -67,7 +65,6 @@ export function createSessions(db, { lan, now = Date.now, audit } = {}) {
       (config.viewer_mode === 'disabled' || (config.viewer_mode === 'password' && !config.viewer_hash))
     )
       return
-    if (session.role === 'operator' && !config.operator_hash) return
     if (at - session.last_seen_at >= minute)
       db.prepare('UPDATE sessions SET last_seen_at=? WHERE id_hash=?').run(at, session.id_hash)
     return { ...session, token }
@@ -112,7 +109,6 @@ export function createSessions(db, { lan, now = Date.now, audit } = {}) {
     const base = {
       source,
       viewerMode: settings?.viewer_mode ?? 'disabled',
-      operatorConfigured: Boolean(settings?.operator_hash),
       remoteEnabled: remoteEnabled(lan, settings),
     }
     if (source === 'local') return { ...base, authenticated: true, role: 'admin' }

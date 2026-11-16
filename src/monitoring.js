@@ -1,9 +1,22 @@
 import { csrf, hostFetch } from './auth.js'
 import { validateTopology } from './topology.js'
 
+const writeTokenSelector = 'meta[name="netwatch-write-token"]'
+
 export function writeHeaders() {
-  const token = csrf() ?? globalThis.document?.querySelector('meta[name="netwatch-write-token"]')?.content
+  const token = csrf() ?? globalThis.document?.querySelector(writeTokenSelector)?.content
   return token ? { 'X-NetWatch-Write': token } : {}
+}
+
+export async function refreshLocalWriteToken() {
+  const response = await hostFetch('/', { cache: 'no-store' })
+  if (!response.ok) return false
+  const html = new DOMParser().parseFromString(await response.text(), 'text/html')
+  const fresh = html.querySelector(writeTokenSelector)?.content
+  const current = document.querySelector(writeTokenSelector)
+  if (!current || !/^[0-9a-f]{64}$/.test(fresh ?? '') || current.content === fresh) return false
+  current.content = fresh
+  return true
 }
 
 export async function hostRequest(path, { signal, body } = {}) {

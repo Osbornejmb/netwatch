@@ -36,9 +36,7 @@ export function needsRehash(value) {
 }
 
 export function readAuthConfig(db) {
-  return db
-    .prepare('SELECT viewer_mode, viewer_hash, admin_hash, operator_hash FROM auth_config WHERE singleton=1')
-    .get()
+  return db.prepare('SELECT viewer_mode, viewer_hash, admin_hash FROM auth_config WHERE singleton=1').get()
 }
 
 export function remoteEnabled(lan, config) {
@@ -46,7 +44,6 @@ export function remoteEnabled(lan, config) {
     lan &&
     viewerModes.includes(config?.viewer_mode) &&
     parseHash(config.admin_hash) &&
-    (config.viewer_hash === null || parseHash(config.viewer_hash)) &&
-    (config.operator_hash === null || parseHash(config.operator_hash)),
+    (config.viewer_hash === null || parseHash(config.viewer_hash)),
   )
 }

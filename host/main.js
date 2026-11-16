@@ -27,7 +27,9 @@ try {
   process.exit(1)
 }
 const scheme = tls ? 'https' : 'http'
-const dashboardUrl = loopbackUrl(port, scheme)
+// Managed sharing keeps the local dashboard on its existing loopback origin.
+const localTls = tls?.pfx ? undefined : tls
+const dashboardUrl = loopbackUrl(port, localTls ? 'https' : 'http')
 const path = resolve(process.env.NETWATCH_DB || 'data/netwatch.sqlite')
 mkdirSync(dirname(path), { recursive: true })
 const release = lock(path)
@@ -69,7 +71,11 @@ const lan = allowLan
       createServer: (lanAuthorities) => createHost(store, { ...hostOptions, lanAuthorities }),
     })
   : undefined
-const server = createHost(store, { ...hostOptions, lanAuthorities: lan?.authorities })
+const server = createHost(store, {
+  ...hostOptions,
+  tls: localTls,
+  lanAuthorities: localTls === tls ? lan?.authorities : undefined,
+})
 server.listen(port, '127.0.0.1', () => {
   if (stopping) {
     server.close()

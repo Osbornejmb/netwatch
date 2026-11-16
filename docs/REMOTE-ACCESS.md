@@ -2,24 +2,36 @@
 
 NetWatch listens on loopback by default. Enable private-network sharing on the NetWatch PC before opening the dashboard from another PC. Other PCs need only a browser.
 
-Local-only NetWatch serves the dashboard over HTTP by default. LAN sharing requires direct HTTPS with a certificate trusted by the viewing PCs. Keep NetWatch private and never port-forward its port.
+The installer's sharing option keeps the dashboard on this PC at `http://127.0.0.1:4317`. Other PCs use HTTPS and trust a copy of this NetWatch PC's connection file. Keep NetWatch private and never port-forward its port.
 
 ## Access and limits
 
 | Access | What it permits |
 | --- | --- |
 | Remote viewer | Dashboard, status filters, device map and details, check history, outages and ports. Open viewer mode shares this data with any admitted client without a password. |
-| Remote operator | Viewer features plus the Devices list, discovery results and **Scan now**. Operators use a separate password. Operator scans leave the saved map untouched. |
 | Remote admin | Viewer features plus map editing and transfer, Devices, discovery review, browser map backups and imports, and per-device check controls. Admin sign-in always requires a password. |
 | Loopback admin | Current local dashboard behavior without sign-in. The access log, SNMP credential management, password and viewer policy changes, launcher options, database maintenance and restore, and stopping the host remain local. |
 
 NetWatch binds 127.0.0.1 and, when enabled, the PC's non-internal RFC1918 IPv4 addresses. It rejects socket peers outside loopback or the private ranges. Routed private clients can still qualify, so use Windows Firewall rules if you need to restrict access to particular networks. The listener leaves public addresses unbound. Clients connect directly because the host does not trust forwarding headers. The NetWatch PC's loopback URL always remains local admin. On the NetWatch PC, use its private URL to exercise the remote role workflow.
 
-Admin and operator sessions expire after 30 minutes idle or 12 hours total. Viewer sessions expire after eight hours idle or seven days total. At most five admin, five operator and 20 viewer sessions are active. New sessions at the cap evict the oldest. Open viewer mode creates a new viewer session when the dashboard loads after sign-out.
+Admin sessions expire after 30 minutes idle or 12 hours total. Viewer sessions expire after eight hours idle or seven days total. At most five admin and 20 viewer sessions are active. New sessions at the cap evict the oldest. Open viewer mode creates a new viewer session when the dashboard loads after sign-out.
 
-## Windows launcher setup
+## Windows installer setup
 
-1. On the NetWatch PC, quit any old tray instance and run the [standalone installer](WINDOWS-LAUNCHER.md#standalone-installer). For a source checkout, use these commands instead.
+Use installer 0.1.1 or newer. Leave the sharing option clear if you only use NetWatch on this PC.
+
+1. **On the NetWatch PC**, install NetWatch and select **Set up access from another PC on my private network**. Choose **Require a viewing password** or **No viewer password**. With no password, anyone on the private network who can reach NetWatch can view the read-only dashboard. Setup prepares the connection file and keeps existing passwords for future use.
+2. Open NetWatch from the Start menu and click **Start**. If Windows asks about firewall access, choose **Private networks**.
+3. Open **Remote access** and choose **Save connection file**. **On the viewing PC**, open the saved `NetWatch-connection.cer` and choose **Install Certificate → Current User → Place all certificates in the following store**. Browse to **Trusted Root Certification Authorities** and finish. Only trust the connection file you saved from your own NetWatch PC.
+4. Back on the NetWatch PC, use **Copy URL** in **Remote access**. Open that address in a browser on the viewing PC. If prompted, enter the viewing password and choose **View dashboard**. Only the host PC needs NetWatch installed.
+
+For read-only sign-in on an existing installation, set **Viewers** to **Password** in **Remote access** and use **Set viewer password** if needed. Use **Set admin password** on the host only if someone needs to edit the map remotely.
+
+If you skipped setup, check **Allow other PCs on this network** in the launcher. If your PC's address changes or the browser reports an expired certificate, stop NetWatch and choose **Remote access → Set up or repair sharing**. If the setup creates a new connection file, install the new copy on the viewing PC. Turn off **Allow other PCs on this network** to use the dashboard on this PC only.
+
+## Manual Windows launcher setup
+
+Use this path for a source checkout or your own certificate. On the NetWatch PC, quit any old tray instance. Install the current launcher from the checkout if needed.
 
    ~~~powershell
    npm.cmd ci
@@ -27,9 +39,9 @@ Admin and operator sessions expire after 30 minutes idle or 12 hours total. View
    npm.cmd run desktop:setup -- --desktop-shortcut
    ~~~
 
-2. Configure [Direct HTTPS](#direct-https), then start the launcher from the PowerShell window with the certificate and key settings. Open **Remote access** and set an admin password. Use a unique password of 12–128 characters. Pick **Password**, **Open (no password)** or **Disabled** under **Viewers**. Set a different viewer password for Password mode.
-3. Enable **Allow other PCs on this network**, then click **Start**. If Windows asks about firewall access for Node, allow **Private networks** only. The launcher runs without elevation and does not edit firewall rules.
-4. Open **Remote access** again and copy a reachable URL. Paste it into the second PC's browser. Prefer a resolvable hostname covered by your certificate, or reserve the private address with your router's DHCP settings.
+1. Configure [Direct HTTPS](#direct-https), then start the launcher from the PowerShell window with the certificate and key settings. Open **Remote access** and set an admin password. Use a unique password of 12–128 characters. Pick **Password**, **Open (no password)** or **Disabled** under **Viewers**. Set a different viewer password for Password mode.
+2. Enable **Allow other PCs on this network**, then click **Start**. If Windows asks about firewall access for Node, allow **Private networks** only. The launcher runs without elevation and does not edit firewall rules.
+3. Open **Remote access** again and copy a reachable URL. Paste it into the second PC's browser. Prefer a resolvable hostname covered by your certificate, or reserve the private address with your router's DHCP settings.
 
 ## Terminal setup and operations
 
@@ -39,7 +51,6 @@ Stop the tray host first. Set both [HTTPS file settings](#direct-https) in the s
 $env:NETWATCH_DB = Join-Path $env:LOCALAPPDATA 'NetWatch\data\netwatch.sqlite'
 npm.cmd run auth -- set-admin-password
 npm.cmd run auth -- set-viewer-password
-npm.cmd run auth -- set-operator-password
 npm.cmd run auth -- viewer-mode password
 npm.cmd run auth -- status
 $env:NETWATCH_LAN = '1'
@@ -47,8 +58,6 @@ npm.cmd start
 ~~~
 
 Password prompts are masked. Rotate passwords by running the same commands or using the launcher. Rotation and viewer policy changes revoke remote sessions. Use **Sign out all remote sessions** in the launcher or stop the host and run the command below. Use the local Dashboard's **Access log** button or the launcher to review recent entries. The API retains up to 5,000 records for up to 30 days.
-
-Set an operator password from **Remote access → Set operator password**, then choose **Operator sign in** from the remote browser. Use **Disable operator access** or `npm.cmd run auth -- disable-operator` to clear the credential and revoke remote sessions. Operator access is disabled until configured.
 
 If you forget the admin password, use **Set admin password** on the NetWatch PC. If the launcher is unavailable, stop NetWatch, select its existing database with `NETWATCH_DB`, run `npm.cmd run auth -- set-admin-password`, and restart. The new password replaces the old one and all remote sessions are revoked. The inventory and history stay in that database.
 
@@ -67,6 +76,8 @@ curl.exe https://127.0.0.1:4317/api/v1/audit
 Reopen the browser after a host restart to refresh the admin write token. Database restore clears sessions and may restore older password hashes and viewer policy from the backup. Check the configuration before turning LAN sharing back on. Protect the database and its backups because they contain hashes, inventory and the access log.
 
 ## Direct HTTPS
+
+These steps are for manual certificate setup. If you used the installer's sharing option, use the connection file from **Remote access**. Launching the packaged app with both `NETWATCH_TLS_CERT` and `NETWATCH_TLS_KEY` set selects your own certificate for that run.
 
 On the NetWatch PC, create a certificate that covers every URL you intend to use, including the launcher's loopback URL. Use your organization's private CA or a local CA such as [mkcert](https://github.com/FiloSottile/mkcert). With mkcert installed, replace the example IP and hostname below with the actual private IP and name. The new directory lives outside the checkout.
 

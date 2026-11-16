@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { createInterface } from 'node:readline'
+import { createServer } from 'node:net'
 import { mkdtempSync, mkdirSync, existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -10,14 +11,20 @@ import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import { DatabaseSync } from 'node:sqlite'
 
+const listener = createServer().listen(0, '127.0.0.1')
+await once(listener, 'listening')
+const port = listener.address().port
+await new Promise(resolve => listener.close(resolve))
+const healthUrl = `http://127.0.0.1:${port}/api/v1/health`
+
 function setup(t) {
  const directory=mkdtempSync(join(tmpdir(),'netwatch-desktop-test-'))
  t.after(()=>rmSync(directory,{recursive:true,force:true,maxRetries:10,retryDelay:50}))
  return directory
 }
 function launch(t,path,execArgs=[],env={}) {
- const { NETWATCH_TLS_CERT, NETWATCH_TLS_KEY, ...baseEnv } = process.env
- const child=spawn(process.execPath,[...execArgs,fileURLToPath(new URL('../host/desktop.js',import.meta.url))],{env:{...baseEnv,NETWATCH_DB:path,NETWATCH_ICMP:'0',NETWATCH_LAN:'0',...env},stdio:['pipe','pipe','pipe']})
+ const { NETWATCH_TLS_CERT, NETWATCH_TLS_KEY, NETWATCH_TLS_PFX, ...baseEnv } = process.env
+ const child=spawn(process.execPath,[...execArgs,fileURLToPath(new URL('../host/desktop.js',import.meta.url))],{env:{...baseEnv,NETWATCH_DB:path,NETWATCH_PORT:String(port),NETWATCH_ICMP:'0',NETWATCH_LAN:'0',...env},stdio:['pipe','pipe','pipe']})
  const events=[];const lines=createInterface({input:child.stdout});lines.on('line',line=>events.push(JSON.parse(line)))
  const closed=once(child,'close');let finished=false;void closed.then(()=>{finished=true})
  const deadline=setTimeout(()=>child.kill('SIGKILL'),20000);child.once('close',()=>clearTimeout(deadline))
@@ -35,7 +42,7 @@ test('desktop-owned host starts, stops, restarts and closes cleanly when control
  const path=join(setup(t),'db')
  for(const command of ['stop','eof']) {
   const instance=launch(t,path);await running(instance);assert.equal(existsSync(path+'.lock'),true)
-  const health=await (await fetch('http://127.0.0.1:4317/api/v1/health')).json();assert.equal(health.ready,true);assert.equal(health.collector.state,'disabled')
+  const health=await (await fetch(healthUrl)).json();assert.equal(health.ready,true);assert.equal(health.collector.state,'disabled')
   if(command==='stop')instance.child.stdin.write('stop\n');else instance.child.stdin.end()
   assert.equal((await instance.closed)[0],0);assert.equal(existsSync(path+'.lock'),false)
   const db=new DatabaseSync(path,{readOnly:true});assert.equal(db.prepare('PRAGMA integrity_check').get().integrity_check,'ok');db.close()
@@ -64,7 +71,7 @@ test('desktop start reports an occupied port without stopping the existing host'
  const refused=launch(t,join(directory,'refused'));assert.equal((await refused.closed)[0],1)
  assert.ok(refused.events.some(e=>e.state==='error'&&e.message.includes('EADDRINUSE')))
  assert.equal(existsSync(join(directory,'refused.lock')),false)
- assert.equal((await (await fetch('http://127.0.0.1:4317/api/v1/health')).json()).ready,true)
+ assert.equal((await (await fetch(healthUrl)).json()).ready,true)
  owner.child.stdin.write('stop\n');assert.equal((await owner.closed)[0],0)
 })
 test('desktop start preserves an existing lock; controller death leaves no running orphan and reports an unclean lock',async t=>{
@@ -76,7 +83,7 @@ test('desktop start preserves an existing lock; controller death leaves no runni
  const deadline=Date.now()+10000
  let listening=true
  while(listening&&Date.now()<deadline) {
-  try {await fetch('http://127.0.0.1:4317/api/v1/health',{signal:AbortSignal.timeout(500)});await delay(25)} catch {listening=false}
+  try {await fetch(healthUrl,{signal:AbortSignal.timeout(500)});await delay(25)} catch {listening=false}
  }
  assert.equal(listening,false,'Controller death left a running orphan host')
 })

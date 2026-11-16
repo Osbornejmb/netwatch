@@ -14,10 +14,10 @@ export function listDiscovered({ store, url }) {
 
 export function scanNow(discovery) {
   let lastScanRequest = 0
-  return async ({ role }) => {
+  return async () => {
     if (Date.now() - lastScanRequest < 30000) throw invalid('Wait before starting another scan.', 429)
     lastScanRequest = Date.now()
-    await discovery?.runOnce({ saveUpstream: role !== 'operator' })
+    await discovery?.runOnce()
     return discovery?.snapshot() ?? { state: 'disabled' }
   }
 }

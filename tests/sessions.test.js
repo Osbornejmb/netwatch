@@ -14,7 +14,6 @@ import { openStore } from '../host/store.js'
 import { writeTokenFixture } from './fixtures/write-token.js'
 
 const password = 'test admin password'
-const operatorPassword = 'test operator password'
 const idPath = '/api/v1/devices/missing/'
 const discoveryPath = '/api/v1/discovered/'
 const api = '/api/v1/'
@@ -26,9 +25,8 @@ async function fixture(t, options = {}) {
   const store = openStore(':memory:')
   const dist = mkdtempSync(join(tmpdir(), 'netwatch-session-test-'))
   writeTokenFixture(dist)
-  store.db.prepare('UPDATE auth_config SET viewer_mode=?, admin_hash=?, viewer_hash=?, operator_hash=?').run(
-    options.viewerMode ?? 'open', await hashPassword(password, options.parameters), await hashPassword('test viewer password'),
-    options.operator ? await hashPassword(operatorPassword) : null)
+  store.db.prepare('UPDATE auth_config SET viewer_mode=?, admin_hash=?, viewer_hash=?').run(
+    options.viewerMode ?? 'open', await hashPassword(password, options.parameters), await hashPassword('test viewer password'))
   const audit = createAudit(store.db, () => time)
   const auth = createSessions(store.db, { lan: true, now: () => time, audit })
   const server = createHost(store, { auth, audit, dist, discovery: options.discovery, port: 0, remoteAddress: () => ip })
@@ -51,6 +49,30 @@ async function fixture(t, options = {}) {
 }
 
 const asCookie = (response) => response.headers.get('set-cookie')?.split(';')[0]
+
+test('installer viewing setup enables read-only sign-in and keeps existing admin credentials', async (t) => {
+  const { store, login, fetchAt, auth } = await fixture(t, { viewerMode: 'password' })
+  const adminHash = () => store.db.prepare('SELECT admin_hash FROM auth_config').get().admin_hash
+  const request = { command: 'prepare-viewer-access' }
+  const original = adminHash()
+  await manageLauncherAccess(store.db, request)
+  assert.equal(adminHash(), original)
+  store.db.prepare('UPDATE auth_config SET admin_hash=NULL').run()
+  assert.equal((await manageLauncherAccess(store.db, request)).adminConfigured, true)
+  const configured = adminHash()
+  await manageLauncherAccess(store.db, request)
+  assert.equal(adminHash(), configured)
+  const viewer = await login({ role: 'viewer', password: 'test viewer password' })
+  assert.equal(viewer.status, 200)
+  assert.equal((await viewer.json()).role, 'viewer')
+  assert.equal((await fetchAt(api + 'topology', { method: 'PUT', headers: { cookie: asCookie(viewer) } })).status, 403)
+  assert.equal((await manageLauncherAccess(store.db, { command: 'viewer-mode', mode: 'open' })).viewerMode, 'open')
+  auth.invalidate()
+  const openViewer = await fetchAt(api + 'auth/session')
+  assert.equal((await openViewer.json()).role, 'viewer')
+  assert.equal((await fetchAt(api + 'topology', { method: 'PUT', headers: { cookie: asCookie(openViewer) } })).status, 403)
+  assert.equal(adminHash(), configured)
+})
 
 test('sessions hash credentials, upgrade atomically, and require an admin CSRF token', async (t) => {
   const { fetchAt, login, store, audit } = await fixture(t, { parameters: { N: 16384, r: 8, p: 1 } })
@@ -95,12 +117,11 @@ test('sessions hash credentials, upgrade atomically, and require an admin CSRF t
   assert.ok(!JSON.stringify(log).includes(password))
 })
 
-test('route table enforces local, unauthenticated, viewer, operator, and admin access', async (t) => {
-  const { fetchAt, login, source, audit } = await fixture(t, { operator: true })
+test('route table enforces local, unauthenticated, viewer, and admin access', async (t) => {
+  const { fetchAt, login, source, audit } = await fixture(t)
   const session = await fetchAt(api + 'auth/session')
   const viewer = asCookie(session)
   const admin = asCookie(await login({ role: 'admin', password }))
-  const operator = asCookie(await login({ role: 'operator', password: operatorPassword }))
   const cases = [
     ['GET', api + 'audit', 200], ['GET', api + 'audit/export', 200],
     ['GET', api + 'auth/session', 200], ['POST', api + 'auth/login', 415], ['POST', api + 'auth/logout', 200],
@@ -114,10 +135,10 @@ test('route table enforces local, unauthenticated, viewer, operator, and admin a
   assert.equal(cases.length, createRoutes().length)
   for (const [method, path, status] of cases) {
     const route = createRoutes().find((candidate) => candidate.method === method && candidate.pattern.test(path))
-    for (const [kind, cookie] of [['local'], ['unauthenticated'], ['viewer', viewer], ['operator', operator], ['admin', admin]]) {
+    for (const [kind, cookie] of [['local'], ['unauthenticated'], ['viewer', viewer], ['admin', admin]]) {
       source(kind === 'local' ? '127.0.0.1' : '192.168.1.12')
       const expected = route.access === 'local' && kind !== 'local' ? 403 : route.access !== 'public' && kind === 'unauthenticated' ? 401 :
-        route.access === 'admin' && ['viewer', 'operator'].includes(kind) || route.access === 'operator' && kind === 'viewer' ? 403 : status
+        route.access === 'admin' && kind === 'viewer' ? 403 : status
       const headers = cookie && !path.endsWith('/logout') ? { cookie } : {}
       assert.equal((await fetchAt(path, { method, headers })).status, expected, kind + ' ' + method + ' ' + path)
     }
@@ -125,23 +146,21 @@ test('route table enforces local, unauthenticated, viewer, operator, and admin a
   assert.equal(audit.read().entries.filter((entry) => entry.action === 'viewer_write_blocked').length, 6)
 })
 
-test('operators can start a scan with CSRF but cannot change the map, and local recovery revokes their session', async (t) => {
+test('admins can scan with CSRF and password recovery revokes their session', async (t) => {
   const calls = []
   const { fetchAt, login, store, auth, source } = await fixture(t, {
-    operator: true,
     viewerMode: 'disabled',
     discovery: { runOnce: async (options) => calls.push(options), snapshot: () => ({ state: 'idle' }) },
   })
-  const operator = await login({ role: 'operator', password: operatorPassword })
-  assert.equal(operator.status, 200)
-  const cookie = asCookie(operator)
-  const { csrfToken } = await operator.json()
+  const admin = await login({ role: 'admin', password })
+  assert.equal(admin.status, 200)
+  const cookie = asCookie(admin)
+  const { csrfToken } = await admin.json()
   const scan = discoveryPath + 'scan-now'
   assert.equal((await fetchAt(scan, { method: 'POST', headers: { cookie } })).status, 403)
   const headers = { cookie, 'X-NetWatch-Write': csrfToken }
   assert.equal((await fetchAt(scan, { method: 'POST', headers })).status, 200)
-  assert.deepEqual(calls, [{ saveUpstream: false }])
-  assert.equal((await fetchAt(api + 'topology', { method: 'PUT', headers })).status, 403)
+  assert.deepEqual(calls, [undefined])
   assert.equal(store.revision(), 0)
   assert.equal((await fetchAt(api + 'audit/export', { headers })).status, 403)
   source('127.0.0.1')
@@ -155,13 +174,11 @@ test('operators can start a scan with CSRF but cannot change the map, and local 
   const updated = await manageLauncherAccess(store.db, {
     command: 'set-admin-password', password: replacement, confirm: replacement,
   })
-  assert.equal(updated.operatorConfigured, true)
+  assert.equal(updated.adminConfigured, true)
   auth.invalidate()
   assert.equal((await fetchAt(api + 'snapshot', { headers })).status, 401)
   assert.equal((await login({ role: 'admin', password: replacement })).status, 200)
-  await manageLauncherAccess(store.db, { command: 'disable-operator' })
-  auth.invalidate()
-  assert.equal((await login({ role: 'operator', password: operatorPassword })).status, 401)
+  assert.equal((await login({ role: 'operator', password: replacement })).status, 401)
 })
 
 test('sessions expire by idle and absolute limits and evict the oldest session at each cap', async (t) => {
