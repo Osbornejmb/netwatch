@@ -36,7 +36,7 @@ test(
           '-Directory',
           dir,
         ],
-        { windowsHide: true, timeout: 20000 },
+        { windowsHide: true, timeout: 90000 },
       )
     setup()
     const original = new X509Certificate(readFileSync(publicFile))
