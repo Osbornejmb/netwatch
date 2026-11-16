@@ -7,6 +7,7 @@
 - [ICMP-COLLECTOR](ICMP-COLLECTOR.md) — maintained reference
 - [INCIDENTS-CHECKPOINT](INCIDENTS-CHECKPOINT.md) — historical log
 - [PROJECT](PROJECT.md) — maintained reference
+- [REMOTE-ACCESS](REMOTE-ACCESS.md) — maintained reference for Windows LAN deployment and release checks
 - [REDESIGN-CHECKPOINT](REDESIGN-CHECKPOINT.md) — historical log
 - [RELEASE-CHECKPOINT](RELEASE-CHECKPOINT.md) — historical log
 - [ROADMAP](ROADMAP.md) — maintained reference

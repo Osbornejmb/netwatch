@@ -4,7 +4,7 @@ The owner's priority is a clear dashboard showing genuine device up/down behavio
 
 ## First usable release
 
-The local host uses per-launch write tokens, helper cache checksums and a configurable loopback port. Private LAN access implements two password roles, bounded sessions, audit logging and direct HTTPS under #10 and #12.
+The local host uses per-launch write tokens, helper cache checksums and a configurable loopback port. Opt-in private LAN access requires direct HTTPS and supports viewer, operator and admin roles, bounded sessions and redacted audit export under #10 and #12.
 
 M1 + M2 deliver the local monitoring MVP. SNMP/LLDP, BGP collection, and remote access are not prerequisites for seeing real up/down status. BGP session monitoring is not currently in scope; ping results cannot establish BGP health.
 
@@ -25,7 +25,7 @@ Hourly latency rollups are a possible later feature for long-term trends. Live o
 | 7 | [#5 Implement bounded Windows ICMP checks and health transitions](https://github.com/Osbornejmb/netwatch/issues/5) | Windows monitoring backend | #4 |
 | 8 | [#28 Add Windows tray controls and optional desktop launcher](https://github.com/Osbornejmb/netwatch/issues/28) | Local host usability | #4, #5 |
 | 9 | [#6 Connect real observations, freshness, and history to the dashboard](https://github.com/Osbornejmb/netwatch/issues/6) | Windows monitoring backend | #13, #5 |
-| 10 | [#11 Add local incident lifecycle and optional approved notifications](https://github.com/Osbornejmb/netwatch/issues/11) | Windows monitoring backend | #6 |
+| 10 | [#11 Add local incident lifecycle and optional approved chat notifications](https://github.com/Osbornejmb/netwatch/issues/11) | Windows monitoring backend | #6 |
 | 11 | [#16 Validate the live dashboard end to end on Windows](https://github.com/Osbornejmb/netwatch/issues/16) | Proven Windows monitoring MVP | #6, #2, #3, #15, #11, #28 |
 | 12 | [#7 Add SNMPv3 interface collection](https://github.com/Osbornejmb/netwatch/issues/7) | Network intelligence | #16 |
 | 13 | [#8 Review LLDP neighbors before applying topology changes](https://github.com/Osbornejmb/netwatch/issues/8) | Network intelligence | #7 |
@@ -57,7 +57,7 @@ Issues: [#7](https://github.com/Osbornejmb/netwatch/issues/7), [#8](https://gith
 
 ### M4 — Secure remote operations
 
-Recoverable Windows service deployment with tested authentication/authorization and an explicitly enabled, protected remote path. Interactive LAN hosting is implemented with direct HTTPS and local launcher controls. Remaining scope includes per-user accounts, SSO, automatic certificate management, unattended service packaging, and release acceptance from a second PC.
+Recoverable Windows deployment with manual launcher startup and opt-in HTTPS LAN access. Remaining scope includes per-user accounts, SSO, automatic certificate management, and release acceptance from a second PC.
 
 Issues: [#10](https://github.com/Osbornejmb/netwatch/issues/10), [#12](https://github.com/Osbornejmb/netwatch/issues/12).
 
@@ -75,8 +75,8 @@ Issues: [#10](https://github.com/Osbornejmb/netwatch/issues/10), [#12](https://g
 - Issue #24's radial layout, direct-peer highlights and individual dashboard dragging are merged through #25. All 21 tests, build, browser regression suites and pre-merge CI checks passed. Real saved-layout moves autosave; radial/sample moves remain temporary and resettable.
 - Issue #4 (2.1) is merged through PR #26 and closed: loopback API/SQLite, explicit inventory transfer, monitoring opt-in and bounded history/backup/restore. All 30 tests/build and final Ubuntu/Windows checks passed.
 - Issue #5 is complete through merged PR #27 (a08c179), with 43 tests/build, Windows/Ubuntu CI and actual approved router/phone failure/recovery and console-shutdown evidence. See ICMP-COLLECTOR.md for timing and limits.
-- Issue #6 is merged through PR #30 (6190bb9) and closed, with controlled browser evidence and a real USB-phone dashboard failure/recovery, disconnected/stale/reconnect run; Ubuntu/Windows CI passed. Local incident implementation (#11) is merged through PR #32; Windows release acceptance remains #16 with real multi-device capacity deferred by the owner. #28 tray/desktop controls are merged in #29. WINDOWS-LAUNCHER.md explains the interactive launcher and future service handoff. LLDP neighbor collection and review are implemented with fixture coverage; approved hardware validation for #8 remains pending. External notifications and the unattended service remain planned. #16 requires actual Windows release evidence.
-- Deployment is one Windows host connected to the monitored network and multiple browser clients. The tray is host-local; remote browser closure never owns collection lifetime. #12's unattended service must survive sign-out/reboot and be the single collector/database owner, with optional tray controls attached to it. Remote shared URLs are available from the interactive launcher. See [Remote access](REMOTE-ACCESS.md) for rollout and validation.
+- Issue #6 is merged through PR #30 (6190bb9) and closed, with controlled browser evidence and a real USB-phone dashboard failure/recovery, disconnected/stale/reconnect run; Ubuntu/Windows CI passed. Local incident implementation (#11) is merged through PR #32; Windows release acceptance remains #16 with real multi-device capacity deferred by the owner. #28 tray/desktop controls are merged in #29. WINDOWS-LAUNCHER.md explains the manual launcher workflow. LLDP neighbor collection and review are implemented with fixture coverage; approved hardware validation for #8 remains pending. Optional chat notifications remain planned. The second-PC deployment checklist for #12 remains open.
+- Deployment is one Windows host connected to the monitored network and multiple browser clients. The tray is host-local; remote browser closure never owns collection lifetime. For #12, an operator signs in to Windows and starts the host from the launcher. Sign-out and reboot interrupt monitoring. Remote shared URLs are available from the interactive launcher. See [Remote access](REMOTE-ACCESS.md) for rollout and validation.
 
 ## Plan maintenance
 

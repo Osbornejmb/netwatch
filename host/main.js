@@ -17,7 +17,15 @@ import { createInterfaceCollector } from './snmp-collector.js'
 import { createDiscovery } from './discovery.js'
 import { createProbeGate } from './probe-gate.js'
 const port = readPort()
-const tls = readTlsOptions()
+const allowLan = process.env.NETWATCH_LAN === '1'
+let tls
+try {
+  tls = readTlsOptions()
+  if (allowLan && !tls) throw new Error('LAN sharing requires HTTPS. Set NETWATCH_TLS_CERT and NETWATCH_TLS_KEY.')
+} catch (error) {
+  console.error(error.message)
+  process.exit(1)
+}
 const scheme = tls ? 'https' : 'http'
 const dashboardUrl = loopbackUrl(port, scheme)
 const path = resolve(process.env.NETWATCH_DB || 'data/netwatch.sqlite')
@@ -52,16 +60,15 @@ const discovery = createDiscovery(store, {
 })
 const audit = createAudit(store.db)
 audit.purge()
-const auth = createSessions(store.db, { lan: process.env.NETWATCH_LAN === '1', audit })
+const auth = createSessions(store.db, { lan: allowLan, audit })
 const hostOptions = { port, collector, interfaces, discovery, routes: createRoutes(discovery), auth, audit, tls }
-const lan =
-  process.env.NETWATCH_LAN === '1'
-    ? createLanListeners({
-        port,
-        scheme,
-        createServer: (lanAuthorities) => createHost(store, { ...hostOptions, lanAuthorities }),
-      })
-    : undefined
+const lan = allowLan
+  ? createLanListeners({
+      port,
+      scheme,
+      createServer: (lanAuthorities) => createHost(store, { ...hostOptions, lanAuthorities }),
+    })
+  : undefined
 const server = createHost(store, { ...hostOptions, lanAuthorities: lan?.authorities })
 server.listen(port, '127.0.0.1', () => {
   if (stopping) {

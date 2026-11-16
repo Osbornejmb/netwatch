@@ -1,5 +1,12 @@
 # Working checkpoint
 
+## Current status (2026-11-16) — manual Windows deployment (#12)
+
+- Windows deployment uses the per-user launcher with explicit Start and Stop. The installer offers a desktop shortcut. Sign-out and reboot interrupt monitoring until the operator starts NetWatch again.
+- The host refuses LAN startup without a valid direct HTTPS certificate and key, before opening the database. Local-only HTTP remains available. The launcher and [remote access guide](REMOTE-ACCESS.md) provide HTTPS setup guidance.
+- The earlier DPAPI failure reproduced inside the sandbox. The synthetic credential round-trip and all 155 tests passed under the normal Windows profile. Lint, the build using Vite's runner config loader, and a disposable WinForms launcher install also passed.
+- The live installation, second-PC HTTPS and firewall behavior, native dialogs and Linux runtime verification remain pending.
+
 ## Current status (2026-11-16) — branch layout
 
 - Circle fans branches outward from their parent, and Tidy keeps small branches together beneath their parent. The map keeps all saved connections and device positions.
@@ -25,7 +32,7 @@
 
 - Scans show Windows default gateways as routers. Add all to map saves pending results from the latest successful scan in one inventory update.
 - Discovery uses a previously observed gateway's MAC address to suggest a router when the same hardware appears at another local IP.
-- Verified the live Windows gateway lookup, the bulk action in Chrome at desktop and narrow widths, lint and the production build. The full suite still hits the previously recorded Windows DPAPI credential failure.
+- Verified the live Windows gateway lookup, the bulk action in Chrome at desktop and narrow widths, lint and the production build. That run encountered the sandbox DPAPI failure. The later run under the normal Windows profile passed.
 
 ## Current status (2026-11-15) — remote access
 
