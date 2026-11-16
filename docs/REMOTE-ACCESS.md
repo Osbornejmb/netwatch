@@ -19,7 +19,7 @@ Admin and operator sessions expire after 30 minutes idle or 12 hours total. View
 
 ## Windows launcher setup
 
-1. On the NetWatch PC, quit any old tray instance, build the dashboard, and install the current launcher.
+1. On the NetWatch PC, quit any old tray instance and run the [standalone installer](WINDOWS-LAUNCHER.md#standalone-installer). For a source checkout, use these commands instead.
 
    ~~~powershell
    npm.cmd ci
@@ -82,8 +82,10 @@ $env:NETWATCH_TLS_KEY = Join-Path $certDir 'netwatch-key.pem'
 Quit any open launcher, then open it from that terminal so it inherits both variables. Click **Start** in the launcher to run the host.
 
 ~~~powershell
-Start-Process (Join-Path $env:LOCALAPPDATA 'NetWatch\NetWatch.exe')
+Start-Process (Join-Path $env:LOCALAPPDATA 'Programs\NetWatch\NetWatch.exe')
 ~~~
+
+For a source install, use `NetWatch\NetWatch.exe` under `LOCALAPPDATA`.
 
 HTTPS replaces HTTP on the same port for both loopback and LAN listeners. The host accepts TLS 1.2 or later and sends Secure session cookies and HSTS. An unreadable file, incomplete pair, or invalid certificate/key prevents startup.
 

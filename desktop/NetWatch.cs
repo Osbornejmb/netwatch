@@ -28,7 +28,12 @@ public class NetWatchMenuColors : ProfessionalColorTable {
  public override Color MenuBorder {get{return Color.FromArgb(216,221,211);}}
 }
 public class NetWatch : Form {
+#if PACKAGED
+ readonly string settingsPath=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"NetWatch","desktop.json");
+#else
  readonly string settingsPath=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"desktop.json");
+#endif
+ readonly string nodePath,appRoot;
  readonly JavaScriptSerializer json=new JavaScriptSerializer();
  DesktopSettings settings;
  Process host;
@@ -48,14 +53,28 @@ public class NetWatch : Form {
   using(var showRequest=new EventWaitHandle(false,EventResetMode.AutoReset,"Local\\NetWatch.Show."+WindowsIdentity.GetCurrent().User.Value))
   using(var single=new Mutex(true,"Local\\NetWatch.Desktop."+WindowsIdentity.GetCurrent().User.Value,out first)) {
    if(!first){showRequest.Set();return;}
+#if PACKAGED
+   using(var installed=new Mutex(false,"Local\\NetWatch.InstalledDesktop")) {
+#endif
    Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
    try {Application.Run(new NetWatch(showRequest));}
    catch(Exception e){MessageBox.Show(e.Message,"NetWatch startup",MessageBoxButtons.OK,MessageBoxIcon.Error);}
+#if PACKAGED
+   }
+#endif
   }
  }
  public NetWatch(EventWaitHandle showRequest) {
+#if PACKAGED
+  Directory.CreateDirectory(Path.GetDirectoryName(settingsPath));
+  settings=File.Exists(settingsPath)?json.Deserialize<DesktopSettings>(File.ReadAllText(settingsPath)):new DesktopSettings{database=Path.Combine(Path.GetDirectoryName(settingsPath),"data","netwatch.sqlite")};
+  appRoot=AppDomain.CurrentDomain.BaseDirectory;
+  nodePath=Path.Combine(appRoot,"node.exe");
+#else
   settings=json.Deserialize<DesktopSettings>(File.ReadAllText(settingsPath));
-  if(settings==null||!Path.IsPathRooted(settings.database)||!File.Exists(settings.node)||!File.Exists(Path.Combine(settings.root,"host","desktop.js")))throw new Exception("Launcher paths are unavailable. Run desktop:setup again from the current checkout.");
+  nodePath=settings==null?null:settings.node;appRoot=settings==null?null:settings.root;
+#endif
+  if(settings==null||!Path.IsPathRooted(settings.database)||!File.Exists(nodePath)||String.IsNullOrEmpty(appRoot)||!File.Exists(Path.Combine(appRoot,"host","desktop.js")))throw new Exception("NetWatch files or settings are unavailable. Check the data path and reinstall NetWatch.");
   Text="NetWatch";ClientSize=new Size(540,444);Font=new Font(SystemFonts.MessageBoxFont.FontFamily,10);BackColor=Color.FromArgb(244,243,238);ForeColor=Color.FromArgb(37,58,54);
   FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;Icon=SystemIcons.Application;
   var title=new Label{Text="Your network, at a glance",Font=new Font(Font,FontStyle.Bold),Location=new Point(20,18),AutoSize=true};Controls.Add(title);
@@ -105,7 +124,7 @@ public class NetWatch : Form {
  void StartHost() {
   if(host!=null)return;
   try {
-   var info=new ProcessStartInfo(settings.node,"host/desktop.js"){WorkingDirectory=settings.root,UseShellExecute=false,CreateNoWindow=true,RedirectStandardInput=true,RedirectStandardOutput=true,RedirectStandardError=true,StandardOutputEncoding=Encoding.UTF8,StandardErrorEncoding=Encoding.UTF8};
+   var info=new ProcessStartInfo(nodePath,"host/desktop.js"){WorkingDirectory=appRoot,UseShellExecute=false,CreateNoWindow=true,RedirectStandardInput=true,RedirectStandardOutput=true,RedirectStandardError=true,StandardOutputEncoding=Encoding.UTF8,StandardErrorEncoding=Encoding.UTF8};
    info.EnvironmentVariables["NETWATCH_DB"]=settings.database;info.EnvironmentVariables["NETWATCH_ICMP"]=settings.icmp?"1":"0";info.EnvironmentVariables["NETWATCH_DISCOVERY"]=settings.discovery?"1":"0";info.EnvironmentVariables["NETWATCH_DISCOVERY_ICMP"]=settings.discovery&&settings.discoveryIcmp?"1":"0";
    info.EnvironmentVariables["NETWATCH_LAN"]=settings.lan?"1":"0";
    accessInfo=null;
@@ -140,7 +159,7 @@ public class NetWatch : Form {
     if(state!="running")throw new InvalidOperationException();
     host.StandardInput.WriteLine(message);host.StandardInput.Flush();
    } else {
-    var info=new ProcessStartInfo(settings.node,"host/auth-config.js --launcher"){WorkingDirectory=settings.root,UseShellExecute=false,CreateNoWindow=true,RedirectStandardInput=true,RedirectStandardOutput=true,StandardOutputEncoding=Encoding.UTF8};
+    var info=new ProcessStartInfo(nodePath,"host/auth-config.js --launcher"){WorkingDirectory=appRoot,UseShellExecute=false,CreateNoWindow=true,RedirectStandardInput=true,RedirectStandardOutput=true,StandardOutputEncoding=Encoding.UTF8};
     info.EnvironmentVariables["NETWATCH_DB"]=settings.database;
     using(var process=Process.Start(info)) {
      process.StandardInput.WriteLine(message);process.StandardInput.Close();
