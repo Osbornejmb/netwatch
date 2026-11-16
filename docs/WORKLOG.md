@@ -1,5 +1,10 @@
 # Working checkpoint
 
+## Current status (2026-11-16) — standalone Windows installer (#12)
+
+- Built the per-user x64 installer with Node.js, production dashboard, host dependencies, and precompiled ICMP and DPAPI helpers. Setup adds a Start menu shortcut. The host remains manually started.
+- A disposable Windows installation verified the shortcut target, no automatic launch, loopback dashboard startup and clean shutdown, the bundled helper executables, and uninstall with the test database preserved. All 155 repository tests passed. The installer is unsigned. Upgrade over an existing live installation and second-PC acceptance remain pending.
+
 ## Current status (2026-11-16) — manual Windows deployment (#12)
 
 - Windows deployment uses the per-user launcher with explicit Start and Stop. The installer offers a desktop shortcut. Sign-out and reboot interrupt monitoring until the operator starts NetWatch again.

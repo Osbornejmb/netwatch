@@ -1,8 +1,27 @@
 # Windows tray and desktop controls
 
-The per-user launcher starts the existing local Node host without leaving a PowerShell window open. It is an interactive Windows application, runs in the signed-in Windows account. Requires Windows 10/11, Node 22.13+, and the existing .NET Framework v4 compiler/runtime; no new runtime dependency is installed.
+The per-user launcher runs the NetWatch host in the signed-in Windows account. Open NetWatch after signing in and click **Start**.
 
-## One-time setup
+## Standalone installer
+
+Run `NetWatch-<version>-Windows-x64-Setup.exe` on Windows 10 or 11 x64. Setup bundles Node.js, the built dashboard, host dependencies and precompiled Windows helpers. It installs to `%LOCALAPPDATA%\Programs\NetWatch` for the current user and adds a Start menu shortcut. The installer is unsigned.
+
+To update, quit NetWatch, back up the database and run the new installer. The installed launcher uses the same `%LOCALAPPDATA%\NetWatch\desktop.json` and database path as the source launcher. To roll back, quit NetWatch, uninstall the current version, install the earlier package and restore a compatible database backup if the schema changed. To uninstall, quit NetWatch and remove it from **Settings → Apps**. Settings, databases, credentials and backups stay in the per-user data directory.
+
+For terminal maintenance from the installed program folder, use `.\node.exe host/maintenance.js`, `.\node.exe host/auth-config.js` or `.\node.exe host/snmp-config.js` in place of the corresponding npm command. Use the database path shown in the launcher as `NETWATCH_DB`.
+
+### Build the installer
+
+On a Windows build machine with Node.js 22.13+, npm, the .NET Framework compiler and [Inno Setup](https://jrsoftware.org/inno-setup/downloads), run these commands from the checkout. Use a current Node.js LTS release. The builder downloads the official x64 runtime matching the build machine's Node version and checks its SHA-256 checksum.
+
+```powershell
+npm.cmd ci
+.\scripts\package-windows.ps1 -Compiler 'C:\Path\To\ISCC.exe'
+```
+
+The installer and its SHA-256 hash are reported at the end. The installer is written to `.tools\release`.
+
+## Source setup
 
 From a checkout containing the launcher:
 
@@ -18,7 +37,7 @@ The shortcut opens host controls. Click **Start**, **Stop**, **Open dashboard**,
 
 ## Inventory, monitoring and storage
 
-Default persistent data is `%LOCALAPPDATA%\NetWatch\data\netwatch.sqlite`, outside replaceable checkout/program files. This is a new, initially empty host inventory, not an automatic import of `data/netwatch.sqlite` or `phone-test.sqlite`. Existing databases/browser storage are untouched. The data path is visible in the control window; `desktop.json` records the absolute Node, checkout and database paths plus the monitoring, discovery and LAN preferences. Keep the checkout and Node executable available. To intentionally select an existing compatible database, stop both hosts, back it up, then change only `database` in this settings file to its absolute path. Re-run setup after relocating the checkout or Node.
+Default persistent data is `%LOCALAPPDATA%\NetWatch\data\netwatch.sqlite`, outside installed program files. A new data directory starts with an empty inventory. The control window shows the database path. `desktop.json` stores the selected database and monitoring, discovery and LAN preferences. Source setup also records the checkout and Node paths. Keep those paths available for the source launcher and rerun source setup if either moves. To select a compatible existing database, stop NetWatch, back up the database and set `database` to its absolute path in `desktop.json`.
 
 The **Check devices on next start** and **Discover local network neighbors on next start** checkboxes are off on first setup and apply on the next Start. Discovery is limited to directly attached IPv4 networks and its results require review. On the host PC, explicit Add to map turns on checks for that saved device; the global collector must still be enabled, and the discovery sweep does not create saved-device observations. The host/collector status is refreshed while the owned process runs. This is host process readiness, not device up/down.
 
@@ -32,7 +51,7 @@ The launcher binds the host to 127.0.0.1 on port 4317 by default. Set NETWATCH_P
 
 The launcher runs without administrator rights and never changes the firewall. If Windows displays a firewall prompt for Node, select **Private networks** only. If granting access requires an administrator in your Windows setup, ask the administrator to allow Node on the Private profile, or leave LAN sharing off. Use a unique password. A DHCP reservation can keep the URL stable. LAN sharing requires direct HTTPS. The launcher enables it when it inherits both TLS file settings.
 
-Open the launcher and click **Start** after signing in to Windows. Sleep, sign-out, shutdown or loss of network interrupts monitoring. For an update or rollback, quit NetWatch, back up the database, build the intended revision, and rerun setup. Use a compatible database backup when rolling back across schema versions. To remove the launcher, quit it and remove NetWatch.exe and the optional desktop shortcut. Keep desktop.json, the database, credentials and backups for recovery.
+Open the launcher and click **Start** after signing in to Windows. Sleep, sign-out, shutdown or loss of network interrupts monitoring. For a source update or rollback, quit NetWatch, back up the database, build the intended revision, and rerun source setup. To remove the source launcher, quit it and remove its NetWatch.exe and optional desktop shortcut. Keep `desktop.json` and the data directory for recovery.
 
 ## Verification
 

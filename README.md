@@ -12,7 +12,15 @@ Screenshots use a test inventory with documentation addresses.
 
 ## Windows setup
 
-Requirements: Windows 10/11, Node.js 22.13 or newer with npm, and the Windows .NET Framework v4 compiler/runtime used by the launcher and checks.
+Download `NetWatch-<version>-Windows-x64-Setup.exe` from the [latest GitHub release](https://github.com/Osbornejmb/netwatch/releases/latest) and run it on Windows 10 or 11 x64. The installer bundles Node.js, the dashboard and monitoring helpers. The release includes a SHA-256 checksum for the unsigned installer.
+
+Setup installs for your Windows account and adds a **NetWatch** Start menu shortcut. Open it, click **Start**, then **Open dashboard**. Before starting, select **Check devices on next start** if you want reachability checks for devices you authorize.
+
+See the [Windows launcher guide](docs/WINDOWS-LAUNCHER.md) for building the installer, updating, uninstalling and keeping your data. To build and run from source, use the steps below.
+
+### Setup from source
+
+Source setup requires Node.js 22.13 or newer with npm and the Windows .NET Framework compiler.
 
 1. Download and extract this repository into a permanent folder, or clone it.
 2. Open PowerShell in the folder containing `package.json`.
@@ -72,7 +80,7 @@ The launcher stores data under `%LOCALAPPDATA%\NetWatch\data\netwatch.sqlite`; i
 
 To share the dashboard, follow the [direct HTTPS setup](docs/REMOTE-ACCESS.md#direct-https), enable **Allow other PCs on this network**, set an admin password, choose a viewer mode, and click **Start**. Open the HTTPS URL shown in **Remote access** on the other PC.
 
-Closing the browser or hiding the control window keeps monitoring running. **Stop** stops the host; **Quit** stops it and exits the tray app. The PC must remain awake, connected and signed in. Start NetWatch manually after signing in. Setup creates an optional desktop shortcut.
+Closing the browser or hiding the control window keeps monitoring running. **Stop** stops the host. **Quit** stops it and exits the tray app. The PC must remain awake, connected and signed in. Start NetWatch manually after signing in.
 
 For a terminal-based setup, build once and run:
 

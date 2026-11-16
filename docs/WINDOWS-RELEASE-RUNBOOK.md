@@ -4,9 +4,9 @@ This runbook covers one awake, signed-in Windows host and local browsers. Keep L
 
 ## Install and first start
 
-1. Use a permanent checkout of the intended release commit. Record the commit, Windows build, `node --version` and `npm --version`. Node 22.13+ and the Windows .NET Framework v4 compiler/runtime are required.
-2. Run `npm.cmd ci`, `npm.cmd test`, and `npm.cmd run build`. A failed check is a release blocker to investigate, not a reason to delete data or bypass checks.
-3. For the interactive app, run `npm.cmd run desktop:setup -- --desktop-shortcut`. Quit an existing tray app before replacing its executable. Re-running setup preserves its database path and ICMP preference. It does not migrate an unrelated checkout database.
+1. Record the release commit and Windows build. For a packaged installation, also record the installer hash and bundled Node version. For a source installation, use a permanent checkout and record `node --version` and `npm --version`.
+2. In the build checkout, run `npm.cmd ci`, `npm.cmd test`, and `npm.cmd run build`. Investigate failures before proceeding with release acceptance.
+3. Quit any existing tray app. Run the [standalone installer](WINDOWS-LAUNCHER.md#standalone-installer) or run `npm.cmd run desktop:setup -- --desktop-shortcut` for a source install. Both use the saved database path and monitoring preference when present.
 4. Open the shortcut and confirm the host shows **Stopped** before you click **Start**. Confirm the displayed data location. First installations start empty; verify that no fixture devices appear. Existing installations preserve their devices/history.
 5. Start with ICMP disabled. Start/Open dashboard should show the local dashboard at `http://127.0.0.1:4317`. Confirm that closing the browser leaves the host running.
 6. Add only owner-approved devices in Topology editor. Export the browser map as a backup. Use Backup → Local host storage → Check host → Save to host, review and confirm replacement. Verify stable IDs/counts; editor additions and imports initially have monitoring disabled. Loading a host map replaces the browser working copy only after review.

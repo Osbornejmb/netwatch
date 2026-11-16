@@ -15,6 +15,9 @@ export function prepareWindowsHelper({
   kind = 'ping',
 } = {}) {
   if (!['ping', 'secrets'].includes(kind)) return Promise.reject(new Error('Unknown Windows helper'))
+  const bundledNode = fileURLToPath(new URL('../node.exe', import.meta.url))
+  if (process.platform === 'win32' && process.execPath.toLowerCase() === bundledNode.toLowerCase())
+    return Promise.resolve(fileURLToPath(new URL(`../helpers/${kind}.exe`, import.meta.url)))
   const source = fileURLToPath(new URL(`./windows-${kind}.cs`, import.meta.url))
   const hashFile = (path) => createHash('sha256').update(fs.readFileSync(path)).digest('hex')
   const hash = hashFile(source).slice(0, 24)
