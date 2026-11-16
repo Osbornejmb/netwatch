@@ -150,7 +150,7 @@ for (const viewport of [{width:1440,height:900},{width:390,height:844}]) {
 const empty=await browser.newContext()
 await empty.addInitScript(()=>localStorage.setItem('netwatch-topology-v1',JSON.stringify({nodes:[],edges:[]})))
 const page=await empty.newPage();await page.goto(url)
-assert.ok(await page.getByText('Your network starts here',{exact:true}).isVisible())
+await page.getByText('Your network starts here',{exact:true}).waitFor({state:'visible'})
 await empty.close()
 assert.deepEqual(errors,[])
 await writeFile(fileURLToPath(new URL('../.tools/evidence/scale-results.json',import.meta.url)),JSON.stringify(report,null,2)+'\n')
