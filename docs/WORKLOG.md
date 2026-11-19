@@ -1,5 +1,9 @@
 # Working checkpoint
 
+## Current status (2026-11-19) — launcher port setup
+
+- The Windows launcher selects a saved device, tests read-only SNMPv3 port access and protects the profile locally. It remembers whether to check ports on start. Physical Cisco validation remains pending.
+
 ## Current status (2026-11-16) — local scan recovery in 0.1.3
 
 - A local dashboard tab left open across a host restart refreshes its write token and retries a scan rejected for the stale token. The dashboard distinguishes scan cooldown, expired access, disabled discovery, and unavailable results.

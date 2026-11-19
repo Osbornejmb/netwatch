@@ -53,7 +53,7 @@ Local network discovery is opt-in through the launcher and lists neighbors on th
 
 ## Read device status
 
-An optional Windows-host SNMPv3 feature adds interface status and traffic rates under device details → **Ports**. It requires local credential enrollment and separate opt-in; it does not change ping-based device health. See [SNMP interface setup](docs/SNMP-INTERFACES.md). Cisco 3750/2811 physical verification is pending.
+An optional Windows-host SNMPv3 feature adds interface status and traffic rates under device details → **Ports**. In the Windows launcher, stop the host and choose **Port monitoring** to test and enroll a saved device for port checks; it does not change ping-based device health. See [SNMP interface setup](docs/SNMP-INTERFACES.md). Cisco 3750/2811 physical verification is pending.
 
 Use **Edit map → Uplinks & redundancy** to map ports to connections and group alternate router links. The dashboard reports group status from port readings while map line colors continue to show device reachability.
 

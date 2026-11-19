@@ -6,13 +6,14 @@ using System.Drawing;
 using System.IO;
 using System.Security.Principal;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Text;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
 
 public class DesktopSettings {
  public string node {get;set;} public string root {get;set;} public string database {get;set;} public bool icmp {get;set;} public bool discovery {get;set;} public bool discoveryIcmp {get;set;} public bool lan {get;set;}
- public bool managedSharing {get;set;}
+ public bool managedSharing {get;set;} public bool? snmp {get;set;}
 }
 public class AuditRow {public long at {get;set;} public string ip {get;set;} public string action {get;set;} public string detail {get;set;}}
 public class RemoteSession {public string role {get;set;} public string ip {get;set;} public long lastSeen {get;set;}}
@@ -41,13 +42,13 @@ public class NetWatch : Form {
  Process host;
  NotifyIcon tray;
  Label status;
- CheckBox monitoring,discovery,discoveryIcmp,lan;
+ CheckBox monitoring,discovery,discoveryIcmp,lan,portChecks;
  AccessWindow accessWindow;
  HostEvent accessInfo;
  Button start,stop,open;
  ToolStripMenuItem trayStart,trayStop,trayOpen;
  string dashboardUrl="http://127.0.0.1:4317";
- bool quitting=false;
+ bool quitting=false,settingUpPorts=false,restoringPortPreference=false;
  string state="stopped";
 
  [STAThread] public static void Main(string[] args) {
@@ -93,7 +94,7 @@ public class NetWatch : Form {
   nodePath=settings==null?null:settings.node;appRoot=settings==null?null:settings.root;
 #endif
   if(settings==null||!Path.IsPathRooted(settings.database)||!File.Exists(nodePath)||String.IsNullOrEmpty(appRoot)||!File.Exists(Path.Combine(appRoot,"host","desktop.js")))throw new Exception("NetWatch files or settings are unavailable. Check the data path and reinstall NetWatch.");
-  Text="NetWatch";ClientSize=new Size(540,444);Font=new Font(SystemFonts.MessageBoxFont.FontFamily,10);BackColor=Color.FromArgb(244,243,238);ForeColor=Color.FromArgb(37,58,54);
+  Text="NetWatch";ClientSize=new Size(540,484);Font=new Font(SystemFonts.MessageBoxFont.FontFamily,10);BackColor=Color.FromArgb(244,243,238);ForeColor=Color.FromArgb(37,58,54);
   FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;Icon=SystemIcons.Application;
   var title=new Label{Text="Your network, at a glance",Font=new Font(Font,FontStyle.Bold),Location=new Point(20,18),AutoSize=true};Controls.Add(title);
   status=new Label{Text="Stopped",Location=new Point(20,55),Size=new Size(500,65),AccessibleName="Host status"};Controls.Add(status);
@@ -121,8 +122,20 @@ public class NetWatch : Form {
   }catch(Exception ex){MessageBox.Show(ex.Message,"Unable to save settings");}};Controls.Add(lan);
   var access=new Button{Text="Remote access…",Location=new Point(350,251),Size=new Size(170,38)};
   access.Click+=(s,e)=>ShowAccess();Controls.Add(access);
-  var data=new TextBox{Text="Saved data: "+settings.database,ReadOnly=true,Multiline=true,BorderStyle=BorderStyle.None,BackColor=BackColor,ForeColor=ForeColor,Location=new Point(20,302),Size=new Size(500,40),AccessibleName="Saved data location"};Controls.Add(data);
-  Controls.Add(new Label{Text="Discovery lists nearby devices for review; it never enables monitoring.\nICMP discovery is separately optional. Saved devices need their own approval.\nStop or Quit pauses the host; sign-out also stops it.",Location=new Point(20,350),Size=new Size(500,70)});
+  portChecks=new CheckBox{Text="Check ports on next start",Checked=settings.snmp??(Environment.GetEnvironmentVariable("NETWATCH_SNMP")=="1"),Location=new Point(20,305),AutoSize=true};
+  portChecks.CheckedChanged+=(s,e)=>{
+   if(!restoringPortPreference&&!SavePortPreference(portChecks.Checked)) {
+    restoringPortPreference=true;
+    portChecks.Checked=settings.snmp??(Environment.GetEnvironmentVariable("NETWATCH_SNMP")=="1");
+    restoringPortPreference=false;
+    MessageBox.Show(this,"Could not save the port check setting.","Port monitoring");
+   }
+  };
+  Controls.Add(portChecks);
+  var ports=new Button{Text="Port monitoring…",Location=new Point(350,294),Size=new Size(170,38)};
+  ports.Click+=(s,e)=>ShowPortSetup();Controls.Add(ports);
+  var data=new TextBox{Text="Saved data: "+settings.database,ReadOnly=true,Multiline=true,BorderStyle=BorderStyle.None,BackColor=BackColor,ForeColor=ForeColor,Location=new Point(20,348),Size=new Size(500,40),AccessibleName="Saved data location"};Controls.Add(data);
+  Controls.Add(new Label{Text="Discovery lists nearby devices for review; it never enables monitoring.\nICMP discovery is separately optional. Saved devices need their own approval.\nStop or Quit pauses the host; sign-out also stops it.",Location=new Point(20,397),Size=new Size(500,70)});
   foreach(Control control in Controls){var button=control as Button;if(button!=null){button.FlatStyle=FlatStyle.Flat;button.BackColor=Color.FromArgb(252,251,247);button.ForeColor=ForeColor;button.FlatAppearance.BorderColor=Color.FromArgb(170,183,172);button.UseVisualStyleBackColor=false;}}
   var menu=new ContextMenuStrip{BackColor=Color.FromArgb(252,251,247),ForeColor=ForeColor,Renderer=new ToolStripProfessionalRenderer(new NetWatchMenuColors())};menu.Items.Add("Show controls",null,(s,e)=>ShowControls());
   trayStart=new ToolStripMenuItem("Start",null,(s,e)=>StartHost());menu.Items.Add(trayStart);
@@ -153,13 +166,14 @@ public class NetWatch : Form {
   status.Text=message;status.AccessibleName="NetWatch status: "+message;tray.Text="NetWatch: "+next;
   bool idle=host==null;
   start.Enabled=trayStart.Enabled=idle&&!quitting;stop.Enabled=trayStop.Enabled=!idle&&next!="stopping";
-  open.Enabled=trayOpen.Enabled=next=="running";monitoring.Enabled=discovery.Enabled=lan.Enabled=idle;discoveryIcmp.Enabled=idle&&settings.discovery;
+  open.Enabled=trayOpen.Enabled=next=="running";monitoring.Enabled=discovery.Enabled=lan.Enabled=portChecks.Enabled=idle;discoveryIcmp.Enabled=idle&&settings.discovery;
  }
  void StartHost() {
-  if(host!=null)return;
+  if(host!=null||settingUpPorts)return;
   try {
    var info=new ProcessStartInfo(nodePath,"host/desktop.js"){WorkingDirectory=appRoot,UseShellExecute=false,CreateNoWindow=true,RedirectStandardInput=true,RedirectStandardOutput=true,RedirectStandardError=true,StandardOutputEncoding=Encoding.UTF8,StandardErrorEncoding=Encoding.UTF8};
    info.EnvironmentVariables["NETWATCH_DB"]=settings.database;info.EnvironmentVariables["NETWATCH_ICMP"]=settings.icmp?"1":"0";info.EnvironmentVariables["NETWATCH_DISCOVERY"]=settings.discovery?"1":"0";info.EnvironmentVariables["NETWATCH_DISCOVERY_ICMP"]=settings.discovery&&settings.discoveryIcmp?"1":"0";
+   if(settings.snmp.HasValue)info.EnvironmentVariables["NETWATCH_SNMP"]=settings.snmp.Value?"1":"0";
    info.EnvironmentVariables["NETWATCH_LAN"]=settings.lan?"1":"0";
 #if PACKAGED
    if(settings.managedSharing&&!(settings.lan&&ManualTlsConfigured())) {
@@ -197,6 +211,9 @@ public class NetWatch : Form {
   var request=new Dictionary<string,string>{{"command",command}};
   if(mode!=null)request["mode"]=mode;
   if(password!=null){request["password"]=password;request["confirm"]=confirm;}
+  return SerializeRequest(request);
+ }
+ static string SerializeRequest(object request) {
   return Regex.Replace(new JavaScriptSerializer().Serialize(request),@"[^\x00-\x7F]",m=>"\\u"+((int)m.Value[0]).ToString("x4"));
  }
  static HostEvent LocalAccess(string root,string node,string database,string message) {
@@ -303,9 +320,170 @@ public class NetWatch : Form {
   MessageBox.Show(accessWindow,"On the viewing PC:\n1. Open the connection file you saved from this PC. Choose Install Certificate, then Current User.\n2. Choose Place all certificates in the following store. Browse to Trusted Root Certification Authorities and finish.\n3. Open the address from Copy URL in your browser. Enter the viewing password if prompted.","Connect another PC",MessageBoxButtons.OK,MessageBoxIcon.Information);
  }
 #endif
+ bool SavePortPreference(bool enabled) {
+  if(settings.snmp==enabled)return true;
+  bool? previous=settings.snmp;
+  string staged=settingsPath+"."+Guid.NewGuid().ToString("N")+".tmp";
+  try {
+   settings.snmp=enabled;
+   File.WriteAllText(staged,json.Serialize(settings));
+   if(File.Exists(settingsPath))File.Replace(staged,settingsPath,null);
+   else File.Move(staged,settingsPath);
+   return true;
+  } catch {
+   settings.snmp=previous;
+   return false;
+  } finally {
+   try {File.Delete(staged);}catch(IOException){}catch(UnauthorizedAccessException){}
+  }
+ }
+ void ShowPortSetup() {
+  if(settingUpPorts)return;
+  if(host!=null) {
+   MessageBox.Show(this,"Stop NetWatch, then reopen Port monitoring. Start NetWatch again when setup is complete.","Port monitoring");
+   return;
+  }
+  settingUpPorts=true;
+  try {
+   using(var dialog=new PortSetupWindow(RunPortSetup,()=>{
+    if(!SavePortPreference(true))return false;
+    portChecks.Checked=true;
+    return true;
+   }))dialog.ShowDialog(this);
+  } finally {settingUpPorts=false;}
+ }
+ async Task<PortSetupResult> RunPortSetup(object request) {
+  var info=new ProcessStartInfo(nodePath,"host/snmp-config.js --launcher"){
+   WorkingDirectory=appRoot,UseShellExecute=false,CreateNoWindow=true,
+   RedirectStandardInput=true,RedirectStandardOutput=true,StandardOutputEncoding=Encoding.UTF8
+  };
+  info.EnvironmentVariables["NETWATCH_DB"]=settings.database;
+  using(var process=Process.Start(info)) {
+   process.StandardInput.WriteLine(SerializeRequest(request));
+   process.StandardInput.Close();
+   var output=process.StandardOutput.ReadToEndAsync();
+   if(!await Task.Run(()=>process.WaitForExit(35000))){
+    process.Kill();
+    throw new InvalidOperationException();
+   }
+   if(process.ExitCode!=0)throw new InvalidOperationException();
+   return json.Deserialize<PortSetupResult>(await output);
+  }
+ }
  void StopHost(){if(host==null)return;try{host.StandardInput.WriteLine("stop");host.StandardInput.Flush();SetState("stopping","Finishing checks and saving your data…");}catch(Exception ex){SetState("error",ex.Message);}}
  void OpenDashboard(){try{Process.Start(new ProcessStartInfo(dashboardUrl){UseShellExecute=true});}catch(Exception ex){MessageBox.Show(ex.Message,"Unable to open browser");}}
- void Quit(){quitting=true;if(host==null)Application.Exit();else StopHost();}
+ void Quit(){if(settingUpPorts)return;quitting=true;if(host==null)Application.Exit();else StopHost();}
+}
+
+public class PortSetupDevice {
+ public string id {get;set;} public string label {get;set;} public string address {get;set;} public string type {get;set;} public bool configured {get;set;}
+ public override string ToString(){return label+" ("+address+")"+(configured?" · configured":"");}
+}
+public class PortSetupResult {
+ public PortSetupDevice[] devices {get;set;} public int portCount {get;set;} public string error {get;set;}
+}
+public class PortSetupWindow : Form {
+ readonly Func<object,Task<PortSetupResult>> request;
+ readonly Func<bool> enableOnStart;
+ readonly ComboBox devices,algorithm;
+ readonly TextBox username,authentication,privacy;
+ readonly Label status;
+ readonly Button test,enable,close;
+ bool busy,tested;
+ public PortSetupWindow(Func<object,Task<PortSetupResult>> request,Func<bool> enableOnStart) {
+  this.request=request;
+  this.enableOnStart=enableOnStart;
+  Text="Port monitoring";ClientSize=new Size(480,466);StartPosition=FormStartPosition.CenterParent;
+  FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=false;MinimizeBox=false;
+  BackColor=Color.FromArgb(244,243,238);ForeColor=Color.FromArgb(37,58,54);
+
+  AddLabel("Use the device’s read-only SNMPv3 account with AES-128 privacy.",16,42);
+  AddLabel("Saved device",66,22);
+  devices=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Location=new Point(16,91),Width=448,AccessibleName="Saved device"};
+  Controls.Add(devices);
+  AddLabel("Authentication algorithm",128,22);
+  algorithm=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Location=new Point(16,153),Width=448,AccessibleName="Authentication algorithm"};
+  algorithm.Items.AddRange(new object[]{"SHA-256","SHA-1"});
+  algorithm.SelectedIndex=0;Controls.Add(algorithm);
+  username=AddSecret("SNMP username",190,32);
+  authentication=AddSecret("Authentication password",244,128);
+  privacy=AddSecret("Privacy password",298,128);
+  status=AddLabel("Reading saved devices…",352,56);
+  test=AddButton("Test connection",16,132);
+  enable=AddButton("Enable monitoring",157,152);
+  close=AddButton("Close",364,100);
+  close.DialogResult=DialogResult.Cancel;CancelButton=close;
+  test.Click+=async (s,e)=>await Submit(false);
+  enable.Click+=async (s,e)=>await Submit(true);
+  devices.SelectedIndexChanged+=(s,e)=>ClearTest();
+  algorithm.SelectedIndexChanged+=(s,e)=>ClearTest();
+  username.TextChanged+=(s,e)=>ClearTest();
+  authentication.TextChanged+=(s,e)=>ClearTest();
+  privacy.TextChanged+=(s,e)=>ClearTest();
+  FormClosing+=(s,e)=>{if(busy&&e.CloseReason==CloseReason.UserClosing)e.Cancel=true;};
+  Shown+=async (s,e)=>await LoadDevices();
+ }
+ Label AddLabel(string text,int top,int height) {
+  var label=new Label{Text=text,Location=new Point(16,top),Size=new Size(448,height)};
+  Controls.Add(label);return label;
+ }
+ TextBox AddSecret(string label,int top,int length) {
+  AddLabel(label,top,22);
+  var input=new TextBox{Location=new Point(16,top+23),Width=448,MaxLength=length,UseSystemPasswordChar=true,AccessibleName=label};
+  Controls.Add(input);return input;
+ }
+ Button AddButton(string text,int left,int width) {
+  var button=new Button{Text=text,Location=new Point(left,410),Size=new Size(width,40),FlatStyle=FlatStyle.Flat,
+   BackColor=Color.FromArgb(252,251,247),ForeColor=ForeColor,UseVisualStyleBackColor=false};
+  button.FlatAppearance.BorderColor=Color.FromArgb(170,183,172);
+  Controls.Add(button);return button;
+ }
+ void ClearTest() {
+  if(tested)status.Text="Test the connection again after changing the device or credentials.";
+  tested=false;
+  UpdateControls();
+ }
+ void UpdateControls() {
+  bool ready=!busy&&devices.SelectedItem!=null;
+  devices.Enabled=!busy&&devices.Items.Count>0;
+  algorithm.Enabled=username.Enabled=authentication.Enabled=privacy.Enabled=ready;
+  test.Enabled=ready;enable.Enabled=ready&&tested;close.Enabled=!busy;
+ }
+ async Task LoadDevices() {
+  busy=true;UpdateControls();
+  try {
+   var result=await request(new {command="list"});
+   devices.Items.AddRange(result.devices);
+   if(devices.Items.Count>0)devices.SelectedIndex=0;
+   status.Text=devices.Items.Count>0?"Select a saved device and enter its SNMP credentials.":"Add a device with a management IP to the saved map first.";
+  } catch {status.Text="Could not read saved devices. Make sure the NetWatch host is stopped.";}
+  finally {busy=false;UpdateControls();}
+ }
+ async Task Submit(bool save) {
+  var device=(PortSetupDevice)devices.SelectedItem;
+  tested=false;busy=true;UpdateControls();
+  status.Text=save?"Checking the connection and protecting credentials…":"Checking the switch or router for readable ports…";
+  try {
+   var result=await request(new {
+    command=save?"enable":"test",id=device.id,address=device.address,type=device.type,
+    user=new {name=username.Text,authProtocol=algorithm.SelectedIndex==0?"sha256":"sha",authKey=authentication.Text,privKey=privacy.Text}
+   });
+   if(result.error!=null){status.Text=result.error;return;}
+   if(!save) {
+    tested=true;
+    status.Text="Connection passed. Read "+result.portCount+" port(s).";
+    return;
+   }
+   username.Clear();authentication.Clear();privacy.Clear();
+   int index=devices.SelectedIndex;
+   device.configured=true;
+   devices.Items[index]=device;
+   devices.SelectedIndex=index;
+   bool enabled=enableOnStart();
+   status.Text=enabled?"Monitoring saved. Close this window and start NetWatch.":"Credentials saved. Turn on Check ports on next start in the launcher.";
+  } catch {status.Text="Port setup could not finish. Make sure the host is stopped and try again.";}
+  finally {busy=false;UpdateControls();}
+ }
 }
 
 public class AccessWindow : Form {
