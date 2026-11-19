@@ -66,13 +66,15 @@ test('launcher setup tests the selected saved address before authorizing port ch
 test('Windows launcher helper lists enrolled devices from the configured database over stdio',{skip:process.platform!=='win32'},t=>{
  const {store,path}=fixture(t)
  store.close()
- const response=spawnSync(process.execPath,['host/snmp-config.js','--launcher'],{
-  env:{...process.env,NETWATCH_DB:path},input:'{"command":"list"}\n',encoding:'utf8',timeout:10000
- })
- assert.equal(response.status,0,response.stderr)
- assert.deepEqual(JSON.parse(response.stdout),{devices:[
-  {id:'a',label:'Fixture',address:'192.0.2.1',type:'switch',configured:true}
- ]})
+ for(const prefix of ['', '\uFEFF']) {
+  const response=spawnSync(process.execPath,['host/snmp-config.js','--launcher'],{
+   env:{...process.env,NETWATCH_DB:path},input:prefix+'{"command":"list"}\r\n',encoding:'utf8',timeout:10000
+  })
+  assert.equal(response.status,0,response.stderr)
+  assert.deepEqual(JSON.parse(response.stdout),{devices:[
+   {id:'a',label:'Fixture',address:'192.0.2.1',type:'switch',configured:true}
+  ]})
+ }
 })
 test('SNMPv3 reader is read-only, bounded and literal-targeted; counters retain 64-bit precision',async()=>{
  const session=fakeSession();let args
