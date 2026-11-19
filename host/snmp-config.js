@@ -62,7 +62,8 @@ async function readLauncherRequest() {
     data += chunk
     if (data.length > 8192) throw new Error('Invalid setup command.')
   }
-  return JSON.parse(data)
+  // Windows can prefix redirected stdin with a UTF-8 byte-order mark.
+  return JSON.parse(data.replace(/^\uFEFF/, ''))
 }
 
 async function visible(question) {
