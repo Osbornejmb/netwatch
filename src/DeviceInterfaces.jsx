@@ -111,7 +111,7 @@ export default function DeviceInterfaces({ deviceId, revision, remote, viewer })
                 ? 'Change this on the NetWatch PC'
                 : remote
                   ? 'Port checks are not set up.'
-                  : 'On the NetWatch PC, choose Port monitoring in the Windows launcher to set up port checks.'
+                  : 'Port checks are not set up. On the NetWatch PC, choose Port monitoring in the Windows launcher.'
               : page.monitoring.collectorState === 'disabled'
                 ? 'Port checks are paused.'
                 : !current
