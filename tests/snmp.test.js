@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import {spawnSync} from 'node:child_process'
 import {EventEmitter} from 'node:events'
 import {mkdtempSync,rmSync,readFileSync,readdirSync} from 'node:fs'
 import {join} from 'node:path'
@@ -14,6 +15,7 @@ import {createHost} from '../host/server.js'
 import {backupDatabase,restoreDatabase} from '../host/maintenance.js'
 import {validateInterfaces,interfaceRates} from '../host/interfaces.js'
 import {createSnmpProbe,INTERFACE_OIDS,validateSnmpUser} from '../host/snmp-probe.js'
+import {manageLauncherSnmp} from '../host/snmp-config.js'
 import {createInterfaceCollector} from '../host/snmp-collector.js'
 import {createCredentialVault,credentialDirectory} from '../host/snmp-secrets.js'
 
@@ -36,6 +38,42 @@ function fakeSession({malformed=false,stall=false,missing=false,endless=false}={
  }
  return session
 }
+test('launcher setup tests the selected saved address before authorizing port checks',async t=>{
+ const {store,authorization}=fixture(t)
+ let profile,probes=0
+ const vault={save:async value=>{profile=value}}
+ const probe=async (address,credentials)=>{
+  probes++
+  assert.equal(address,'192.0.2.1')
+  assert.deepEqual(credentials,user)
+  return sample()
+ }
+ const request={id:'a',address:'192.0.2.1',type:'switch',user}
+ assert.deepEqual(await manageLauncherSnmp(store,vault,{command:'list'}),{
+  devices:[{id:'a',label:'Fixture',address:'192.0.2.1',type:'switch',configured:true}]
+ })
+ assert.ok((await manageLauncherSnmp(store,vault,{...request,command:'enable',address:'192.0.2.2'},probe)).error)
+ assert.equal(probes,0)
+ assert.deepEqual(await manageLauncherSnmp(store,vault,{...request,command:'test'},probe),{portCount:1})
+ assert.ok((await manageLauncherSnmp(store,vault,{...request,command:'enable'},async()=>({error:'snmp_failed'}))).error)
+ assert.equal(profile,undefined)
+ assert.equal(store.interfaceTargets()[0].authorization,authorization)
+ assert.deepEqual(await manageLauncherSnmp(store,vault,{...request,command:'enable'},probe),{portCount:1})
+ assert.notEqual(profile.authorization,authorization)
+ assert.equal(store.interfaceTargets()[0].authorization,profile.authorization)
+ assert.deepEqual(profile.user,user)
+})
+test('Windows launcher helper lists enrolled devices from the configured database over stdio',{skip:process.platform!=='win32'},t=>{
+ const {store,path}=fixture(t)
+ store.close()
+ const response=spawnSync(process.execPath,['host/snmp-config.js','--launcher'],{
+  env:{...process.env,NETWATCH_DB:path},input:'{"command":"list"}\n',encoding:'utf8',timeout:10000
+ })
+ assert.equal(response.status,0,response.stderr)
+ assert.deepEqual(JSON.parse(response.stdout),{devices:[
+  {id:'a',label:'Fixture',address:'192.0.2.1',type:'switch',configured:true}
+ ]})
+})
 test('SNMPv3 reader is read-only, bounded and literal-targeted; counters retain 64-bit precision',async()=>{
  const session=fakeSession();let args
  const probe=createSnmpProbe({createSession:(...a)=>{args=a;return session}})
