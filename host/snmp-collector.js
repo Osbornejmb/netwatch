@@ -18,6 +18,7 @@ export function createInterfaceCollector(
     stopped = false
   const devices = new Map(),
     neighbors = new Map(),
+    switchPorts = new Map(),
     info = {
       state: !enabled ? 'disabled' : platform !== 'win32' ? 'unsupported' : 'starting',
       lastSeenAt: null,
@@ -42,6 +43,7 @@ export function createInterfaceCollector(
     const ids = new Set(targets.map((t) => t.deviceId))
     for (const id of devices.keys()) if (!ids.has(id)) devices.delete(id)
     for (const id of neighbors.keys()) if (!ids.has(id)) neighbors.delete(id)
+    for (const id of switchPorts.keys()) if (!ids.has(id)) switchPorts.delete(id)
     if (!targets.length) {
       info.state = 'idle'
       info.lastSeenAt = stamp()
@@ -82,7 +84,10 @@ export function createInterfaceCollector(
               return { error: 'credentials_unavailable' }
             }
             if (targetController.signal.aborted || store.revision() !== revision) return { error: 'cancelled' }
-            return runner(target.address, user, { signal: targetController.signal })
+            return runner(target.address, user, {
+              signal: targetController.signal,
+              collectSwitchPorts: target.type === 'switch',
+            })
           })()
           const value = await Promise.race([operation, interrupted])
           if (signal.aborted || store.revision() !== revision) break
@@ -93,6 +98,9 @@ export function createInterfaceCollector(
                 : 'snmp_failed',
             )
           store.appendInterfaces(target.deviceId, value, { revision, authorization: target.authorization })
+          if (value.switchPorts)
+            switchPorts.set(target.deviceId, { ...target, checkedAt: value.checkedAt, ports: value.switchPorts })
+          else switchPorts.delete(target.deviceId)
           const prior = neighbors.get(target.deviceId)
           if (value.lldp?.checkedAt)
             neighbors.set(target.deviceId, { ...value.lldp, authorization: target.authorization })
@@ -101,6 +109,7 @@ export function createInterfaceCollector(
           else neighbors.delete(target.deviceId)
           devices.set(target.deviceId, { state: 'ok', lastAttemptAt: stamp() })
         } catch (error) {
+          switchPorts.delete(target.deviceId)
           const prior = neighbors.get(target.deviceId)
           if (prior?.authorization === target.authorization)
             neighbors.set(target.deviceId, { ...prior, state: 'stale' })
@@ -160,6 +169,26 @@ export function createInterfaceCollector(
     runOnce,
     snapshot: () => ({ ...info, freshness: { staleAfterMs: freshness() } }),
     device: (id) => ({ ...devices.get(id), collectorState: info.state, staleAfterMs: freshness() }),
+    switchPorts() {
+      const matches = new Map()
+      if (stopped || !enabled || platform !== 'win32') return matches
+      for (const target of store.interfaceTargets()) {
+        const sample = switchPorts.get(target.deviceId)
+        if (
+          target.type !== 'switch' ||
+          sample?.address !== target.address ||
+          sample.authorization !== target.authorization
+        )
+          continue
+        const age = now() - Date.parse(sample.checkedAt)
+        if (!Number.isFinite(age) || age < 0 || age > freshness()) continue
+        for (const { mac, index, name } of sample.ports) {
+          if (!matches.has(mac)) matches.set(mac, [])
+          matches.get(mac).push({ switchId: target.deviceId, index, name })
+        }
+      }
+      return matches
+    },
     neighbors(id) {
       const target = store.interfaceTargets().find((row) => row.deviceId === id)
       if (!target) return { state: 'unconfigured', neighbors: [] }

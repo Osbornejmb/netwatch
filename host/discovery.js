@@ -165,6 +165,7 @@ export function createDiscovery(
     },
     pingRunner = async () => ({ outcome: 'error', code: 'unsupported_platform' }),
     nameLookup,
+    onDiscovery,
     probeGate = async (task) => task(),
     now = () => Date.now(),
     policy = DISCOVERY_POLICY,
@@ -245,6 +246,16 @@ export function createDiscovery(
             }
           })
           await Promise.all(workers)
+          // Successful pings can populate the Windows neighbor cache during this scan.
+          if (!controller.signal.aborted && [...byIp.values()].some(({ source }) => source === 'icmp')) {
+            const refreshed = await runner({ signal: controller.signal }).catch(() => '')
+            for (const neighbor of parseNeighbors(refreshed, now())) {
+              if (byIp.get(neighbor.ip)?.source !== 'icmp') continue
+              if (knownMacs.has(neighbor.mac))
+                neighbor.source = knownByIp.get(neighbor.ip) === neighbor.mac ? 'gateway' : 'gateway-mac'
+              byIp.set(neighbor.ip, neighbor)
+            }
+          }
         }
         if (controller.signal.aborted) throw Error('cancelled')
         progress = { phase: 'names', processed: 0, total: Math.min(byIp.size, 128) }
@@ -264,7 +275,9 @@ export function createDiscovery(
         if (active && gateways.size) await traceUpstream(gateways, allowed, controller.signal)
         if (controller.signal.aborted) throw Error('cancelled')
         progress = { phase: 'saving', processed: progress.total, total: progress.total }
-        store.recordDiscovery([...byIp.values()])
+        const rows = [...byIp.values()]
+        store.recordDiscovery(rows)
+        await onDiscovery?.(rows, controller.signal)
         lastRunAt = new Date(now()).toISOString()
       } catch (e) {
         diagnostics = [

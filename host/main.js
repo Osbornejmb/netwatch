@@ -15,6 +15,7 @@ import { prepareWindowsHelper } from './windows-helper.js'
 import { createCredentialVault, credentialDirectory } from './snmp-secrets.js'
 import { createInterfaceCollector } from './snmp-collector.js'
 import { createDiscovery } from './discovery.js'
+import { linkScannedSwitchPorts } from './switch-ports.js'
 import { createProbeGate } from './probe-gate.js'
 const port = readPort()
 const allowLan = process.env.NETWATCH_LAN === '1'
@@ -59,6 +60,11 @@ const discovery = createDiscovery(store, {
   pingRunner: (ip, { signal }) => runner(ip, { signal }),
   probeGate,
   maxPrefix: discoveryPrefix,
+  async onDiscovery(rows, signal) {
+    if (!rows.some(({ mac }) => mac)) return
+    await interfaces.runOnce()
+    if (!signal.aborted) linkScannedSwitchPorts(store, interfaces.switchPorts(), rows)
+  },
 })
 const audit = createAudit(store.db)
 audit.purge()

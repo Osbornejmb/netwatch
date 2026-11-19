@@ -2,11 +2,27 @@ import { createHash, randomUUID } from 'node:crypto'
 import { connectionKey } from '../../src/connections.js'
 import { invalid } from '../store.js'
 import { queryNumber } from './query.js'
+import { saveSwitchPortLink, switchPortFor } from '../switch-ports.js'
 
-export function listDiscovered({ store, url }) {
+export function listDiscovered({ store, url, interfaces }) {
   const pending = store.pendingDiscovery()
+  const page = store.discovered({
+    after: queryNumber(url, 'after', 0),
+    limit: queryNumber(url, 'limit', 100),
+    includeMisses: true,
+  })
+  const ports = interfaces?.switchPorts?.()
+  const nodes = ports?.size ? store.read().topology.nodes : []
+  const byId = new Map(nodes.map((node) => [node.id, node]))
+  const byIp = new Map(nodes.map((node) => [node.data.ip, node]))
+  page.devices = page.devices.map(({ misses, ...device }) => {
+    if (misses || !ports?.size) return device
+    const port = switchPortFor(ports, byIp.get(device.ip) ?? { data: { ip: device.ip } }, device)
+    const owner = port && byId.get(port.switchId)
+    return owner ? { ...device, switchPort: { switch: owner.data.label || owner.data.ip, name: port.name } } : device
+  })
   return {
-    ...store.discovered({ after: queryNumber(url, 'after', 0), limit: queryNumber(url, 'limit', 100) }),
+    ...page,
     pendingCount: pending.length,
     pendingVersion: pendingVersion(pending),
   }
@@ -31,7 +47,7 @@ export function removeDiscovered({ store, id }) {
   return { ok: true }
 }
 
-export async function addDiscoveredToMap({ store, discovery, id, body, source = 'local' }) {
+export async function addDiscoveredToMap({ store, discovery, interfaces, id, body, source = 'local' }) {
   const bulk = id === undefined
   const discovered = bulk ? null : store.discoveredDevice(id)
   if (!bulk && !discovered) throw invalid('Discovered device not found.', 404)
@@ -58,6 +74,7 @@ export async function addDiscoveredToMap({ store, discovery, id, body, source = 
   const links = new Set(topology.edges.map(connectionKey))
   const updates = []
   const routes = []
+  const ports = interfaces?.switchPorts?.() ?? new Map()
   let promotedRouter = false,
     discoveryLink = null,
     addedCount = 0
@@ -65,7 +82,7 @@ export async function addDiscoveredToMap({ store, discovery, id, body, source = 
   for (const item of items) {
     const gatewayIp = gatewayFor?.(item.ip)
     const isRouter = item.ip === gatewayIp || item.source === 'gateway-mac'
-    let node = bulk ? nodesByIp.get(item.ip) : nodesById.get(item.savedDeviceId)
+    let node = nodesById.get(item.savedDeviceId) ?? (item.status === 'added' ? null : nodesByIp.get(item.ip))
     if (item.status === 'added' && !node) throw invalid('The saved device is missing from the map.', 409)
     if (!node) {
       node = {
@@ -86,7 +103,9 @@ export async function addDiscoveredToMap({ store, discovery, id, body, source = 
       promotedRouter = true
     }
     if (item.status !== 'added') updates.push([item.id, node.id])
-    routes.push([node.id, gatewayIp])
+    const port = !item.misses && switchPortFor(ports, node, item)
+    if (port) discoveryLink = saveSwitchPortLink(topology, node, port) ?? discoveryLink
+    else routes.push([node.id, gatewayIp])
   }
 
   for (const [deviceId, gatewayIp] of routes) {

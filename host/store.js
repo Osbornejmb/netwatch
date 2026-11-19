@@ -350,7 +350,7 @@ export function openStore(
     discoveredDevice(id) {
       return db
         .prepare(
-          'SELECT ip, hostname, source, status, saved_device_id AS savedDeviceId FROM discovered_devices WHERE id=?',
+          'SELECT ip, mac, hostname, source, status, misses, saved_device_id AS savedDeviceId FROM discovered_devices WHERE id=?',
         )
         .get(id)
     },
@@ -364,7 +364,7 @@ export function openStore(
         )
         .all()
     },
-    discovered({ after = 0, limit = 100 } = {}) {
+    discovered({ after = 0, limit = 100, includeMisses = false } = {}) {
       if (!Number.isSafeInteger(after) || after < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 200)
         throw invalid('Invalid discovery pagination.')
       const rows = db
@@ -381,6 +381,7 @@ export function openStore(
           lastSeen: new Date(r.last_seen).toISOString(),
           status: r.status,
           savedDeviceId: r.saved_device_id,
+          ...(includeMisses && { misses: r.misses }),
         })),
         nextAfter: rows.length > limit ? rows[limit - 1].cursor : null,
       }
