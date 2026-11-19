@@ -2,6 +2,7 @@ import snmp from 'net-snmp'
 import { normalizeAddress } from '../src/inventory.js'
 import { INTERFACE_POLICY as POLICY, validateInterfaces } from './interfaces.js'
 import { readLldp } from './lldp.js'
+import { readSwitchPorts } from './switch-ports.js'
 
 export const INTERFACE_OIDS = Object.freeze({
   description: '1.3.6.1.2.1.2.2.1.2',
@@ -70,7 +71,7 @@ export function createSnmpProbe({
   now = () => Date.now(),
   policy = POLICY,
 } = {}) {
-  return async (address, credentials, { signal } = {}) => {
+  return async (address, credentials, { signal, collectSwitchPorts = false } = {}) => {
     let session, timer, onAbort, rejectActive
     try {
       const target = normalizeAddress(address)
@@ -192,10 +193,14 @@ export function createSnmpProbe({
           }
         }),
       })
+      const lldp = await readLldp(request, interfaces.checkedAt).catch(() => ({ state: 'unavailable' }))
+      if (!collectSwitchPorts) return { ...interfaces, lldp }
       try {
-        return { ...interfaces, lldp: await readLldp(request, interfaces.checkedAt) }
+        const ports = await readSwitchPorts(request, interfaces.interfaces, policy)
+        if ((await uptime()) < endUptime) throw new Error('Switch restarted')
+        return { ...interfaces, lldp, switchPorts: ports }
       } catch {
-        return { ...interfaces, lldp: { state: 'unavailable' } }
+        return { ...interfaces, lldp }
       }
     } catch (error) {
       return {

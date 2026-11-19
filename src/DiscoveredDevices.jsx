@@ -76,7 +76,7 @@ export default function DiscoveredDevices({ remote }) {
           : result.promotedRouter
             ? 'Updated device to Router.'
             : result.discoveryLink
-              ? `Linked to ${result.discoveryLink.label}`
+              ? `Linked to ${result.discoveryLink.label}${result.discoveryLink.port ? ` · ${result.discoveryLink.port}` : ''}`
               : kind === 'remove'
                 ? 'Removed from discovered devices.'
                 : device.status === 'added'
@@ -297,10 +297,19 @@ export default function DiscoveredDevices({ remote }) {
                   {device.source === 'gateway-mac' && device.status !== 'gone' && (
                     <span>Likely router · Matches known gateway</span>
                   )}
+                  {device.switchPort && (
+                    <span>
+                      Seen on {device.switchPort.switch} · {device.switchPort.name}
+                    </span>
+                  )}
                 </div>
                 <div className="discovery-actions">
                   <button className="button secondary" disabled={busy} onClick={() => action(device, 'add-to-map')}>
-                    {device.status === 'added' ? 'Update gateway link' : 'Add to map'}
+                    {device.status === 'added'
+                      ? device.switchPort
+                        ? 'Update port link'
+                        : 'Update gateway link'
+                      : 'Add to map'}
                   </button>
                   <button
                     className="button secondary"
