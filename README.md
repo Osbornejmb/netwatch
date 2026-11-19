@@ -1,6 +1,6 @@
 # NetWatch
 
-NetWatch is a Windows network-monitoring dashboard with a topology editor, device reachability checks and recent history. A fresh installation starts with an empty network. There are no built-in devices, example addresses, demo statuses or preview mode.
+NetWatch helps you see which switches, routers, and other devices on your network are responding. You start with an empty map and add the devices you want to check.
 
 ## Screenshots
 
@@ -10,46 +10,72 @@ Screenshots use a test inventory with documentation addresses.
 | --- | --- | --- |
 | <img src="docs/screenshots/desktop-after.png" alt="Network dashboard with connected routers and switches, device status counts, and a Needs attention row" width="380"> | <img src="docs/screenshots/editor-after.png" alt="Draft topology editor with an editable network map and controls for adding device connections" width="380"> | <img src="docs/screenshots/devices-narrow-after.png" alt="Narrow Devices view with stacked status cards and the Backups menu open" width="180"> |
 
-## Windows setup
+## Set up NetWatch on Windows
 
-Download `NetWatch-<version>-Windows-x64-Setup.exe` from the [latest GitHub release](https://github.com/Osbornejmb/netwatch/releases/latest) and run it on Windows 10 or 11 x64. The installer bundles Node.js, the dashboard and monitoring helpers. The release includes a SHA-256 checksum for the unsigned installer.
+### 1. Install NetWatch
 
-Setup installs for your Windows account and adds a **NetWatch** Start menu shortcut. Open it, click **Start**, then **Open dashboard**. Before starting, select **Check devices on next start** if you want reachability checks for devices you authorize.
+1. On the Windows 10 or 11 PC you want to use for monitoring, open the [latest NetWatch release](https://github.com/Osbornejmb/netwatch/releases/latest).
+2. Under **Assets**, download the file whose name ends in **Windows-x64-Setup.exe**. This is the installer for 64-bit Windows PCs with Intel or AMD processors. It includes everything NetWatch needs to run.
+3. Open the downloaded file and follow the prompts. For your first setup, leave **Set up access from another PC on my private network** unchecked. You can [set up sharing later](docs/REMOTE-ACCESS.md#windows-installer-setup).
 
-Install NetWatch on one PC. In installer 0.1.1 or newer, select **Set up access from another PC on my private network** during Setup. Choose **Require a viewing password** or **No viewer password**. Setup prepares a secure connection. Click **Start** on the NetWatch PC. Other PCs open the dashboard in a browser. [Connect another PC](docs/REMOTE-ACCESS.md#windows-installer-setup)
+### 2. Open the dashboard
 
-See the [Windows launcher guide](docs/WINDOWS-LAUNCHER.md) for building the installer, updating, uninstalling and keeping your data. To build and run from source, use the steps below.
+1. Open the Windows **Start** menu, search for **NetWatch**, and open the app.
+2. Select **Check devices on next start**. This lets NetWatch ask the devices you choose whether they are responding.
+3. Click **Start**, wait until NetWatch says it is running, then click **Open dashboard**. The dashboard opens in your web browser and runs from this PC.
 
-### Setup from source
+### 3. Add your first switch or router
 
-Source setup requires Node.js 22.13 or newer with npm and the Windows .NET Framework compiler.
+1. Find its **management IP address**, the network address you use to open the device’s settings. If you don’t know it, ask the person who set up the device. You can also try [Find a device automatically](#find-a-device-automatically).
+2. In the dashboard, choose **Edit map → Add device**. Choose **Switch** or **Router**, enter a name you’ll recognize and the device’s IP address, then choose **Add device**.
+3. Choose **Use this map**, review the device you added, then choose **Confirm replacement**. This applies your draft map so the running app can use it.
+4. Return to **Dashboard**. If you’re still looking at your draft, choose **View options → Show → Monitored network**.
+5. Select the device and choose **Turn checks on**. Wait for **Last check** to show a time. **Up** means the device answered the check. If the check fails, confirm the address and that this PC can reach it.
 
-1. Download and extract this repository into a permanent folder, or clone it.
-2. Open PowerShell in the folder containing `package.json`.
-3. Run:
+### 4. Optional — see what is connected to a switch port
 
-```powershell
-npm.cmd ci
-npm.cmd run build
-npm.cmd run desktop:setup -- --desktop-shortcut
-```
+1. Ask whoever manages the switch for a read-only **SNMPv3** account. SNMPv3 is how NetWatch securely reads port information, and a read-only account lets it look without changing the switch.
+2. In the Windows NetWatch app, click **Stop** and wait for it to finish. Then open **Port monitoring** and choose the switch you saved.
+3. Enter the username, choose the password-checking method the switch uses, and enter the authentication and privacy passwords. Those passwords let NetWatch prove it can access the switch and keep the replies private.
+4. Click **Test connection**. If the test passes, choose **Enable monitoring**, then close the setup window and click **Start**.
+5. Open the dashboard, select the switch, and expand **Ports** to see whether its ports are up. Expand **Network neighbors** to see connected devices that announce themselves using **LLDP**, a way for devices to share their name and port with a directly connected neighbor. [Port and neighbor setup](docs/SNMP-INTERFACES.md)
 
-4. Open the **NetWatch** desktop shortcut.
-5. Enable its **Check devices on next start** checkbox if you want reachability checks, then click **Start** and **Open dashboard**.
+Keep the NetWatch PC awake, connected, and signed in while you want checks to run. Start NetWatch again after signing back in. For updates and uninstall steps, see the [Windows launcher guide](docs/WINDOWS-LAUNCHER.md).
 
-The dashboard is available at **http://127.0.0.1:4317** by default. Set `NETWATCH_PORT` to a free port from 1024 through 65535 in the environment before starting the host or the launcher. No administrator access or PowerShell execution-policy change is required. Keep the repository folder and Node installation in place; rerun setup if either moves. Quit NetWatch before updating its launcher.
+### Find a device automatically
 
-For release acceptance, safe updates and recovery, see the [Windows release runbook](docs/WINDOWS-RELEASE-RUNBOOK.md).
+1. In the Windows NetWatch app, click **Stop** and wait for it to finish. Turn on **Discover local network neighbors on next start**, then click **Start** and **Open dashboard**.
+2. In the dashboard, open **Discovered devices → Scan now** and wait for the scan to finish. NetWatch looks on the nearby private networks the PC is directly connected to.
+3. If you recognize your device, choose **Add to map**. On the NetWatch PC, **Add to map** allows checks for that device. Checks run when **Check devices on next start** was enabled at startup. If you can’t find the device, ask for its address and add it manually. [Discovery guide](docs/DISCOVERY.md)
 
-## Add your devices
+### Set up from the project files
 
-1. Open **Edit map**, choose **Add device**, and enter a device name and its actual IPv4 or IPv6 address. An empty address is allowed for a device you do not monitor.
-2. Arrange devices and add their configured links. The editor saves a working copy in this browser.
-3. Choose **Use this map** above the editor to prepare a fresh replacement review.
-4. Review the replacement and choose **Confirm replacement**. New or changed devices start with monitoring disabled.
-5. Return to **Dashboard**, open a device and choose **Turn checks on**; select the monitored network under **View options → Show** if needed.
+Use these steps if you want to run NetWatch from its project files. The Windows installer above is the simplest option for regular use.
 
-Local network discovery is opt-in through the launcher and lists neighbors on the computer's directly attached IPv4 networks for review. Windows default gateways are marked as routers. Use **Add to map** for one result or **Add all to map** for pending devices from the latest successful scan across all pages. On the NetWatch PC, **Add to map** turns checks on for that device, and the launcher’s ICMP setting must be on for checks to run. Remote admins add devices with checks off and can turn them on in device details. Only enable checks for devices you manage; the launcher's ICMP setting and each saved device's monitoring setting are separate approvals. Wi-Fi isolation, blocked pings, randomized phone hardware addresses, and other subnets or VLANs can hide devices. See [Discovery](docs/DISCOVERY.md).
+1. Install [Node.js LTS](https://nodejs.org/en/download), version 22.13 or newer, using its Windows installer and the default options. Node.js runs NetWatch, and its included tool, npm, gets the extra files the app needs.
+2. From the [latest release](https://github.com/Osbornejmb/netwatch/releases/latest), download **Source code (zip)**. In File Explorer, right-click the download, choose **Extract All**, and extract it to a folder you’ll keep, such as **Documents**.
+3. Open the extracted folder that contains `package.json`. PowerShell is where you enter the setup commands, and opening it from this folder lets the commands find the project files. Click the File Explorer address bar, type `powershell`, and press **Enter**.
+4. Download the packages, which are extra pieces of software NetWatch needs.
+
+   ```powershell
+   npm.cmd ci
+   ```
+
+5. Build the dashboard, which prepares the files the browser will open.
+
+   ```powershell
+   npm.cmd run build
+   ```
+
+6. Create the Windows launcher and desktop shortcut so you can start NetWatch without typing commands again.
+
+   ```powershell
+   npm.cmd run desktop:setup -- --desktop-shortcut
+   ```
+
+7. Open **NetWatch** from the desktop shortcut, then continue with step 2 under [Open the dashboard](#2-open-the-dashboard). Keep the project folder and Node.js installation in place so the shortcut can find them.
+
+For help with launcher setup, see the [Windows launcher guide](docs/WINDOWS-LAUNCHER.md#source-setup).
 
 ## Read device status
 
@@ -84,14 +110,21 @@ To share the dashboard, follow the [direct HTTPS setup](docs/REMOTE-ACCESS.md#di
 
 Closing the browser or hiding the control window keeps monitoring running. **Stop** stops the host. **Quit** stops it and exits the tray app. The PC must remain awake, connected and signed in. Start NetWatch manually after signing in.
 
-For a terminal-based setup, build once and run:
+To start NetWatch without the Windows launcher, first install the packages and build the dashboard using the [project files steps](#set-up-from-the-project-files).
+
+An environment variable is a setting you give to the app before it starts. Set this one if you want NetWatch to check whether the devices you approve are responding.
 
 ```powershell
 $env:NETWATCH_ICMP = '1'
+```
+
+Start the local server, the part of NetWatch that runs the checks and sends the dashboard to your browser on this PC.
+
+```powershell
 npm.cmd start
 ```
 
-This enables the collector for devices you separately authorize; it does not add or authorize devices. Omit the environment setting to start with collection disabled. Keep that terminal open and use Ctrl+C to stop. Terminal mode defaults to `data/netwatch.sqlite` in the repository, separately from the launcher's database.
+Open **http://127.0.0.1:4317** in your browser. Keep PowerShell open while NetWatch runs and press **Ctrl+C** there to stop it. This way of starting NetWatch keeps its saved data in `data/netwatch.sqlite` inside the project folder. The Windows launcher uses its own saved data location.
 
 ## Development and verification
 
@@ -99,9 +132,21 @@ Loopback API writes use the per-launch token. Remote admin writes use their sess
 
 NetWatch uses the experimental `node:sqlite` API in Node.js 22. Before upgrading Node, verify the host and its migrations with the test suite against the target Node version.
 
+Run the automated tests to check that the app still behaves as expected.
+
 ```powershell
 npm.cmd test
+```
+
+Build the dashboard to prepare the files NetWatch uses during regular operation.
+
+```powershell
 npm.cmd run build
+```
+
+Start the development preview to see dashboard changes while you edit the project.
+
+```powershell
 npm.cmd run dev
 ```
 
