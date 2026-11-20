@@ -87,6 +87,7 @@ export function createRoutes(discovery, eventOptions, topologyDiscovery) {
     { method: 'GET', pattern: /^\/api\/v1\/discovery\/runs\/([^/]+)$/, handler: topology.get, access: 'admin' },
     ...[
       ['runs', topology.start, 'topology_discovery_started', 'json'],
+      ['schedule', topology.schedule, 'topology_discovery_schedule', 'json'],
       ['runs/([^/]+)/cancel', topology.cancel, 'topology_discovery_cancelled'],
       ['runs/([^/]+)/accept', topology.accept, null, 'json'],
       ['runs/([^/]+)/reject', topology.reject, 'topology_proposal_rejected', 'json'],

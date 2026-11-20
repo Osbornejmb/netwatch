@@ -50,6 +50,13 @@ try {
   page.setDefaultTimeout(12000)
   await page.goto('http://127.0.0.1:' + server.address().port)
   await page.getByRole('link', { name: 'Discovered', exact: true }).click()
+  await page.getByText('Scheduled discovery · Off', { exact: true }).click()
+  await page.locator('select[name="discoverySeed"]').selectOption('Router')
+  await page.locator('input[name="interval"]').fill('60')
+  await page.getByRole('button', { name: 'Save schedule' }).click()
+  await page.getByText('Scheduled discovery · On', { exact: true }).waitFor()
+  assert.deepEqual(store.dynamics.schedule(), { seedId: 'Router', intervalMinutes: 60 })
+  await page.getByText('Scheduled discovery · On', { exact: true }).click()
   await page.getByLabel('Start device').selectOption('Router')
   await page.getByRole('button', { name: 'Find connections' }).click()
   await page

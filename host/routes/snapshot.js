@@ -2,7 +2,7 @@ import { layoutTiers } from '../../src/refocus.js'
 import { createHash } from 'node:crypto'
 
 export function createSnapshotRoute(instance) {
-  let cached
+  const slots = new Map()
   return ({ store, collector, interfaces, discovery, requestHeaders, response, role }) => {
     const status = collector?.snapshot()
     const viewer = role === 'viewer'
@@ -13,9 +13,15 @@ export function createSnapshotRoute(instance) {
       : undefined
     const visibleStatus =
       viewer && status ? { state: status.state, freshness: { staleAfterMs: status.freshness.staleAfterMs } } : status
-    const snapshotKey = JSON.stringify([store.snapshotVersion(), portFreshness])
+    let cached = slots.get(viewer)
+    const snapshotKey = JSON.stringify([store.snapshotVersion(!viewer), portFreshness])
     if (cached?.store !== store || cached.key !== snapshotKey || store.snapshotNow() >= cached.expiresAt) {
-      const snapshot = store.snapshot({ uplinkPorts: portFreshness > 0, portFreshness, linkHealth: true })
+      const snapshot = store.snapshot({
+        uplinkPorts: portFreshness > 0,
+        portFreshness,
+        linkHealth: true,
+        includeDynamics: !viewer,
+      })
       const { linkHealthExpiresAt, ...result } = snapshot
       cached = {
         store,
@@ -27,6 +33,7 @@ export function createSnapshotRoute(instance) {
         result,
         tiers: layoutTiers(result.inventory.topology),
       }
+      slots.set(viewer, cached)
     }
     const result = { ...cached.result, tiers: cached.tiers, generatedAt: new Date(store.snapshotNow()).toISOString() }
     const version = createHash('sha256')

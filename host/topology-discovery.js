@@ -320,6 +320,7 @@ export function createTopologyDiscovery(store, { read, allowed, limits = crawlLi
   }
   return {
     get,
+    busy: () => !!active,
     latest: () => {
       const row = db.prepare('SELECT id FROM topology_runs ORDER BY rowid DESC LIMIT 1').get()
       return row ? get(row.id) : null
@@ -372,11 +373,12 @@ export function createTopologyDiscovery(store, { read, allowed, limits = crawlLi
             for (const item of superseded) item.status = 'superseded'
             db.prepare('UPDATE topology_runs SET payload=? WHERE id=?').run(JSON.stringify(previous), row.id)
           }
-          db.prepare('UPDATE topology_runs SET status=?,payload=? WHERE id=?').run(
-            partial ? 'partial' : 'complete',
-            JSON.stringify(result),
-            id,
-          )
+          const finish = () =>
+            db
+              .prepare('UPDATE topology_runs SET status=?,payload=? WHERE id=?')
+              .run(partial ? 'partial' : 'complete', JSON.stringify(result), id)
+          if (partial || !store.dynamics) finish()
+          else store.dynamics.discovery(seedId, result, finish)
         })
         .catch(() => {
           db.prepare("UPDATE topology_runs SET status='partial',payload=? WHERE id=?").run(

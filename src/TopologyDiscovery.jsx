@@ -70,6 +70,7 @@ function DiscoveryTree({ devices }) {
 export default function TopologyDiscovery({ stageDiscovery }) {
   const [data, setData] = useState(null)
   const [seed, setSeed] = useState('')
+  const [interval, setInterval] = useState(null)
   const [filter, setFilter] = useState('all')
   const [busy, setBusy] = useState(false)
   const [matches, setMatches] = useState({})
@@ -161,6 +162,54 @@ export default function TopologyDiscovery({ stageDiscovery }) {
   return (
     <section className="inventory-controls" aria-label="Topology proposals">
       <h2>Topology proposals</h2>
+      {data?.schedule && (
+        <details>
+          <summary>Scheduled discovery · {data.schedule.intervalMinutes ? 'On' : 'Off'}</summary>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault()
+              void act(async () => {
+                const fields = new FormData(event.currentTarget)
+                const schedule = await request('schedule', {
+                  seedId: fields.get('discoverySeed'),
+                  intervalMinutes: Number(fields.get('interval')),
+                })
+                setData((previous) => ({ ...previous, schedule }))
+                setInterval(null)
+                setMessage('Discovery schedule saved.')
+              })
+            }}
+          >
+            <label>
+              Rediscovery seed
+              <select name="discoverySeed" key={data.schedule.seedId} defaultValue={data.schedule.seedId || seed}>
+                <option value="">Choose an enrolled device</option>
+                {data.seeds.map(({ id, label }) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Minutes between runs
+              <input
+                name="interval"
+                type="number"
+                min="0"
+                max="1440"
+                step="1"
+                value={interval ?? data.schedule.intervalMinutes}
+                onChange={(event) => setInterval(event.target.value)}
+              />
+            </label>
+            <p>Enter 0 to turn scheduling off. Choose 15–1,440 minutes for automatic runs.</p>
+            <button type="submit" className="button secondary" disabled={busy}>
+              Save schedule
+            </button>
+          </form>
+        </details>
+      )}
       <label htmlFor="discovery-seed">Start device</label>
       <select
         id="discovery-seed"

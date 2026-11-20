@@ -11,6 +11,7 @@ export function createInterfaceCollector(
     now = () => Date.now(),
     policy = INTERFACE_POLICY,
     onSwitchPorts,
+    onEvidence,
   } = {},
 ) {
   let timer,
@@ -147,7 +148,10 @@ export function createInterfaceCollector(
     }
     info.state = signal.aborted ? 'starting' : info.errors ? 'degraded' : 'running'
     info.lastSeenAt = stamp()
-    if (!signal.aborted && store.revision() === revision) onSwitchPorts?.(readSwitchPorts())
+    if (!signal.aborted && store.revision() === revision) {
+      onSwitchPorts?.(readSwitchPorts())
+      onEvidence?.(freshness())
+    }
   }
   function runOnce() {
     if (stopped || !enabled || platform !== 'win32') return Promise.resolve()

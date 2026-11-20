@@ -1,3 +1,4 @@
+import { createDynamics } from './dynamics.js'
 import { normalizeLinkEvidence, qualityRates, qualityThresholds } from './link-evidence.js'
 import { DatabaseSync } from 'node:sqlite'
 import { validateTopology } from '../src/topology.js'
@@ -204,6 +205,14 @@ const MIGRATIONS = [
       )
     },
   },
+  {
+    version: 14,
+    up(db) {
+      db.exec(
+        "CREATE TABLE dynamics_state(key TEXT PRIMARY KEY,payload TEXT NOT NULL); CREATE TABLE topology_changes(id INTEGER PRIMARY KEY AUTOINCREMENT,at INTEGER NOT NULL,payload TEXT NOT NULL); CREATE TABLE redundancy_incidents(id INTEGER PRIMARY KEY AUTOINCREMENT,device_id TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('isolated','degraded')),affected INTEGER NOT NULL,opened_at INTEGER NOT NULL,resolved_at INTEGER); CREATE UNIQUE INDEX redundancy_incidents_active ON redundancy_incidents(device_id) WHERE resolved_at IS NULL",
+      )
+    },
+  },
 ]
 
 export function openStore(
@@ -223,6 +232,7 @@ export function openStore(
     migrateV11,
     migrateV12,
     migrateV13,
+    migrateV14,
     linkQuality = qualityThresholds(),
   } = {},
 ) {
@@ -247,6 +257,7 @@ export function openStore(
     migrateV11,
     migrateV12,
     migrateV13,
+    migrateV14,
   ]
   try {
     for (const migration of MIGRATIONS) {
@@ -273,6 +284,7 @@ export function openStore(
     resolvedAt: r.resolved_at === null ? null : new Date(r.resolved_at).toISOString(),
   })
   let observationVersion = 0
+  let dynamicsVersion = 0
   const interfaceHistory = new Map()
   let cachedInventory
   const transaction = (fn, readOnly = false) => {
@@ -289,6 +301,9 @@ export function openStore(
   }
   const readRevision = db.prepare('SELECT revision FROM inventory')
   const readInventory = db.prepare('SELECT * FROM inventory')
+  const dynamics = createDynamics(db, now, transaction, () => {
+    dynamicsVersion++
+  })
   const revision = () => readRevision.get().revision
   const databaseVersion = db.prepare('PRAGMA data_version')
   const readState = () => {
@@ -400,8 +415,14 @@ export function openStore(
         .all(now() - 86400000)
         .map((row) => JSON.parse(row.payload))
     },
+    dynamics,
     snapshotNow: now,
-    snapshotVersion: () => [revision(), observationVersion, databaseVersion.get().data_version],
+    snapshotVersion: (includeDynamics = false) => [
+      revision(),
+      observationVersion,
+      databaseVersion.get().data_version,
+      ...(includeDynamics ? [dynamicsVersion] : []),
+    ],
     cleanup,
     discoveryCounts: () =>
       db
@@ -737,7 +758,7 @@ export function openStore(
         return { revision: state.revision, checks, nextBefore: rows.length > limit ? checks.at(-1).id : null }
       }, true)
     },
-    snapshot({ uplinkPorts = false, portFreshness, linkHealth = false } = {}) {
+    snapshot({ uplinkPorts = false, portFreshness, linkHealth = false, includeDynamics = false } = {}) {
       return transaction(() => {
         const state = readState()
         const latest = new Map(
@@ -810,6 +831,7 @@ export function openStore(
         }
         return {
           inventory: structuredClone(state),
+          ...(includeDynamics && { dynamics: dynamics.read() }),
           ...(linkHealth &&
             state.topology.edges.length && {
               linkHealth: evaluateLinks(state.topology, linkReadings, generatedAt, portFreshness ?? 0),

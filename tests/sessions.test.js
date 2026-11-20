@@ -132,7 +132,7 @@ test('route table enforces local, unauthenticated, viewer, and admin access', as
     ['POST', discoveryPath + 'missing/remove', 403], ['GET', idPath + 'checks', 404],
     ['GET', idPath + 'incidents', 404], ['GET', idPath + 'interfaces', 404],
     ['GET', api + 'discovery/runs', 503], ['GET', api + 'discovery/runs/missing', 503],
-    ['POST', api + 'discovery/runs', 403], ['POST', api + 'discovery/runs/missing/cancel', 403],
+    ['POST', api + 'discovery/schedule', 403], ['POST', api + 'discovery/runs', 403], ['POST', api + 'discovery/runs/missing/cancel', 403],
     ['POST', api + 'discovery/runs/missing/accept', 403], ['POST', api + 'discovery/runs/missing/reject', 403],
     ['POST', api + 'discovery/hints/missing/accept', 403],
     ['GET', idPath + 'neighbors', 404], ['PUT', idPath + 'neighbors', 403], ['GET', '/', 200],
@@ -150,7 +150,7 @@ test('route table enforces local, unauthenticated, viewer, and admin access', as
       if (path === api + 'events') await reply.body.cancel()
     }
   }
-  assert.equal(audit.read().entries.filter((entry) => entry.action === 'viewer_write_blocked').length, 9)
+  assert.equal(audit.read().entries.filter((entry) => entry.action === 'viewer_write_blocked').length, 10)
 })
 
 test('remote event streams use the snapshot projection and close on logout, expiry, role or access changes', async (t) => {

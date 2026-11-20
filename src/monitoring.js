@@ -207,6 +207,41 @@ export function validateSnapshot(value, previousInventory) {
         throw Error('Invalid failure points.')
     }
   }
+  const dynamics = value.dynamics
+  if (dynamics !== undefined) {
+    const validId = (row) => Number.isSafeInteger(row?.id) && row.id > 0
+    const validTime = (time) => typeof time === 'string' && Number.isFinite(Date.parse(time))
+    const validDetail = (detail) =>
+      (typeof detail === 'string' && detail.length <= 500) || (Number.isFinite(detail) && detail > 0)
+    if (
+      !Array.isArray(dynamics?.changes) ||
+      dynamics.changes.length > 50 ||
+      dynamics.changes.some(
+        (row) =>
+          !validId(row) ||
+          !validTime(row.at) ||
+          typeof row.label !== 'string' ||
+          row.label.length > 500 ||
+          !['deviceAdded', 'linkAdded', 'linkMoved', 'linkMissing', 'speedChanged'].includes(row.kind) ||
+          ((row.before !== undefined || row.after !== undefined) &&
+            (!validDetail(row.before) || !validDetail(row.after))),
+      ) ||
+      !Array.isArray(dynamics.incidents) ||
+      dynamics.incidents.length > 100 ||
+      dynamics.incidents.some(
+        (row) =>
+          !validId(row) ||
+          typeof row.deviceId !== 'string' ||
+          !['isolated', 'degraded'].includes(row.state) ||
+          !Number.isInteger(row.affected) ||
+          row.affected < 0 ||
+          row.affected > 2000 ||
+          !validTime(row.openedAt) ||
+          (row.resolvedAt !== null && !validTime(row.resolvedAt)),
+      )
+    )
+      throw Error('Invalid topology changes or redundancy incidents.')
+  }
   return { ...value, activeIncidents, inventory, checks, uplinkPorts, tiers, linkHealth }
 }
 

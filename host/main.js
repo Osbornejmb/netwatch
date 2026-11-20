@@ -51,6 +51,10 @@ const collector = createCollector(store, { enabled: process.env.NETWATCH_ICMP ==
 const interfaces = createInterfaceCollector(store, {
   enabled: process.env.NETWATCH_SNMP === '1',
   vault: createCredentialVault(credentialDirectory(path)),
+  onEvidence(portFreshness) {
+    const snapshot = store.snapshot({ uplinkPorts: true, linkHealth: true, portFreshness })
+    store.dynamics.observe(snapshot.inventory.topology, snapshot.linkHealth)
+  },
   onSwitchPorts(ports) {
     if (ports.size && process.env.NETWATCH_DISCOVERY === '1')
       linkScannedSwitchPorts(store, ports, store.recentDiscoveryAddresses(Date.now() - DISCOVERY_POLICY.intervalMs * 2))
@@ -123,6 +127,22 @@ server.listen(port, '127.0.0.1', () => {
   if (process.connected)
     process.send({ type: 'ready', port, dashboardUrl, collector: collector.snapshot().state, urls: lan?.urls() ?? [] })
 })
+let scheduled = null
+const rediscoveryTimer = setInterval(() => {
+  const { seedId, intervalMinutes } = store.dynamics.schedule()
+  if (!seedId || !intervalMinutes || !topologyDiscovery.seeds().includes(seedId)) {
+    scheduled = null
+    return
+  }
+  const key = JSON.stringify([seedId, intervalMinutes])
+  const time = Date.now()
+  if (scheduled?.key !== key) scheduled = { key, due: time + intervalMinutes * 60000 }
+  if (time < scheduled.due || topologyDiscovery.busy()) return
+  scheduled.due = time + intervalMinutes * 60000
+  topologyDiscovery.start(seedId)
+  audit.record('topology_discovery_started')
+}, 15000)
+rediscoveryTimer.unref()
 const sessionCleanup = setInterval(() => {
   auth.purge()
   audit.purge()
@@ -134,6 +154,7 @@ async function shutdown(code = 0) {
   if (stopping) return
   stopping = true
   clearInterval(sessionCleanup)
+  clearInterval(rediscoveryTimer)
   const closed = new Promise((resolve) => server.close(resolve))
   server.closeAllConnections()
   await Promise.all([collector.stop(), topologyDiscovery.stop(), interfaces.stop(), discovery.stop(), lan?.stop()])
