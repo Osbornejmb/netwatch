@@ -1,4 +1,4 @@
-import { baselineLabels, formatSpeed, linkLabels, scopeLabels } from './refocus.js'
+import { baselineLabels, formatSpeed, linkLabels, roleLabels, scopeLabels } from './refocus.js'
 import { formatCheckTime } from './monitoring.js'
 import useModal from './useModal'
 
@@ -48,7 +48,9 @@ export function LinkOverview({ summary, nodes, tiers, failurePoints, selectDevic
         ? 'Port readings overdue'
         : link.count === 0
           ? 'Ports not monitored'
-          : linkLabels[link.state]
+          : link.state === 'degraded'
+            ? 'Degraded link · Sustained errors or discards'
+            : linkLabels[link.state]
     entries.push({
       rank,
       id: link.edge.id,
@@ -80,6 +82,14 @@ export function LinkOverview({ summary, nodes, tiers, failurePoints, selectDevic
     }
   }
   entries.sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label))
+  const byId = new Map(summary.links.map((link) => [link.edge.id, link]))
+  const grouped = new Set(summary.bundles.flatMap((bundle) => bundle.members))
+  const connectionCount = summary.links.length - grouped.size + summary.bundles.length
+  const connectionButton = (link) => (
+    <button className="health-button" onClick={() => selectLink(link.edge.id)}>
+      {title(link, names)} · {linkLabels[link.state]}
+    </button>
+  )
   return (
     <section className="link-overview" aria-label="Link and redundancy status">
       <p role="status">
@@ -108,15 +118,32 @@ export function LinkOverview({ summary, nodes, tiers, failurePoints, selectDevic
             </details>
           )}
           <details>
-            <summary>Connections ({summary.links.length})</summary>
+            <summary>Connections ({connectionCount})</summary>
             <ul>
-              {summary.links.map((link) => (
-                <li key={link.edge.id}>
-                  <button className="health-button" onClick={() => selectLink(link.edge.id)}>
-                    {title(link, names)} · {linkLabels[link.state]}
-                  </button>
-                </li>
-              ))}
+              {summary.bundles.map((bundle) => {
+                const members = bundle.members.map((id) => byId.get(id)).filter(Boolean)
+                return (
+                  members.length > 0 && (
+                    <li key={bundle.id}>
+                      <details>
+                        <summary>
+                          Bundle · {title(members[0], names)} · {bundle.up} of {bundle.total} members up
+                        </summary>
+                        <ul>
+                          {members.map((link) => (
+                            <li key={link.edge.id}>{connectionButton(link)}</li>
+                          ))}
+                        </ul>
+                      </details>
+                    </li>
+                  )
+                )
+              })}
+              {summary.links
+                .filter((link) => !grouped.has(link.edge.id))
+                .map((link) => (
+                  <li key={link.edge.id}>{connectionButton(link)}</li>
+                ))}
             </ul>
           </details>
           {!!summary.devices.length && (
@@ -153,6 +180,16 @@ export function LinkDetails({ link, nodes, now, onClose }) {
       <p>
         <strong>{linkLabels[link.state]}</strong> · {scopeLabels[link.scope]}
       </p>
+      {link.role && link.role !== 'unknown' && (
+        <p>
+          {roleLabels[link.role]} from {names.get(link.edge.source)?.data.label}
+        </p>
+      )}
+      {link.bundle && (
+        <p>
+          Bundle · {link.bundle.up} of {link.bundle.total} members up · {link.bundle.state}
+        </p>
+      )}
       <ul>
         {['source', 'target'].map((side) => {
           const end = link[side]
@@ -164,6 +201,11 @@ export function LinkDetails({ link, nodes, now, onClose }) {
               {names.get(link.edge[side])?.data.label} ·{' '}
               {end.portLabel || link.edge.uplink?.[side].label || 'Port unknown'}
               {end.fresh && end.speedBps ? ' · ' + formatSpeed(end.speedBps) : ''}
+              {end.fresh && end.stp && ' · Spanning tree ' + end.stp}
+              {end.fresh && Number.isFinite(end.errorsPerSec) && ' · ' + end.errorsPerSec.toFixed(2) + ' errors/sec'}
+              {end.fresh &&
+                Number.isFinite(end.discardsPerSec) &&
+                ' · ' + end.discardsPerSec.toFixed(2) + ' discards/sec'}
               {' · '}
               {end.checkedAt
                 ? (end.fresh ? 'Checked ' : 'Last checked ') + age + ' (' + formatCheckTime(end.checkedAt) + ')'

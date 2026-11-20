@@ -111,7 +111,7 @@ export function discoveryRoutes(discovery) {
           id: 'lldp-' + link.id,
           source,
           target,
-          label: 'LLDP',
+          label: link.sourceProtocol === 'both' ? 'LLDP + CDP' : 'LLDP',
           uplink: { label: '', source: draftPort(link.sourcePort), target: draftPort(link.targetPort) },
         }
       })

@@ -90,7 +90,12 @@ export function interfaceRates(previous, next) {
       // A falling counter could mean wrap or reset; ambiguous/multiple 32-bit wraps are never guessed.
       if (row.counterBits === 64 || maximum < 2 ** 32) {
         const rate = (key) => {
-          const delta = BigInt(row[key]) - BigInt(before[key])
+          const beforeCount = BigInt(before[key])
+          let delta = BigInt(row[key]) - beforeCount
+          const ceiling = BigInt(Math.ceil(maximum))
+          const modulus = 1n << 64n
+          if (row.counterBits === 64 && delta < 0n && ceiling < modulus && modulus - beforeCount <= ceiling)
+            delta += modulus
           const result = (Number(delta) * 8000) / elapsed
           return delta >= 0n && delta <= BigInt(Math.ceil(maximum)) && result <= 1e15 ? result : null
         }

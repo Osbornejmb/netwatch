@@ -1,4 +1,4 @@
-import { hierarchyLayout, refocusSummary, linkLabels, baselineLabels, formatSpeed } from './refocus.js'
+import { hierarchyLayout, refocusSummary, linkLabels, baselineLabels, basisLabels, formatSpeed } from './refocus.js'
 import { LinkOverview, LinkDetails } from './LinkOverview.jsx'
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { ReactFlow } from '@xyflow/react'
@@ -162,6 +162,10 @@ export default function Dashboard({
   )
   const linksById = useMemo(() => new Map(summary.links.map((link) => [link.edge.id, link])), [summary])
   const selectedLink = linksById.get(selectedLinkId)
+  const bundlesByMember = useMemo(
+    () => new Map(summary.bundles.flatMap((bundle) => bundle.members.map((id) => [id, bundle]))),
+    [summary.bundles],
+  )
   const groups = (live ? (live.inventory.topology.groups ?? []) : draftGroups).filter((group) => !group.protectedDevice)
   const paths = useMemo(
     () =>
@@ -286,13 +290,18 @@ export default function Dashboard({
         const speed = link?.[side].fresh && formatSpeed(link[side].speedBps)
         return speed && !sharedSpeed ? name + ' · ' + speed : name
       }
-      const portLabel = hasPorts
-        ? [endpoint('source') + ' ↔ ' + endpoint('target'), sharedSpeed, linkLabels[link?.state ?? 'unknown']]
-            .filter(Boolean)
-            .join(' · ')
-        : /^(?:Last seen on |LLDP · )/.test(edge.label)
-          ? edge.label.replace(/^(?:Last seen on |LLDP · )/, '')
+      const bundle = bundlesByMember.get(edge.id)
+      const portLabel = bundle
+        ? edge.id === bundle.id
+          ? 'Bundle · ' + bundle.up + ' of ' + bundle.total + ' members up'
           : undefined
+        : hasPorts
+          ? [endpoint('source') + ' ↔ ' + endpoint('target'), sharedSpeed, linkLabels[link?.state ?? 'unknown']]
+              .filter(Boolean)
+              .join(' · ')
+          : /^(?:Last seen on |LLDP · )/.test(edge.label)
+            ? edge.label.replace(/^(?:Last seen on |LLDP · )/, '')
+            : undefined
       return {
         id: edge.id,
         source: edge.source,
@@ -838,6 +847,7 @@ export default function Dashboard({
       {selected && (
         <DeviceDetails
           redundancy={baselineLabels[summary.devices.find(({ node }) => node.id === selected.id)?.state]}
+          redundancyBasis={basisLabels[summary.devices.find(({ node }) => node.id === selected.id)?.basis]}
           stageDiscovery={stageDiscovery}
           key={`${source}-${selected.id}`}
           host={live ? host : null}

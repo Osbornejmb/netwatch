@@ -1,3 +1,4 @@
+import { normalizeLinkEvidence, qualityRates, qualityThresholds } from './link-evidence.js'
 import { DatabaseSync } from 'node:sqlite'
 import { validateTopology } from '../src/topology.js'
 import { validateInterfaces, interfaceRates } from './interfaces.js'
@@ -195,6 +196,14 @@ const MIGRATIONS = [
       )
     },
   },
+  {
+    version: 13,
+    up(db) {
+      db.exec(
+        'CREATE TABLE interface_link_evidence (device_id TEXT PRIMARY KEY REFERENCES snmp_targets(device_id) ON DELETE CASCADE, checked_at INTEGER NOT NULL, payload TEXT NOT NULL)',
+      )
+    },
+  },
 ]
 
 export function openStore(
@@ -213,6 +222,8 @@ export function openStore(
     migrateV10,
     migrateV11,
     migrateV12,
+    migrateV13,
+    linkQuality = qualityThresholds(),
   } = {},
 ) {
   const db = new DatabaseSync(path)
@@ -235,12 +246,13 @@ export function openStore(
     migrateV10,
     migrateV11,
     migrateV12,
+    migrateV13,
   ]
   try {
     for (const migration of MIGRATIONS) {
       if (migration.version <= version) continue
       db.exec('BEGIN IMMEDIATE')
-      if (version > 0 && migration.version === version + 1) verifyUpgradeBackup(db, path, version === 11 ? 12 : 11)
+      if (version > 0 && migration.version === version + 1) verifyUpgradeBackup(db, path, Math.max(11, version + 1))
       migration.up(db, now)
       hooks[migration.version - 1]?.(db)
       db.exec('PRAGMA user_version=' + migration.version + '; COMMIT')
@@ -535,6 +547,7 @@ export function openStore(
       const clean = validateInterfaces(value),
         time = Date.parse(clean.checkedAt)
       if (time > now() || time < now() - 180000) throw invalid('Invalid interface time.')
+      const telemetry = normalizeLinkEvidence(value.linkEvidence, clean.interfaces)
       const previous = transaction(() => {
         if (
           readState().revision !== revision ||
@@ -544,7 +557,27 @@ export function openStore(
           throw invalid('Interface authorization changed.', 409)
         const row = db.prepare('SELECT payload,checked_at FROM interface_samples WHERE device_id=?').get(id)
         if (row && time <= row.checked_at) throw invalid('Interface sample is not newer.')
-        const payload = { ...clean, interfaces: interfaceRates(row ? JSON.parse(row.payload) : null, clean) }
+        const prior = row && JSON.parse(row.payload)
+        const payload = { ...clean, interfaces: interfaceRates(prior, clean) }
+        const older = db.prepare('SELECT checked_at,payload FROM interface_link_evidence WHERE device_id=?').get(id)
+        const previousTelemetry = older && row && older.checked_at === row.checked_at ? JSON.parse(older.payload) : null
+        const compatible =
+          previousTelemetry?.thresholds.errors === linkQuality.errors &&
+          previousTelemetry?.thresholds.discards === linkQuality.discards
+        if (telemetry.length) {
+          const rows = qualityRates(
+            compatible ? previousTelemetry.rows : [],
+            telemetry,
+            prior?.interfaces ?? [],
+            clean.interfaces,
+            time - (row?.checked_at ?? time),
+            !!prior && clean.uptime > prior.uptime,
+            linkQuality,
+          )
+          db.prepare(
+            'INSERT INTO interface_link_evidence VALUES(?,?,?) ON CONFLICT(device_id) DO UPDATE SET checked_at=excluded.checked_at,payload=excluded.payload',
+          ).run(id, time, JSON.stringify({ thresholds: linkQuality, rows }))
+        } else db.prepare('DELETE FROM interface_link_evidence WHERE device_id=?').run(id)
         const total = db
           .prepare(
             "SELECT COALESCE(SUM(json_array_length(payload,'$.interfaces')),0) n FROM interface_samples WHERE device_id!=?",
@@ -554,7 +587,7 @@ export function openStore(
         db.prepare(
           'INSERT INTO interface_samples VALUES(?,?,?) ON CONFLICT(device_id) DO UPDATE SET checked_at=excluded.checked_at,payload=excluded.payload',
         ).run(id, time, JSON.stringify(payload))
-        return row && JSON.parse(row.payload)
+        return prior
       })
       if (previous && previous.uptime <= clean.uptime) {
         const ports = new Map(
@@ -722,11 +755,14 @@ export function openStore(
         ) {
           const samples = new Map(
             db
-              .prepare('SELECT device_id, payload FROM interface_samples JOIN snmp_targets USING(device_id)')
+              .prepare(
+                'SELECT s.device_id, s.payload, e.payload AS telemetry FROM interface_samples s JOIN snmp_targets t ON t.device_id=s.device_id LEFT JOIN interface_link_evidence e ON e.device_id=s.device_id AND e.checked_at=s.checked_at',
+              )
               .all()
-              .map(({ device_id: id, payload }) => {
+              .map(({ device_id: id, payload, telemetry }) => {
                 const { checkedAt, interfaces } = JSON.parse(payload)
-                return [id, { checkedAt, ports: new Map(interfaces.map((row) => [row.index, row])) }]
+                const detail = new Map((telemetry ? JSON.parse(telemetry).rows : []).map((row) => [row.index, row]))
+                return [id, { checkedAt, ports: new Map(interfaces.map((row) => [row.index, row])), detail }]
               }),
           )
           for (const edge of state.topology.edges) {
@@ -738,7 +774,18 @@ export function openStore(
               if (row) {
                 evidence[side] = { checkedAt: sample.checkedAt, admin: row.admin, oper: row.oper }
                 const previous = (interfaceHistory.get(edge[side]) ?? []).map((ports) => ports.get(row.index))
-                readings[side] = [{ ...evidence[side], speed: row.speedBps }]
+                const extra = sample.detail.get(row.index)
+                readings[side] = [
+                  {
+                    ...evidence[side],
+                    speed: row.speedBps,
+                    stp: extra?.stp,
+                    aggregateId: extra?.aggregateId,
+                    errorsPerSec: extra?.errorsPerSec,
+                    discardsPerSec: extra?.discardsPerSec,
+                    degraded: extra?.errorStreak === 3 || extra?.discardStreak === 3,
+                  },
+                ]
                 for (const prior of previous) {
                   if (!prior) break
                   readings[side].push(prior)

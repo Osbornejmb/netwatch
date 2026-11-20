@@ -91,6 +91,7 @@ export async function crawlTopology({
   const deadline = now() + limits.deadlineMs
   const devices = new Map()
   const sightings = new Map()
+  const cdpReports = []
   const byAddress = new Map(targets.map((target) => [target.address, target]))
   const queue = [{ target: seed, depth: 0, expected: null }]
   const queued = new Set([seed.deviceId])
@@ -123,6 +124,22 @@ export async function crawlTopology({
       result = { error: 'snmp_failed' }
     }
     if (signal.aborted) break
+    if (Array.isArray(result?.cdp) && cdpReports.length < 512) {
+      for (const entry of result.cdp.slice(0, Math.min(128, 512 - cdpReports.length))) {
+        if (!Number.isInteger(entry.index) || entry.index < 1 || entry.index > 2147483647) continue
+        cdpReports.push({
+          reporterId: target.deviceId,
+          sourceProtocol: 'cdp',
+          index: entry.index,
+          device: text(entry.device),
+          peerPort: text(entry.peerPort),
+          platform: text(entry.platform),
+          ...(typeof entry.address === 'string' && isIP(entry.address) && { address: entry.address }),
+          ...(typeof entry.capabilities === 'string' &&
+            /^[a-f\d]{2,8}$/.test(entry.capabilities) && { capabilities: entry.capabilities }),
+        })
+      }
+    }
     if (!chassis(result?.chassisKey) || (expected && result.chassisKey !== expected)) {
       const reason =
         expected && chassis(result?.chassisKey)
@@ -193,6 +210,8 @@ export async function crawlTopology({
         local,
         remote,
         checkedAt: result.checkedAt,
+        sourceProtocol: row.source === 'both' ? 'both' : 'lldp',
+        ...(row.protocolConflict === true && { protocolConflict: true }),
       })
       if (peer.state === 'manageable' || !['router', 'switch'].includes(row.type)) continue
       const eligible = addresses
@@ -242,13 +261,15 @@ export async function crawlTopology({
     const reciprocal = paired.length === 1 ? paired[0] : null
     const targetPort = reciprocal?.local ?? row.remote
     const confidence =
-      reciprocal && row.local.index && targetPort.index
-        ? 'verified'
-        : reverse.length && !reciprocal
-          ? 'conflict'
-          : !row.local.index || (reciprocal && !targetPort.index)
-            ? 'unresolved_port'
-            : 'single_sided'
+      row.protocolConflict || reciprocal?.protocolConflict
+        ? 'conflict'
+        : reciprocal && row.local.index && targetPort.index
+          ? 'verified'
+          : reverse.length && !reciprocal
+            ? 'conflict'
+            : !row.local.index || (reciprocal && !targetPort.index)
+              ? 'unresolved_port'
+              : 'single_sided'
     const ends = [
       [row.source, row.local],
       [row.target, targetPort],
@@ -266,11 +287,17 @@ export async function crawlTopology({
       sourcePort: ends[0][1],
       targetPort: ends[1][1],
       confidence,
+      sourceProtocol: row.sourceProtocol === 'both' || reciprocal?.sourceProtocol === 'both' ? 'both' : 'lldp',
       status: 'proposed',
       evidence: reciprocal ? [row, reciprocal] : [row],
     })
   }
-  return { devices: [...devices.values()], links: [...links.values()], diagnostics: [...diagnostics] }
+  return {
+    devices: [...devices.values()],
+    links: [...links.values()],
+    diagnostics: [...diagnostics],
+    ...(cdpReports.length && { cdpReports }),
+  }
 }
 
 export function createTopologyDiscovery(store, { read, allowed, limits = crawlLimits, now = Date.now, audit }) {
@@ -376,9 +403,9 @@ export function createTopologyDiscovery(store, { read, allowed, limits = crawlLi
       const proposals = [...run.links, ...run.devices].filter((item) => ids.has(item.id) && item.status === 'proposed')
       if (!ids.size || ids.size !== proposals.length) throw invalid('Some proposals have already changed.', 409)
       for (const item of proposals) item.status = status
-      const { devices, diagnostics } = run
+      const { devices, diagnostics, cdpReports } = run
       db.prepare('UPDATE topology_runs SET payload=? WHERE id=?').run(
-        JSON.stringify({ devices, links: run.links, diagnostics }),
+        JSON.stringify({ devices, links: run.links, diagnostics, ...(cdpReports?.length && { cdpReports }) }),
         id,
       )
       return proposals

@@ -206,6 +206,20 @@ export default function TopologyDiscovery({ stageDiscovery }) {
             {run.status === 'partial' ? 'Partial results' : 'Discovery complete'} · {proposed.length} connections to
             review
           </p>
+          {!!run.cdpReports?.length && (
+            <details>
+              <summary>CDP reports ({run.cdpReports.length})</summary>
+              <ul>
+                {run.cdpReports.map((report, i) => (
+                  <li key={i}>
+                    {report.device} · {report.peerPort}
+                    {report.platform && ' · ' + report.platform}
+                    {report.address && ' · ' + report.address}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
           {!!run.diagnostics.length && (
             <ul>
               {run.diagnostics.map((code) => (
@@ -292,6 +306,7 @@ export default function TopologyDiscovery({ stageDiscovery }) {
                   {linkDevices(link)[0]?.label || 'Unnamed device'} ({link.sourcePort.label || 'port unknown'}) ↔{' '}
                   {linkDevices(link)[1]?.label || 'Unnamed device'} ({link.targetPort.label || 'port unknown'}) ·{' '}
                   {explain(link.confidence)}
+                  {link.sourceProtocol === 'both' && ' · LLDP and CDP'}
                 </p>
                 <details>
                   <summary>Evidence</summary>
