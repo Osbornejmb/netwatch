@@ -67,12 +67,16 @@ export async function addDiscoveredToMap({ store, discovery, interfaces, id, bod
   const linksToPlan = []
   for (const item of items) {
     const gateway = bulk ? gatewayFor?.(item.ip) : singleGateway
+    const port = !item.misses && switchPortFor(ports, { data: { ip: item.ip } }, item)
     let node = topology.nodes.find((candidate) => candidate.id === item.savedDeviceId || candidate.data.ip === item.ip)
     if (!node) {
       if (item.status === 'added') throw invalid('The saved device is missing from the map.', 409)
       node = {
         id: item.id,
-        type: item.ip === gateway || item.source === 'gateway-mac' ? 'router' : 'switch',
+        type:
+          item.ip === gateway || ['gateway', 'gateway-mac'].includes(item.source)
+            ? 'router'
+            : (port?.peerType ?? 'endpoint'),
         position: { x: 0, y: 0 },
         data: { label: item.hostname || item.ip, ip: item.ip, description: '' },
       }
@@ -85,7 +89,12 @@ export async function addDiscoveredToMap({ store, discovery, interfaces, id, bod
   for (const { node, gateway, item } of linksToPlan) {
     const port = !item.misses && switchPortFor(ports, node, item)
     if (port) {
-      saveSwitchPortLink(topology, node, port)
+      saveSwitchPortLink(
+        topology,
+        node,
+        port,
+        port.remotePort ? store.currentInterfaces?.(node.id, interfaces?.snapshot?.().freshness?.staleAfterMs) : [],
+      )
       continue
     }
     const router = topology.nodes.find((candidate) => candidate.type === 'router' && candidate.data.ip === gateway)

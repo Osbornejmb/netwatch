@@ -80,7 +80,10 @@ function Preview({ action, onClose, onConfirm, busy }) {
     </dialog>
   )
 }
-export default forwardRef(function HostStorage({ nodes, edges, groups, roots, onLoad, paused, importGeneration }, ref) {
+export default forwardRef(function HostStorage(
+  { nodes, edges, groups, roots, onLoad, onSaved, paused, importGeneration },
+  ref,
+) {
   const [host, setHost] = useState(null)
   const [action, setAction] = useState(null)
   const [message, setMessage] = useState('Your draft is separate from the network being monitored.')
@@ -161,6 +164,7 @@ export default forwardRef(function HostStorage({ nodes, edges, groups, roots, on
         imported.current = false
         setHost(value)
         setMonitoring(value.monitoring)
+        onSaved?.(value.revision)
         setMessage('Network saved; start checks in the Windows app to monitor enabled devices.')
       }
       setAction(null)

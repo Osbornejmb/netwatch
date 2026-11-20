@@ -50,6 +50,7 @@ try {
   page.on('pageerror', (error) => errors.push(error.message))
   await page.goto('http://127.0.0.1:' + server.address().port)
   const overview = page.getByRole('region', { name: 'Link and redundancy status' })
+  await overview.locator(".link-overview-panel > summary").click()
   await overview.getByText('Map tools', { exact: true }).waitFor()
   assert.equal(await overview.getByText('Redundancy incidents (1 open)', { exact: true }).isVisible(), false)
   await overview.getByText('Map tools', { exact: true }).click()

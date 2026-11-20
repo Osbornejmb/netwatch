@@ -73,6 +73,7 @@ try {
   page.on('pageerror', (error) => errors.push(error.message))
   await page.goto('http://127.0.0.1:' + server.address().port)
   const overview = page.getByRole('region', { name: 'Link and redundancy status' })
+  await overview.locator(".link-overview-panel > summary").click()
   await overview.getByText('1 device is running without redundancy', { exact: true }).waitFor()
   await overview.getByText(/3 of 3 links monitored at both ends/).waitFor()
   await page.getByText('View options', { exact: true }).click()

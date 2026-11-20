@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import useModal from './useModal'
+import { deviceTypes } from './device-types.js'
 import { deviceFields } from './inventory'
 
 export default function DeviceDialog({ device, nodes, onSave, onClose }) {
@@ -35,17 +36,16 @@ export default function DeviceDialog({ device, nodes, onSave, onClose }) {
             ×
           </button>
         </div>
-        {!device && (
-          <>
-            <label className="field-label" htmlFor="device-kind">
-              Device type
-            </label>
-            <select id="device-kind" value={kind} onChange={(event) => setKind(event.target.value)}>
-              <option value="switch">Switch</option>
-              <option value="router">Router</option>
-            </select>
-          </>
-        )}
+        <label className="field-label" htmlFor="device-kind">
+          Device type
+        </label>
+        <select id="device-kind" value={kind} onChange={(event) => setKind(event.target.value)}>
+          {Object.entries(deviceTypes).map(([value, title]) => (
+            <option key={value} value={value}>
+              {title}
+            </option>
+          ))}
+        </select>
         <label className="field-label" htmlFor="device-name">
           Device name (required)
         </label>

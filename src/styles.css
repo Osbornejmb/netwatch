@@ -963,3 +963,19 @@ label {
   display: grid;
   padding: 0.375rem 0;
 }
+
+.device-node.endpoint-card,
+.health-node.endpoint-card {
+  border-radius: 3px;
+  border-top-style: dashed;
+  border-bottom-style: dashed;
+}
+.endpoint-card:has(.device-ip-label) {
+  width: max-content;
+  min-width: var(--node-width);
+  max-width: var(--node-max-width);
+}
+.map-device-kind {
+  flex-shrink: 0;
+  color: var(--muted);
+}

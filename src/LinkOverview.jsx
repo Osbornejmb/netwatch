@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import DynamicsPanel from './DynamicsPanel.jsx'
 import { baselineLabels, formatSpeed, linkLabels, roleLabels, scopeLabels } from './refocus.js'
 import { formatCheckTime } from './monitoring.js'
@@ -6,7 +7,30 @@ import useModal from './useModal'
 const title = (link, names) =>
   [link.edge.source, link.edge.target].map((id) => names.get(id)?.data.label ?? id).join(' ↔ ')
 
-export function LinkOverview({ summary, nodes, tiers, failurePoints, selectDevice, selectLink, topology, dynamics }) {
+export function LinkOverview(props) {
+  const [expanded, setExpanded] = useState(false)
+  const { links, headline, monitored } = props.summary
+  return (
+    <section className="link-overview" aria-label="Link and redundancy status">
+      <details className="link-overview-panel" onToggle={(event) => setExpanded(event.currentTarget.open)}>
+        <summary>
+          <span role="status">
+            <strong>{headline}</strong>
+            {!!links.length && (
+              <span>
+                {' '}
+                · {monitored} of {links.length} links monitored at both ends
+              </span>
+            )}
+          </span>
+        </summary>
+        {expanded && <LinkOverviewDetails {...props} />}
+      </details>
+    </section>
+  )
+}
+
+function LinkOverviewDetails({ summary, nodes, tiers, failurePoints, selectDevice, selectLink, topology, dynamics }) {
   const names = new Map(nodes.map((node) => [node.id, node]))
   const ranks = new Map(tiers.map(({ deviceId, tier }) => [deviceId, tier]))
   const tierGroups = new Map()
@@ -96,93 +120,77 @@ export function LinkOverview({ summary, nodes, tiers, failurePoints, selectDevic
     </button>
   )
   return (
-    <section className="link-overview" aria-label="Link and redundancy status">
-      <p role="status">
-        <strong>{summary.headline}</strong>
-        {!!summary.links.length && (
-          <span>
-            {' '}
-            · {summary.monitored} of {summary.links.length} links monitored at both ends
-          </span>
-        )}
-      </p>
-      <div className="link-overview-actions">
-        {!!summary.links.length && (
-          <>
-            {!!entries.length && (
-              <details>
-                <summary>Link attention ({entries.length})</summary>
-                <ul>
-                  {entries.map(({ id, rank, label, action }) => (
-                    <li key={rank + ':' + id}>
-                      <button className="health-button" onClick={action}>
-                        {label}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
+    <div className="link-overview-actions">
+      {!!summary.links.length && (
+        <>
+          {!!entries.length && (
             <details>
-              <summary>Connections ({connectionCount})</summary>
+              <summary>Link attention ({entries.length})</summary>
               <ul>
-                {summary.bundles.map((bundle) => {
-                  const members = bundle.members.map((id) => byId.get(id)).filter(Boolean)
-                  return (
-                    members.length > 0 && (
-                      <li key={bundle.id}>
-                        <details>
-                          <summary>
-                            Bundle · {title(members[0], names)} · {bundle.up} of {bundle.total} members up
-                          </summary>
-                          <ul>
-                            {members.map((link) => (
-                              <li key={link.edge.id}>{connectionButton(link)}</li>
-                            ))}
-                          </ul>
-                        </details>
-                      </li>
-                    )
+                {entries.map(({ id, rank, label, action }) => (
+                  <li key={rank + ':' + id}>
+                    <button className="health-button" onClick={action}>
+                      {label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          <details>
+            <summary>Connections ({connectionCount})</summary>
+            <ul>
+              {summary.bundles.map((bundle) => {
+                const members = bundle.members.map((id) => byId.get(id)).filter(Boolean)
+                return (
+                  members.length > 0 && (
+                    <li key={bundle.id}>
+                      <details>
+                        <summary>
+                          Bundle · {title(members[0], names)} · {bundle.up} of {bundle.total} members up
+                        </summary>
+                        <ul>
+                          {members.map((link) => (
+                            <li key={link.edge.id}>{connectionButton(link)}</li>
+                          ))}
+                        </ul>
+                      </details>
+                    </li>
                   )
-                })}
-                {summary.links
-                  .filter((link) => !grouped.has(link.edge.id))
-                  .map((link) => (
-                    <li key={link.edge.id}>{connectionButton(link)}</li>
+                )
+              })}
+              {summary.links
+                .filter((link) => !grouped.has(link.edge.id))
+                .map((link) => (
+                  <li key={link.edge.id}>{connectionButton(link)}</li>
+                ))}
+            </ul>
+          </details>
+          {!!summary.devices.length && (
+            <details>
+              <summary>Redundancy by tier</summary>
+              <ul>
+                {[...tierGroups]
+                  .sort(([a], [b]) => a - b)
+                  .map(([tier, counts]) => (
+                    <li key={tier}>
+                      <strong>{Number.isFinite(tier) ? 'Tier ' + tier : 'No tier assigned'}</strong>
+                      <span>
+                        {' '}
+                        · {counts.healthy} healthy · {counts.degraded} degraded · {counts.isolated} isolated ·{' '}
+                        {counts.unknown} unknown · {counts.none} without a baseline
+                      </span>
+                    </li>
                   ))}
               </ul>
             </details>
-            {!!summary.devices.length && (
-              <details>
-                <summary>Redundancy by tier</summary>
-                <ul>
-                  {[...tierGroups]
-                    .sort(([a], [b]) => a - b)
-                    .map(([tier, counts]) => (
-                      <li key={tier}>
-                        <strong>{Number.isFinite(tier) ? 'Tier ' + tier : 'No tier assigned'}</strong>
-                        <span>
-                          {' '}
-                          · {counts.healthy} healthy · {counts.degraded} degraded · {counts.isolated} isolated ·{' '}
-                          {counts.unknown} unknown · {counts.none} without a baseline
-                        </span>
-                      </li>
-                    ))}
-                </ul>
-              </details>
-            )}
-          </>
-        )}
-        {dynamics && topology && !!nodes.length && (
-          <DynamicsPanel
-            topology={topology}
-            dynamics={dynamics}
-            bundles={summary.bundles}
-            selectDevice={selectDevice}
-          />
-        )}
-      </div>
-    </section>
+          )}
+        </>
+      )}
+      {dynamics && topology && !!nodes.length && (
+        <DynamicsPanel topology={topology} dynamics={dynamics} bundles={summary.bundles} selectDevice={selectDevice} />
+      )}
+    </div>
   )
 }
 

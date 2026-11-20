@@ -8,6 +8,7 @@ export default function InventoryControls({
   onSelect,
   onEdit,
   onRemove,
+  onClearDraft,
   onConnect,
   onRemoveLink,
 }) {
@@ -43,6 +44,9 @@ export default function InventoryControls({
     <section className="inventory-controls" aria-labelledby="inventory-controls-title">
       <h2 id="inventory-controls-title">Devices & connections</h2>
       <p>Choose a device to edit, or connect two devices below.</p>
+      <button type="button" className="button secondary" disabled={!onClearDraft} onClick={onClearDraft}>
+        Clear draft map
+      </button>
       <label htmlFor="editor-device">Selected device</label>
       <select
         id="editor-device"

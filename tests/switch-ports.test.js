@@ -2,13 +2,14 @@ import { mergeDiscoveryDraft } from '../src/discovery-draft.js'
 import { applyDiscoveryPatch } from './fixtures/discovery-draft.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, createHash } from 'node:crypto'
 import snmp from 'net-snmp'
 import { createDiscovery } from '../host/discovery.js'
 import { createInterfaceCollector } from '../host/snmp-collector.js'
 import { openStore } from '../host/store.js'
 import { addDiscoveredToMap, listDiscovered } from '../host/routes/discovered.js'
-import { readSwitchPorts, linkScannedSwitchPorts } from '../host/switch-ports.js'
+import { discoveryRoutes } from '../host/routes/topology-discovery.js'
+import { saveSwitchPortLink, readSwitchPorts, linkScannedSwitchPorts } from '../host/switch-ports.js'
 
 const bridge = '1.3.6.1.2.1.17.1.4.1.2'
 const vlan = '1.3.6.1.2.1.17.7.1.2.2.1.2'
@@ -143,7 +144,7 @@ test('reviewing a moved port updates the same saved discovery link in the draft 
   const patch = (await review(4)).draft
   assert.deepEqual(patch.replaceEdges, [old])
   const draft = mergeDiscoveryDraft(saved, patch)
-  assert.deepEqual(draft.edges, [{ ...old, label: 'Last seen on Fa1/0/4' }])
+  assert.deepEqual(draft.edges, [{ ...old, label: 'Last seen on Fa1/0/4', uplink: { ...old.uplink, target: { label: 'Fa1/0/4', index: 4 } } }])
   assert.deepEqual(mergeDiscoveryDraft(draft, patch).edges, draft.edges)
   assert.equal(store.read().topology.edges[0].label, 'Last seen on Fa1/0/3')
   assert.throws(() => mergeDiscoveryDraft({ ...saved, edges: [{ ...old, label: 'Manually edited' }] }, patch), /changed in your draft/)
@@ -261,6 +262,13 @@ test('adds access and LLDP trunk links, then locates a downstream device after i
   }
   assert.deepEqual(links(), firstLinks)
   const switch1 = store.read().topology.nodes.find(({ data }) => data.ip === ip(3))
+  const map = store.read()
+  assert.equal(switch1.type, 'endpoint')
+  store.write({
+    source: 'inventory',
+    topology: { ...map.topology, nodes: map.topology.nodes.map((node) => node.id === switch1.id ? { ...node, type: 'switch' } : node) },
+    monitoring: map.monitoring,
+  }, map.revision)
   store.authorizeInterfaces(switch1.id, randomUUID(), store.revision())
   await collector.runOnce()
   t.diagnostic(`Final links=${JSON.stringify(links())}`)
@@ -281,10 +289,58 @@ test('CDP identifies the adjacent switch and excludes a lone transit MAC learned
     interfaces,
     policy,
     [],
-    [{ index: 104, address: '192.168.50.3', peerPort: 'Fa1/0/1' }],
+    [{ index: 104, address: '192.168.50.3', peerPort: 'Fa1/0/1', capabilities: '00000028' }],
   )
   assert.deepEqual(sample, [
     { mac: '02:00:00:00:00:09', index: 107, name: 'Gi1/0/7' },
-    { peerIp: '192.168.50.3', index: 104, name: 'Gi1/0/4', remotePort: 'Fa1/0/1', protocol: 'CDP' },
+    { peerIp: '192.168.50.3', index: 104, name: 'Gi1/0/4', remotePort: 'Fa1/0/1', protocol: 'CDP', peerType: 'switch' },
   ])
+})
+
+test('review backfills a legacy trunk with fresh interface indexes and leaves manual mappings intact', async (t) => {
+  const store = openStore(':memory:')
+  t.after(() => store.close())
+  const node = (id, ip) => ({ id, type: 'switch', position: { x: 0, y: 0 }, data: { label: id, ip } })
+  const label = 'CDP · Fa1/0/2 ↔ FastEthernet1/0/1'
+  const id = 'hint-' + createHash('sha256').update(JSON.stringify(['s1', 's2', label])).digest('hex')
+  store.write({ source: 'inventory', topology: {
+    nodes: [node('s1', '192.0.2.3'), node('s2', '192.0.2.2')],
+    edges: [{ id, source: 's1', target: 's2', label }],
+  } }, 0)
+  const sample = (index, name) => ({ checkedAt: new Date().toISOString(), uptime: 1, interfaces: [
+    { index, name, description: '', admin: 1, oper: 1, speedBps: 1e9, discontinuity: null, counterBits: null, inOctets: null, outOctets: null },
+  ] })
+  for (const [id, index, name] of [['s1', 10001, 'Fa1/0/1'], ['s2', 10002, 'Fa1/0/2']]) {
+    const authorization = randomUUID()
+    store.authorizeInterfaces(id, authorization, store.revision())
+    store.appendInterfaces(id, sample(index, name), { authorization, revision: store.revision() })
+  }
+  store.recordDiscovery([{ ip: '192.0.2.3', mac, source: 'neighbor' }])
+  const ports = new Map([['ip:192.0.2.3', [{
+    switchId: 's2', index: 10002, name: 'Fa1/0/2', remotePort: 'FastEthernet1/0/1', protocol: 'CDP',
+  }]]])
+  const { draft } = await addDiscoveredToMap({
+    store,
+    interfaces: { switchPorts: () => ports },
+    id: store.discovered().devices[0].id,
+    body: { baseRevision: 1 },
+  })
+  assert.equal(draft.edges[0].id, id)
+  assert.deepEqual(draft.edges[0].uplink, {
+    label: '', source: { label: 'Fa1/0/1', index: 10001 }, target: { label: 'Fa1/0/2', index: 10002 },
+  })
+  assert.equal(store.read().topology.edges[0].uplink, undefined)
+  linkScannedSwitchPorts(store, ports, [{ ip: '192.0.2.3', mac }])
+  const routes = discoveryRoutes({ seeds: () => [], latest: () => null })
+  const [hint] = routes.read({ store }).hints
+  assert.ok(hint)
+  const reviewed = routes.hint({ store, id: hint.id, body: { baseRevision: 1 } })
+  assert.equal(reviewed.draft.edges[0].id, id)
+  applyDiscoveryPatch(store, reviewed.draft)
+  assert.equal(store.snapshot({ uplinkPorts: true, linkHealth: true, portFreshness: 180000 }).linkHealth.links[0].scope, 'snmpBothEnds')
+  const manual = structuredClone(store.read().topology)
+  delete manual.edges[0].discoveryMapped
+  const change = saveSwitchPortLink(manual, manual.nodes[0], { switchId: 's2', name: 'Fa1/0/3', index: 10003 })
+  assert.equal(change, null)
+  assert.equal(manual.edges[0].uplink.target.index, 10002)
 })

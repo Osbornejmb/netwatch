@@ -30,13 +30,21 @@ export function discoveryRoutes(discovery) {
     const topology = store.read().topology
     const byId = new Map(topology.nodes.map((node) => [node.id, node.data.label]))
     const pairs = new Set(topology.edges.map(connectionKey))
+    const links = new Map(topology.edges.map((edge) => [edge.id, edge]))
     return {
       seeds: topology.nodes.filter((node) => ids.has(node.id)).map(({ id, data }) => ({ id, label: data.label })),
       run: view(store, service().latest()),
       schedule: store.dynamics.schedule(),
       hints: store
         .topologyHints()
-        .filter((edge) => byId.has(edge.source) && byId.has(edge.target) && !pairs.has(connectionKey(edge)))
+        .filter(
+          (edge) =>
+            byId.has(edge.source) &&
+            byId.has(edge.target) &&
+            (edge.replaces
+              ? JSON.stringify(links.get(edge.replaces.id)) === JSON.stringify(edge.replaces)
+              : !pairs.has(connectionKey(edge))),
+        )
         .map((edge) => ({ ...edge, sourceLabel: byId.get(edge.source), targetLabel: byId.get(edge.target) })),
     }
   }
@@ -142,7 +150,11 @@ export function discoveryRoutes(discovery) {
     if (!edge) throw invalid('This connection proposal has expired.', 404)
     const nodes = current.topology.nodes.filter((node) => [edge.source, edge.target].includes(node.id))
     if (nodes.length !== 2) throw invalid('A device in this proposal changed.', 409)
-    return { draft: { nodes, edges: [edge] } }
+    const { replaces, ...link } = edge
+    if (!replaces) return { draft: { nodes, edges: [link] } }
+    if (JSON.stringify(current.topology.edges.find(({ id }) => id === replaces.id)) !== JSON.stringify(replaces))
+      throw invalid('This connection changed. Review the latest port hint.', 409)
+    return { draft: { nodes, edges: [{ ...link, id: replaces.id }], replaceEdges: [replaces] } }
   }
   return { read, start, get, cancel, schedule, accept: review('accepted'), reject: review('rejected'), hint }
 }

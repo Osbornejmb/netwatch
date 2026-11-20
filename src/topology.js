@@ -1,3 +1,4 @@
+import { deviceTypes } from './device-types.js'
 import { normalizeAddress } from './inventory.js'
 import { connectionKey, physicalConnectionKey } from './connections.js'
 
@@ -20,7 +21,7 @@ export function validateTopology(value) {
       typeof node.id !== 'string' ||
       !node.id ||
       ids.has(node.id) ||
-      !['router', 'switch'].includes(node.type) ||
+      !Object.hasOwn(deviceTypes, node.type) ||
       !Number.isFinite(node.position?.x) ||
       !Number.isFinite(node.position?.y) ||
       typeof node.data?.label !== 'string' ||
@@ -85,6 +86,7 @@ export function validateTopology(value) {
       sourceHandle: edge.sourceHandle ?? null,
       targetHandle: edge.targetHandle ?? null,
       ...(uplink && { uplink }),
+      ...(uplink && edge.discoveryMapped === true && { discoveryMapped: true }),
       ...(role !== undefined && { role }),
     }
     if (uplink?.source.index && uplink?.target.index) {

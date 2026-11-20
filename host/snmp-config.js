@@ -1,3 +1,4 @@
+import { isInfrastructure } from '../src/device-types.js'
 import { mkdirSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -28,7 +29,7 @@ export async function manageLauncherSnmp(store, vault, request, probe = createSn
     const configured = new Set(store.interfaceTargets().map((target) => target.deviceId))
     return {
       devices: state.topology.nodes
-        .filter((node) => node.data.ip)
+        .filter((node) => node.data.ip && isInfrastructure(node.type))
         .map((node) => ({
           id: node.id,
           label: node.data.label,
@@ -40,7 +41,7 @@ export async function manageLauncherSnmp(store, vault, request, probe = createSn
   }
   if (!['test', 'enable'].includes(request?.command)) throw new Error('Invalid setup command.')
   const node = state.topology.nodes.find((node) => node.id === request.id)
-  if (!node?.data.ip || node.data.ip !== request.address || node.type !== request.type)
+  if (!node?.data.ip || !isInfrastructure(node.type) || node.data.ip !== request.address || node.type !== request.type)
     return { error: 'Saved device changed. Reopen Port monitoring and select it again.' }
   let user
   try {
@@ -112,7 +113,8 @@ async function main() {
       console.log('Interface monitoring removed.')
       return
     }
-    if (!node?.data.ip) throw new Error('Choose a saved device with a management address.')
+    if (!node?.data.ip || !isInfrastructure(node.type))
+      throw new Error('Choose a saved router or switch with a management address.')
     console.log(
       'This authorizes read-only SNMPv3 checks of this saved device/address. No device configuration is changed. Passwords are hidden and protected for this Windows account.',
     )

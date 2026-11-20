@@ -91,9 +91,12 @@ export async function readSwitchPorts(request, interfaces, policy, neighbors = [
     direct.set(peer.chassisMac, direct.has(peer.chassisMac) ? null : { index, name, remotePort: peer.remotePort })
   }
   for (const [mac, port] of direct) byMac.set(mac, port)
-  const cdpNeighbors = cdp.flatMap(({ index, address, peerPort }) => {
+  const cdpNeighbors = cdp.flatMap(({ index, address, peerPort, capabilities }) => {
     const name = names.get(index)
-    return name && address ? [{ peerIp: address, index, name, remotePort: peerPort, protocol: 'CDP' }] : []
+    if (!name || !address) return []
+    const flags = Number.parseInt(capabilities, 16)
+    const peerType = flags & 8 ? 'switch' : flags & 1 ? 'router' : undefined
+    return [{ peerIp: address, index, name, remotePort: peerPort, protocol: 'CDP', ...(peerType && { peerType }) }]
   })
   return [...byMac].flatMap(([mac, port]) => (port ? [{ mac, ...port }] : [])).concat(cdpNeighbors)
 }
@@ -109,7 +112,27 @@ export function switchPortFor(ports, node, discovery) {
   return matches?.length === 1 ? matches[0] : null
 }
 
-export function saveSwitchPortLink(topology, node, port) {
+const normalizePortName = (value) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/^fastethernet(?=\d)/, 'fa')
+    .replace(/^gigabitethernet(?=\d)/, 'gi')
+    .replace(/^tengigabitethernet(?=\d)/, 'te')
+    .replace(/^twentyfivegige(?=\d)/, 'twe')
+    .replace(/^port-channel(?=\d)/, 'po')
+
+const mappedPort = (label, index) => ({
+  label: (label ?? '').replace(/[\p{Cc}\p{Cf}]/gu, '').slice(0, 80),
+  index: Number.isInteger(index) && index >= 1 && index <= 2147483647 ? index : null,
+})
+const switchHintId = ({ source, target, label }) =>
+  'hint-' +
+  createHash('sha256')
+    .update(JSON.stringify([source, target, label]))
+    .digest('hex')
+
+export function saveSwitchPortLink(topology, node, port, peerInterfaces = []) {
   const owner = topology.nodes.find(({ id, type }) => id === port.switchId && type === 'switch')
   if (!owner) return null
   const id = 'discovery-port-' + createHash('sha256').update(node.id).digest('hex')
@@ -117,29 +140,59 @@ export function saveSwitchPortLink(topology, node, port) {
     ? `${port.protocol ?? 'LLDP'} · ${port.name.slice(0, 45)} ↔ ${port.remotePort.slice(0, 45)}`
     : `Last seen on ${port.name}`.slice(0, 100)
   const link = { id, source: node.id, target: owner.id, label }
-  const key = connectionKey(link)
-  const index = topology.edges.findIndex((edge) => edge.id === id)
-  if (index >= 0) {
-    const prior = topology.edges[index]
+  let index = topology.edges.findIndex((edge) => edge.id === id)
+  if (index < 0)
+    index = topology.edges.findIndex(
+      (edge) =>
+        edge.source === node.id &&
+        edge.target === owner.id &&
+        (edge.id === switchHintId(edge) || (edge.discoveryMapped && edge.id.startsWith('hint-'))),
+    )
+  const prior = topology.edges[index]
+  if (prior) {
     if (
       prior.source !== node.id ||
-      !(
-        prior.label.startsWith('Last seen on ') ||
-        prior.label.startsWith('LLDP · ') ||
-        prior.label.startsWith('CDP · ')
-      ) ||
-      prior.uplink ||
+      !/^(?:Last seen on |(?:LLDP|CDP) · )/.test(prior.label) ||
+      (prior.uplink && !prior.discoveryMapped) ||
       prior.role !== undefined ||
-      topology.groups?.some((group) => group.links.includes(id))
+      topology.groups?.some((group) => group.links.includes(prior.id))
     )
       return null
+    link.id = prior.id
   }
-  const existing = topology.edges.find((edge) => edge !== topology.edges[index] && connectionKey(edge) === key)
-  if (existing || (index < 0 && topology.edges.length >= 10000)) return null
-  if (index >= 0 && topology.edges[index].target === link.target && topology.edges[index].label === link.label)
+  const key = connectionKey(link)
+  if (
+    topology.edges.some((edge) => edge !== prior && connectionKey(edge) === key) ||
+    (!prior && topology.edges.length >= 10000)
+  )
     return null
-  if (index < 0) topology.edges.push(link)
-  else topology.edges[index] = link
+
+  const matching = port.remotePort
+    ? peerInterfaces.filter(({ name }) => name && normalizePortName(name) === normalizePortName(port.remotePort))
+    : []
+  const target = mappedPort(port.name, port.index)
+  const source = mappedPort(matching[0]?.name ?? port.remotePort, matching.length === 1 ? matching[0].index : null)
+  if (!target.index && prior?.discoveryMapped) return null
+  if (target.index) {
+    if (
+      prior?.discoveryMapped &&
+      prior.target === link.target &&
+      prior.label === label &&
+      !source.index &&
+      !matching.length
+    )
+      source.index = prior.uplink.source.index
+    link.uplink = { label: '', source, target }
+    link.discoveryMapped = true
+  }
+  if (
+    prior?.target === link.target &&
+    prior.label === label &&
+    JSON.stringify(prior.uplink) === JSON.stringify(link.uplink)
+  )
+    return null
+  if (!prior) topology.edges.push(link)
+  else topology.edges[index] = { ...prior, ...link }
   return { label: owner.data.label || owner.data.ip, port: port.name }
 }
 
@@ -153,7 +206,8 @@ export function linkScannedSwitchPorts(store, ports, rows) {
   for (const row of rows) {
     const node = byIp.get(row.ip)
     const port = node && switchPortFor(ports, node, row)
-    if (port && saveSwitchPortLink(topology, node, port)) changed = true
+    if (port && saveSwitchPortLink(topology, node, port, port.remotePort ? store.currentInterfaces?.(node.id) : []))
+      changed = true
   }
   if (changed) {
     const original = new Map(current.topology.edges.map((edge) => [edge.id, edge]))
@@ -161,11 +215,8 @@ export function linkScannedSwitchPorts(store, ports, rows) {
       .filter((edge) => original.get(edge.id) !== edge)
       .map((edge) => ({
         ...edge,
-        id:
-          'hint-' +
-          createHash('sha256')
-            .update(JSON.stringify([edge.source, edge.target, edge.label]))
-            .digest('hex'),
+        id: switchHintId(edge),
+        ...(original.has(edge.id) && { replaces: original.get(edge.id) }),
       }))
     store.recordTopologyHints(hints)
   }
