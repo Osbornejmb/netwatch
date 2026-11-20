@@ -584,7 +584,7 @@ export default function Dashboard({
       {!showInventory && (
         <LinkOverview
           summary={summary}
-          topology={viewer ? undefined : live?.inventory.topology}
+          topology={!viewer && live ? live.inventory.topology : undefined}
           dynamics={viewer ? undefined : live?.dynamics}
           nodes={nodes}
           tiers={tiers}
