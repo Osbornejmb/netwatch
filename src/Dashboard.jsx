@@ -568,21 +568,6 @@ export default function Dashboard({
           </details>
         </div>
       </header>
-      {!showInventory && (
-        <LinkOverview
-          summary={summary}
-          topology={!viewer && live ? live.inventory.topology : undefined}
-          dynamics={viewer ? undefined : live?.dynamics}
-          nodes={nodes}
-          tiers={tiers}
-          failurePoints={viewer ? undefined : live?.linkHealth?.failurePoints}
-          selectLink={(id) => {
-            setSelectedId(null)
-            setSelectedLinkId(id)
-          }}
-          selectDevice={selectDevice}
-        />
-      )}
       <div className="health-overview">
         <div className="health-summary" aria-label="Device health summary">
           {Object.entries({ up: 'up', down: 'down', stale: 'overdue', unknown: 'not monitored' }).map(
@@ -732,6 +717,7 @@ export default function Dashboard({
       ) : (
         <div className={`health-map${dense || nodes.length >= 120 ? ' health-map-large' : ''}`}>
           <ReactFlow
+            style={{ position: 'absolute', inset: 0 }}
             key={`${layoutKey}-${effectiveCenterId}`}
             onNodesChange={(changes) => {
               onDimensionsChange(changes)
@@ -823,6 +809,21 @@ export default function Dashboard({
             </div>
           )}
         </div>
+      )}
+      {!showInventory && (
+        <LinkOverview
+          summary={summary}
+          topology={!viewer && live ? live.inventory.topology : undefined}
+          dynamics={viewer ? undefined : live?.dynamics}
+          nodes={nodes}
+          tiers={tiers}
+          failurePoints={viewer ? undefined : live?.linkHealth?.failurePoints}
+          selectLink={(id) => {
+            setSelectedId(null)
+            setSelectedLinkId(id)
+          }}
+          selectDevice={selectDevice}
+        />
       )}
       {selectedLink && (
         <LinkDetails link={selectedLink} nodes={nodes} now={now} onClose={() => setSelectedLinkId(null)} />

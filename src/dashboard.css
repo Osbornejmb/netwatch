@@ -1,17 +1,7 @@
 .dashboard-shell .main-area {
-  height: 100dvh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-}
-.dashboard-shell .topbar {
-  flex-shrink: 0;
-}
-.dashboard-shell .page-content {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
 }
 .health-dashboard {
   flex: 1;
@@ -22,9 +12,6 @@
   line-height: 1.5;
   color: var(--text);
   background: var(--canvas);
-}
-.health-dashboard.is-inventory {
-  overflow: auto;
 }
 .health-page-titlebar {
   display: flex;
@@ -118,8 +105,7 @@
   width: 174px;
 }
 .health-map {
-  flex: 1;
-  min-height: 0;
+  flex: 1 0 max(22rem, 55dvh);
   position: relative;
   background: var(--canvas);
 }
@@ -522,6 +508,9 @@
   outline-offset: 3px;
 }
 @media (max-width: 720px) {
+  .health-map {
+    flex-basis: max(20rem, 50dvh);
+  }
   .health-page-titlebar {
     padding: 8px 12px;
     align-items: stretch;
