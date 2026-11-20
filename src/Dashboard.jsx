@@ -570,20 +570,16 @@ export default function Dashboard({
       </header>
       <div className="health-overview">
         <div className="health-summary" aria-label="Device health summary">
-          {Object.entries({ up: 'up', down: 'down', stale: 'overdue', unknown: 'not monitored' }).map(
-            ([key, label], index) => (
-              <span key={key}>
-                {index > 0 && ' · '}
-                <button
-                  className={`summary-${key}`}
-                  aria-pressed={statusFilter === key}
-                  onClick={() => setStatusFilter(statusFilter === key ? 'all' : key)}
-                >
-                  {counts[key]} {label}
-                </button>
-              </span>
-            ),
-          )}
+          {Object.entries(HEALTH).map(([key, { label }]) => (
+            <button
+              key={key}
+              className={`summary-${key}`}
+              aria-pressed={statusFilter === key}
+              onClick={() => setStatusFilter(statusFilter === key ? 'all' : key)}
+            >
+              <strong>{counts[key]}</strong> {label}
+            </button>
+          ))}
         </div>
         {attention.length > 0 && (
           <details className="health-attention">

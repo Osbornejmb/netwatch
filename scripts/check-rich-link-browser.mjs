@@ -85,7 +85,7 @@ try {
   page.on('pageerror', (error) => errors.push(error.message))
   await page.goto('http://127.0.0.1:' + server.address().port)
   const overview = page.getByRole('region', { name: 'Link and redundancy status' })
-  await overview.locator(".link-overview-panel > summary").click()
+  await overview.locator('.link-overview-panel > summary').click()
   await overview.getByText('Connections (1)', { exact: true }).click()
   await overview.getByText('Bundle · Core router ↔ Access switch · 2 of 2 members up', { exact: true }).click()
   await overview.getByRole('button', { name: /Core router.*Degraded link/ }).press('Enter')
@@ -99,7 +99,7 @@ try {
   assert.ok(await details.evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth + 1))
   await page.screenshot({ path: '.tools/evidence/screenshots/rich-link-narrow.png', animations: 'disabled' })
   await page.keyboard.press('Escape')
-  await overview.getByText(/Link attention/).click()
+  await overview.getByText('Device redundancy alerts', { exact: true }).click()
   await overview.getByRole('button', { name: /Access switch.*Running without redundancy/ }).click()
   await page
     .getByRole('dialog', { name: 'Access switch' })

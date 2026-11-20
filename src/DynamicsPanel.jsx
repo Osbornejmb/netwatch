@@ -22,9 +22,9 @@ export default function DynamicsPanel({ topology, bundles, dynamics, selectDevic
     <details className="map-tools">
       <summary>Map tools</summary>
       <div className="map-tools-content">
-        <details>
-          <summary>Recent changes ({dynamics.changes.length})</summary>
-          {dynamics.changes.length ? (
+        {dynamics.changes.length ? (
+          <details>
+            <summary>Recent changes ({dynamics.changes.length})</summary>
             <ul>
               {dynamics.changes.map((event) => (
                 <li key={event.id}>
@@ -35,15 +35,15 @@ export default function DynamicsPanel({ topology, bundles, dynamics, selectDevic
                 </li>
               ))}
             </ul>
-          ) : (
-            <p>No changes recorded yet.</p>
-          )}
-        </details>
-        <details>
-          <summary>
-            Redundancy incidents ({dynamics.incidents.filter((incident) => !incident.resolvedAt).length} open)
-          </summary>
-          {dynamics.incidents.length ? (
+          </details>
+        ) : (
+          <p className="map-tools-empty">No recent changes.</p>
+        )}
+        {dynamics.incidents.length ? (
+          <details>
+            <summary>
+              Redundancy incidents ({dynamics.incidents.filter((incident) => !incident.resolvedAt).length} open)
+            </summary>
             <ul>
               {dynamics.incidents.map((incident) => {
                 const device = topology.nodes.find((node) => node.id === incident.deviceId)
@@ -66,10 +66,10 @@ export default function DynamicsPanel({ topology, bundles, dynamics, selectDevic
                 )
               })}
             </ul>
-          ) : (
-            <p>No redundancy incidents recorded yet.</p>
-          )}
-        </details>
+          </details>
+        ) : (
+          <p className="map-tools-empty">No redundancy incidents.</p>
+        )}
         <details>
           <summary>Estimate a failure</summary>
           <p>Topology-based estimate from your saved map.</p>
