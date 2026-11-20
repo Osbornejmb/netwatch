@@ -52,7 +52,7 @@ for (const viewport of [{width:1440,height:900},{width:390,height:844}]) {
   assert.ok(await page.locator('.health-node-muted').evaluateAll(nodes=>nodes.length>0&&nodes.every(node=>getComputedStyle(node).opacity==='1')))
   assert.equal(await page.locator('.react-flow__edge').count(),initial.edges.length)
   await page.getByRole('button',{name:'Clear connection highlight'}).click()
-  assert.equal(await page.locator('.react-flow__edge').count(),initial.edges.length)
+  await page.waitForFunction(count=>document.querySelectorAll('.react-flow__edge').length===count,initial.edges.length)
   const stored=()=>page.evaluate(()=>localStorage.getItem('netwatch-topology-v1'))
   assert.equal(await stored(),serialized)
   const view=page.locator('.health-view-options > summary')

@@ -66,10 +66,13 @@ try {
   await page.getByRole('link', { name: 'Devices', exact: true }).click()
   for (const width of [1280, 1920, 390, 320]) {
     await page.setViewportSize({ width, height: 900 })
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth ? [] :
-      [...document.querySelectorAll('body *')].filter(element => element.getBoundingClientRect().right > innerWidth + 0.5)
-        .slice(0, 10).map(element => [element.tagName, element.getAttribute('class'), Math.round(element.getBoundingClientRect().right)]))
-    assert.deepEqual(overflow, [], 'Horizontal overflow at viewport width ' + width)
+    const { scrollWidth, offenders } = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      offenders: [...document.querySelectorAll('body *')]
+        .filter(element => element.getBoundingClientRect().right > innerWidth + 0.5)
+        .slice(0, 10).map(element => [element.tagName, element.getAttribute('class')]),
+    }))
+    assert.ok(scrollWidth <= width, `Horizontal overflow at ${width}px: ${scrollWidth}px (${JSON.stringify(offenders)})`)
     assert.equal(await page.locator('.health-inventory table').isVisible(), width >= 720)
     if (width < 720) assert.equal(await page.locator('.health-device-card:visible').count(), 14)
     await page.locator('.backup-recovery summary').click()
