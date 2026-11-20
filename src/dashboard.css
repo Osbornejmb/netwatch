@@ -255,7 +255,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  max-width: calc(100% - 32px);
+  max-width: calc(100% - 80px);
   align-items: center;
   padding: 4px 8px;
   background: var(--surface);
@@ -586,7 +586,7 @@
   .health-map-focus-controls {
     top: 8px;
     right: 8px;
-    max-width: calc(100% - 16px);
+    max-width: calc(100% - 72px);
   }
   .health-empty-map strong {
     font-size: 21px;
