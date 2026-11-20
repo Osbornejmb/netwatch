@@ -60,7 +60,7 @@ export async function addDiscoveredToMap({ store, discovery, interfaces, id, bod
   if (!bulk && !items[0].ip) throw invalid('Discovered device not found.', 404)
   if (bulk && pendingVersion(items) !== body.pendingVersion) throw invalid('Scan results changed.', 409)
   const topology = { ...current.topology, nodes: [...current.topology.nodes], edges: [...current.topology.edges] }
-  const existing = new Set(topology.edges.map((edge) => edge.id))
+  const existing = new Map(topology.edges.map((edge) => [edge.id, edge]))
   const members = new Set()
   const ports = interfaces?.switchPorts?.() ?? new Map()
   let addedCount = 0
@@ -84,7 +84,10 @@ export async function addDiscoveredToMap({ store, discovery, interfaces, id, bod
   }
   for (const { node, gateway, item } of linksToPlan) {
     const port = !item.misses && switchPortFor(ports, node, item)
-    if (port && saveSwitchPortLink(topology, node, port)) continue
+    if (port) {
+      saveSwitchPortLink(topology, node, port)
+      continue
+    }
     const router = topology.nodes.find((candidate) => candidate.type === 'router' && candidate.data.ip === gateway)
     if (!router || router.id === node.id || topology.edges.length >= 10000) continue
     const pair = { source: node.id, target: router.id }
@@ -93,13 +96,18 @@ export async function addDiscoveredToMap({ store, discovery, interfaces, id, bod
       topology.edges.push({ ...pair, id: 'gateway-' + key, label: 'Gateway route' })
     }
   }
-  const edges = topology.edges.filter((edge) => !existing.has(edge.id))
+  const edges = topology.edges.filter((edge) => existing.get(edge.id) !== edge)
+  const replaceEdges = edges.flatMap(({ id }) => (existing.has(id) ? [existing.get(id)] : []))
   for (const { source, target } of edges) {
     members.add(source)
     members.add(target)
   }
   return {
-    draft: { nodes: topology.nodes.filter((node) => members.has(node.id)), edges },
+    draft: {
+      nodes: topology.nodes.filter((node) => members.has(node.id)),
+      edges,
+      ...(replaceEdges.length && { replaceEdges }),
+    },
     addedCount,
     existingCount: items.length - addedCount,
     revision: current.revision,

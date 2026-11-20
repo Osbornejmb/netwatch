@@ -299,9 +299,7 @@ export default function Dashboard({
           ? [endpoint('source') + ' ↔ ' + endpoint('target'), sharedSpeed, linkLabels[link?.state ?? 'unknown']]
               .filter(Boolean)
               .join(' · ')
-          : /^(?:Last seen on |LLDP · )/.test(edge.label)
-            ? edge.label.replace(/^(?:Last seen on |LLDP · )/, '')
-            : undefined
+          : /^(?:Last seen on |(?:LLDP|CDP) · )(.*)$/.exec(edge.label)?.[1]
       return {
         id: edge.id,
         source: edge.source,

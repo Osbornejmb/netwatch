@@ -14,6 +14,7 @@ using System.Windows.Forms;
 public class DesktopSettings {
  public string node {get;set;} public string root {get;set;} public string database {get;set;} public bool icmp {get;set;} public bool discovery {get;set;} public bool discoveryIcmp {get;set;} public bool lan {get;set;}
  public bool managedSharing {get;set;} public bool? snmp {get;set;}
+ public Dictionary<string,string> snmpPortContexts {get;set;}
 }
 public class AuditRow {public long at {get;set;} public string ip {get;set;} public string action {get;set;} public string detail {get;set;}}
 public class RemoteSession {public string role {get;set;} public string ip {get;set;} public long lastSeen {get;set;}}
@@ -174,6 +175,7 @@ public class NetWatch : Form {
    var info=new ProcessStartInfo(nodePath,"host/desktop.js"){WorkingDirectory=appRoot,UseShellExecute=false,CreateNoWindow=true,RedirectStandardInput=true,RedirectStandardOutput=true,RedirectStandardError=true,StandardOutputEncoding=Encoding.UTF8,StandardErrorEncoding=Encoding.UTF8};
    info.EnvironmentVariables["NETWATCH_DB"]=settings.database;info.EnvironmentVariables["NETWATCH_ICMP"]=settings.icmp?"1":"0";info.EnvironmentVariables["NETWATCH_DISCOVERY"]=settings.discovery?"1":"0";info.EnvironmentVariables["NETWATCH_DISCOVERY_ICMP"]=settings.discovery&&settings.discoveryIcmp?"1":"0";
    if(settings.snmp.HasValue)info.EnvironmentVariables["NETWATCH_SNMP"]=settings.snmp.Value?"1":"0";
+   info.EnvironmentVariables["NETWATCH_SNMP_PORT_CONTEXTS"]=FormatPortContexts();
    info.EnvironmentVariables["NETWATCH_LAN"]=settings.lan?"1":"0";
 #if PACKAGED
    if(settings.managedSharing&&!(settings.lan&&ManualTlsConfigured())) {
@@ -320,18 +322,57 @@ public class NetWatch : Form {
   MessageBox.Show(accessWindow,"On the viewing PC:\n1. Open the connection file you saved from this PC. Choose Install Certificate, then Current User.\n2. Choose Place all certificates in the following store. Browse to Trusted Root Certification Authorities and finish.\n3. Open the address from Copy URL in your browser. Enter the viewing password if prompted.","Connect another PC",MessageBoxButtons.OK,MessageBoxIcon.Information);
  }
 #endif
+ Dictionary<string,string> EffectivePortContexts() {
+  var values=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
+  string inherited=Environment.GetEnvironmentVariable("NETWATCH_SNMP_PORT_CONTEXTS",EnvironmentVariableTarget.User)
+   ??Environment.GetEnvironmentVariable("NETWATCH_SNMP_PORT_CONTEXTS")??"";
+  foreach(string entry in inherited.Split(',')) {
+   string[] parts=entry.Trim().Split('=');
+   if(parts.Length==2&&IsPortContext(parts[1])&&parts[1].Length>0)values[parts[0]]=parts[1];
+  }
+  if(settings.snmpPortContexts!=null)
+   foreach(var entry in settings.snmpPortContexts)values[entry.Key]=entry.Value;
+  return values;
+ }
+ public static bool IsPortContext(string value) {
+  return value!=null&&Regex.IsMatch(value,@"\A[A-Za-z0-9_.-]{0,32}\z");
+ }
+ string FormatPortContexts() {
+  var entries=new List<string>();
+  foreach(var entry in EffectivePortContexts())
+   if(!String.IsNullOrEmpty(entry.Value))entries.Add(entry.Key+"="+entry.Value);
+  return String.Join(",",entries);
+ }
+ string GetPortContext(string address) {
+  string context;
+  return EffectivePortContexts().TryGetValue(address,out context)?context??"":"";
+ }
+ bool SavePortContext(string address,string context) {
+  if(!IsPortContext(context))return false;
+  var previous=settings.snmpPortContexts;
+  var values=previous==null?new Dictionary<string,string>():new Dictionary<string,string>(previous);
+  values[address]=context;
+  settings.snmpPortContexts=values;
+  if(SavePortSettings())return true;
+  settings.snmpPortContexts=previous;
+  return false;
+ }
  bool SavePortPreference(bool enabled) {
   if(settings.snmp==enabled)return true;
   bool? previous=settings.snmp;
+  settings.snmp=enabled;
+  if(SavePortSettings())return true;
+  settings.snmp=previous;
+  return false;
+ }
+ bool SavePortSettings() {
   string staged=settingsPath+"."+Guid.NewGuid().ToString("N")+".tmp";
   try {
-   settings.snmp=enabled;
    File.WriteAllText(staged,json.Serialize(settings));
    if(File.Exists(settingsPath))File.Replace(staged,settingsPath,null);
    else File.Move(staged,settingsPath);
    return true;
   } catch {
-   settings.snmp=previous;
    return false;
   } finally {
    try {File.Delete(staged);}catch(IOException){}catch(UnauthorizedAccessException){}
@@ -349,7 +390,7 @@ public class NetWatch : Form {
     if(!SavePortPreference(true))return false;
     portChecks.Checked=true;
     return true;
-   }))dialog.ShowDialog(this);
+   },GetPortContext,SavePortContext))dialog.ShowDialog(this);
   } finally {settingUpPorts=false;}
  }
  async Task<PortSetupResult> RunPortSetup(object request) {
@@ -385,15 +426,19 @@ public class PortSetupResult {
 public class PortSetupWindow : Form {
  readonly Func<object,Task<PortSetupResult>> request;
  readonly Func<bool> enableOnStart;
+ readonly Func<string,string> getContext;
+ readonly Func<string,string,bool> saveContext;
  readonly ComboBox devices,algorithm;
- readonly TextBox username,authentication,privacy;
+ readonly TextBox username,authentication,privacy,context;
  readonly Label status;
- readonly Button test,enable,close;
+ readonly Button test,enable,close,saveVlan;
  bool busy,tested;
- public PortSetupWindow(Func<object,Task<PortSetupResult>> request,Func<bool> enableOnStart) {
+ public PortSetupWindow(Func<object,Task<PortSetupResult>> request,Func<bool> enableOnStart,Func<string,string> getContext,Func<string,string,bool> saveContext) {
   this.request=request;
   this.enableOnStart=enableOnStart;
-  Text="Port monitoring";ClientSize=new Size(480,466);StartPosition=FormStartPosition.CenterParent;
+  this.getContext=getContext;
+  this.saveContext=saveContext;
+  Text="Port monitoring";ClientSize=new Size(480,544);StartPosition=FormStartPosition.CenterParent;
   FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=false;MinimizeBox=false;
   BackColor=Color.FromArgb(244,243,238);ForeColor=Color.FromArgb(37,58,54);
 
@@ -408,14 +453,26 @@ public class PortSetupWindow : Form {
   username=AddSecret("SNMP username",190,32);
   authentication=AddSecret("Authentication password",244,128);
   privacy=AddSecret("Privacy password",298,128);
-  status=AddLabel("Reading saved devices…",352,56);
+  AddLabel("VLAN context (optional)",352,22);
+  context=new TextBox{Location=new Point(16,375),Width=300,MaxLength=32,AccessibleName="VLAN context"};
+  Controls.Add(context);
+  saveVlan=AddButton("Save context",324,140);
+  saveVlan.Location=new Point(324,369);
+  saveVlan.Height=32;
+  saveVlan.Click+=(s,e)=>SaveSelectedContext();
+  AddLabel("Use the exact context name from the switch. Leave blank for the default.",405,22);
+  status=AddLabel("Reading saved devices…",430,56);
   test=AddButton("Test connection",16,132);
   enable=AddButton("Enable monitoring",157,152);
   close=AddButton("Close",364,100);
   close.DialogResult=DialogResult.Cancel;CancelButton=close;
   test.Click+=async (s,e)=>await Submit(false);
   enable.Click+=async (s,e)=>await Submit(true);
-  devices.SelectedIndexChanged+=(s,e)=>ClearTest();
+  devices.SelectedIndexChanged+=(s,e)=>{
+   var device=devices.SelectedItem as PortSetupDevice;
+   context.Text=device!=null&&device.type=="switch"?getContext(device.address):"";
+   ClearTest();
+  };
   algorithm.SelectedIndexChanged+=(s,e)=>ClearTest();
   username.TextChanged+=(s,e)=>ClearTest();
   authentication.TextChanged+=(s,e)=>ClearTest();
@@ -433,7 +490,7 @@ public class PortSetupWindow : Form {
   Controls.Add(input);return input;
  }
  Button AddButton(string text,int left,int width) {
-  var button=new Button{Text=text,Location=new Point(left,410),Size=new Size(width,40),FlatStyle=FlatStyle.Flat,
+  var button=new Button{Text=text,Location=new Point(left,488),Size=new Size(width,40),FlatStyle=FlatStyle.Flat,
    BackColor=Color.FromArgb(252,251,247),ForeColor=ForeColor,UseVisualStyleBackColor=false};
   button.FlatAppearance.BorderColor=Color.FromArgb(170,183,172);
   Controls.Add(button);return button;
@@ -447,7 +504,19 @@ public class PortSetupWindow : Form {
   bool ready=!busy&&devices.SelectedItem!=null;
   devices.Enabled=!busy&&devices.Items.Count>0;
   algorithm.Enabled=username.Enabled=authentication.Enabled=privacy.Enabled=ready;
+  context.Enabled=saveVlan.Enabled=ready&&((PortSetupDevice)devices.SelectedItem).type=="switch";
   test.Enabled=ready;enable.Enabled=ready&&tested;close.Enabled=!busy;
+ }
+ void SaveSelectedContext() {
+  var device=(PortSetupDevice)devices.SelectedItem;
+  var value=context.Text.Trim();
+  if(!NetWatch.IsPortContext(value)) {
+   status.Text="Use up to 32 letters, numbers, periods, underscores, or hyphens.";
+   return;
+  }
+  status.Text=saveContext(device.address,value)
+   ?"VLAN context saved. Start NetWatch to use it."
+   :"Could not save the VLAN context.";
  }
  async Task LoadDevices() {
   busy=true;UpdateControls();
@@ -461,6 +530,11 @@ public class PortSetupWindow : Form {
  }
  async Task Submit(bool save) {
   var device=(PortSetupDevice)devices.SelectedItem;
+  var value=context.Text.Trim();
+  if(device.type=="switch"&&!NetWatch.IsPortContext(value)) {
+   status.Text="Use up to 32 letters, numbers, periods, underscores, or hyphens.";
+   return;
+  }
   tested=false;busy=true;UpdateControls();
   status.Text=save?"Checking the connection and protecting credentials…":"Checking the switch or router for readable ports…";
   try {
@@ -474,13 +548,15 @@ public class PortSetupWindow : Form {
     status.Text="Connection passed. Read "+result.portCount+" port(s).";
     return;
    }
+   bool contextSaved=device.type!="switch"||value==getContext(device.address)||saveContext(device.address,value);
    username.Clear();authentication.Clear();privacy.Clear();
    int index=devices.SelectedIndex;
    device.configured=true;
    devices.Items[index]=device;
    devices.SelectedIndex=index;
    bool enabled=enableOnStart();
-   status.Text=enabled?"Monitoring saved. Close this window and start NetWatch.":"Credentials saved. Turn on Check ports on next start in the launcher.";
+   status.Text=!contextSaved?"Credentials saved. Use Save context to retry saving the VLAN context.":enabled?
+    "Monitoring saved. Close this window and start NetWatch.":"Credentials saved. Turn on Check ports on next start in the launcher.";
   } catch {status.Text="Port setup could not finish. Make sure the host is stopped and try again.";}
   finally {busy=false;UpdateControls();}
  }

@@ -187,9 +187,10 @@ export function createInterfaceCollector(
         continue
       const age = now() - Date.parse(sample.checkedAt)
       if (!Number.isFinite(age) || age < 0 || age > freshness()) continue
-      for (const { mac, ...port } of sample.ports) {
-        if (!matches.has(mac)) matches.set(mac, [])
-        matches.get(mac).push({ ...port, switchId: target.deviceId })
+      for (const { mac, peerIp, ...port } of sample.ports) {
+        const key = peerIp ? 'ip:' + peerIp : mac
+        if (!matches.has(key)) matches.set(key, [])
+        matches.get(key).push({ ...port, switchId: target.deviceId })
       }
     }
     return matches

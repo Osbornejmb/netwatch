@@ -1,5 +1,5 @@
 import { readLinkEvidence } from './link-evidence.js'
-import { readDiscoveryLldp } from './discovery-lldp.js'
+import { readCdp, readDiscoveryLldp } from './discovery-lldp.js'
 import snmp from 'net-snmp'
 import { normalizeAddress } from '../src/inventory.js'
 import { INTERFACE_POLICY as POLICY, validateInterfaces } from './interfaces.js'
@@ -68,40 +68,55 @@ function decode(field, v) {
   if (v.type !== type || number(v.value) === null) throw new Error()
   return field.endsWith('32') ? String(v.value) : v.value
 }
+function switchPortContexts(value) {
+  const contexts = new Map()
+  for (const entry of (value ?? '').split(',')) {
+    const [address, context, extra] = entry.trim().split('=')
+    const target = normalizeAddress(address)
+    if (target && /^[A-Za-z0-9_.-]{1,32}$/.test(context ?? '') && extra === undefined) contexts.set(target, context)
+  }
+  return contexts
+}
+
 export function createSnmpProbe({
   createSession = snmp.createV3Session,
   now = () => Date.now(),
   policy = POLICY,
+  portContexts = process.env.NETWATCH_SNMP_PORT_CONTEXTS,
 } = {}) {
+  const contexts = switchPortContexts(portContexts)
   return async (
     address,
     credentials,
     { signal, collectSwitchPorts = false, discovery = false, collectLinkEvidence = false } = {},
   ) => {
-    let session, timer, onAbort, rejectActive
+    let session, portSession, timer, onAbort, rejectActive
     try {
       const target = normalizeAddress(address)
       if (!target) throw new Error()
       const user = validateSnmpUser(credentials)
       if (signal?.aborted) return { error: 'cancelled' }
-      session = createSession(
-        target,
-        {
-          ...user,
-          level: snmp.SecurityLevel.authPriv,
-          authProtocol: snmp.AuthProtocols[user.authProtocol],
-          privProtocol: snmp.PrivProtocols.aes,
-        },
-        {
-          port: 161,
-          retries: discovery ? 1 : 0,
-          timeout: discovery ? 2000 : policy.timeoutMs,
-          transport: target.includes(':') ? 'udp6' : 'udp4',
-          backwardsGetNexts: false,
-          reportOidMismatchErrors: true,
-          strictIntRangeChecks: true,
-        },
-      )
+      const openSession = (context) =>
+        createSession(
+          target,
+          {
+            ...user,
+            level: snmp.SecurityLevel.authPriv,
+            authProtocol: snmp.AuthProtocols[user.authProtocol],
+            privProtocol: snmp.PrivProtocols.aes,
+          },
+          {
+            port: 161,
+            retries: discovery ? 1 : 0,
+            timeout: discovery ? 2000 : policy.timeoutMs,
+            transport: target.includes(':') ? 'udp6' : 'udp4',
+            backwardsGetNexts: false,
+            reportOidMismatchErrors: true,
+            strictIntRangeChecks: true,
+            ...(context && { context }),
+          },
+        )
+      session = openSession()
       const failure = new Promise((_, reject) => {
         rejectActive = reject
       })
@@ -111,26 +126,29 @@ export function createSnmpProbe({
       session.on('error', () => rejectActive(new Error('snmp_failed')))
       timer = setTimeout(() => rejectActive(new Error('snmp_timeout')), policy.deadlineMs)
       let requests = 0
-      const request = (method, ...args) => {
-        if (++requests > policy.maxRequests) throw new Error('snmp_limit')
-        return Promise.race([
-          failure,
-          new Promise((resolve, reject) =>
-            session[method](...args, (error, result) => {
-              if (!error) return resolve(result)
-              const code =
-                error.status === snmp.ErrorStatus.TooBig
-                  ? 'snmp_too_big'
-                  : discovery && error.status === snmp.ErrorStatus.AuthorizationError
-                    ? 'credentials_rejected'
-                    : discovery && error instanceof snmp.RequestTimedOutError
-                      ? 'snmp_timeout'
-                      : 'snmp_failed'
-              reject(new Error(code))
-            }),
-          ),
-        ])
-      }
+      const requestOn =
+        (connection) =>
+        (method, ...args) => {
+          if (++requests > policy.maxRequests) throw new Error('snmp_limit')
+          return Promise.race([
+            failure,
+            new Promise((resolve, reject) =>
+              connection[method](...args, (error, result) => {
+                if (!error) return resolve(result)
+                const code =
+                  error.status === snmp.ErrorStatus.TooBig
+                    ? 'snmp_too_big'
+                    : discovery && error.status === snmp.ErrorStatus.AuthorizationError
+                      ? 'credentials_rejected'
+                      : discovery && error instanceof snmp.RequestTimedOutError
+                        ? 'snmp_timeout'
+                        : 'snmp_failed'
+                reject(new Error(code))
+              }),
+            ),
+          ])
+        }
+      const request = requestOn(session)
       if (discovery) return await readDiscoveryLldp(request, new Date(now()).toISOString())
       const uptime = async () => {
         const rows = await request('get', [UPTIME])
@@ -215,7 +233,19 @@ export function createSnmpProbe({
       let switchPorts
       if (collectSwitchPorts) {
         try {
-          const ports = await readSwitchPorts(request, interfaces.interfaces, policy, lldp.neighbors)
+          const context = contexts.get(target)
+          if (context) {
+            portSession = openSession(context)
+            portSession.on('error', () => {})
+          }
+          const cdp = await readCdp(request).catch(() => [])
+          const ports = await readSwitchPorts(
+            portSession ? requestOn(portSession) : request,
+            interfaces.interfaces,
+            policy,
+            lldp.neighbors,
+            cdp,
+          )
           if ((await uptime()) >= endUptime) switchPorts = ports
         } catch {}
       }
@@ -235,9 +265,11 @@ export function createSnmpProbe({
     } finally {
       clearTimeout(timer)
       if (onAbort) signal?.removeEventListener('abort', onAbort)
-      try {
-        session?.close()
-      } catch {}
+      for (const connection of [portSession, session]) {
+        try {
+          connection?.close()
+        } catch {}
+      }
     }
   }
 }

@@ -34,13 +34,14 @@ Screenshots use a test inventory with documentation addresses.
 
 ### 4. Optional — see what is connected to a switch port
 
-1. Ask whoever manages the switch for a read-only **SNMPv3** account. SNMPv3 is how NetWatch securely reads port information, and a read-only account lets it look without changing the switch.
-2. In the Windows NetWatch app, click **Stop** and wait for it to finish. Then open **Port monitoring** and choose the switch you saved.
-3. Enter the username, choose the password-checking method the switch uses, and enter the authentication and privacy passwords. Those passwords let NetWatch prove it can access the switch and keep the replies private.
-4. Click **Test connection**. If the test passes, choose **Enable monitoring**, then close the setup window and click **Start**.
-5. Open the dashboard, select the switch, and expand **Ports** to see whether its ports are up. Expand **Network neighbors** to see connected devices that announce themselves using **LLDP**, a way for devices to share their name and port with a directly connected neighbor. [Port and neighbor setup](docs/SNMP-INTERFACES.md)
+1. [Configure the switch for NetWatch](switchconfig.md). The guide starts with the switch console and covers account creation, VLAN forwarding tables, LLDP, and Cisco CDP.
+2. In the Windows NetWatch launcher, click **Stop**. Open **Port monitoring…** and select the switch already saved on your map.
+3. Enter its read-only SNMPv3 credentials. If its forwarding table requires a named context, enter the exact name in **VLAN context**. Leave it blank for the default context. Use a NetWatch build that includes this field.
+4. Select **Test connection → Enable monitoring**. NetWatch saves the context for the selected switch. For an enrolled switch, **Save context** changes the context without re-entering credentials.
+5. Start the host and check **Devices → Ports** for recent readings. Then select **Discovered → Scan now**, review the port hint, and save the draft with **Use this map**.
 
-Discovered port matches appear under **Connections** after the device is added to the map. Set up port monitoring on each managed switch to locate devices behind a trunk. [Discovery port matching](docs/DISCOVERY.md#switch-port-matches)
+Enroll each managed switch whose access ports you want to discover. LLDP or CDP can identify the neighbor on a trunk. The switch an endpoint is plugged into supplies the MAC forwarding evidence for its access port. [Discovery guide](docs/DISCOVERY.md#switch-port-matches)
+
 
 Keep the NetWatch PC awake, connected, and signed in while you want checks to run. Start NetWatch again after signing back in. For updates and uninstall steps, see the [Windows launcher guide](docs/WINDOWS-LAUNCHER.md).
 
@@ -83,7 +84,7 @@ For help with launcher setup, see the [Windows launcher guide](docs/WINDOWS-LAUN
 
 ## Read device status
 
-An optional Windows-host SNMPv3 feature adds interface status and traffic rates under device details → **Ports**. In the Windows launcher, stop the host and choose **Port monitoring** to test and enroll a saved device for port checks; it does not change ping-based device health. See [SNMP interface setup](docs/SNMP-INTERFACES.md). Cisco 3750/2811 physical verification is pending.
+An optional Windows-host SNMPv3 feature adds interface status and traffic rates under device details → **Ports**. In the Windows launcher, stop the host and choose **Port monitoring** to test and enroll a saved device for port checks; it does not change ping-based device health. See [SNMP interface setup](docs/SNMP-INTERFACES.md). VLAN 100 access-port matching and CDP trunk detection were verified on a Catalyst 3750. Check the switch setup guide for the required SNMP views.
 
 Use **Edit map → Uplinks & redundancy** to map both ends of a connection, add a parallel link with different ports, or set a link role. To save a redundancy baseline, choose the protected device and its mapped connections, then select the root routers. **Use this map** previews and applies the draft. Existing router groups still show their port-based status on the dashboard. Map line colors continue to show device reachability.
 
