@@ -29,6 +29,7 @@ async function download(button) {
   return readFile(await (await pending).path(), 'utf8')
 }
 await page.goto(url)
+await page.waitForFunction(key => localStorage.getItem(key) !== null, key)
 await page.evaluate(({key,raw}) => localStorage.setItem(key,raw), { key, raw })
 await page.reload()
 assert.match(await page.getByRole('alert').innerText(), /fallback/)
