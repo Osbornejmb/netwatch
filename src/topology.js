@@ -1,10 +1,10 @@
 import { normalizeAddress } from './inventory.js'
-import { connectionKey } from './connections.js'
+import { connectionKey, physicalConnectionKey } from './connections.js'
 
 export const STORAGE_KEY = 'netwatch-topology-v1'
 
 export function validateTopology(value) {
-  if (value?.schemaVersion !== undefined && value.schemaVersion !== 1)
+  if (value?.schemaVersion !== undefined && ![1, 2].includes(value.schemaVersion))
     throw new Error('Unsupported topology schema version.')
   if (!value || !Array.isArray(value.nodes) || !Array.isArray(value.edges)) {
     throw new Error('A topology must contain nodes and edges arrays.')
@@ -45,7 +45,8 @@ export function validateTopology(value) {
   })
   const edgeIds = new Set()
   const routerIds = new Set(nodes.filter((node) => node.type === 'router').map((node) => node.id))
-  const routerLinks = new Map()
+  const linksById = new Map()
+  const physicalKeys = new Set()
   const edges = value.edges.map((edge) => {
     if (
       !edge ||
@@ -63,9 +64,11 @@ export function validateTopology(value) {
       throw new Error('Invalid link: check unique IDs and existing, distinct endpoints.')
     }
     edgeIds.add(edge.id)
-    if (routerIds.has(edge.source) || routerIds.has(edge.target)) routerLinks.set(edge.id, edge)
     const uplink = edge.uplink === undefined ? undefined : validateUplink(edge.uplink)
-    return {
+    const role = edge.role
+    if (role !== undefined && !['uplink', 'downlink', 'peer', 'unknown'].includes(role))
+      throw new Error('Invalid link role.')
+    const normalized = {
       id: edge.id,
       source: edge.source,
       target: edge.target,
@@ -73,11 +76,21 @@ export function validateTopology(value) {
       sourceHandle: edge.sourceHandle ?? null,
       targetHandle: edge.targetHandle ?? null,
       ...(uplink && { uplink }),
+      ...(role !== undefined && { role }),
     }
+    if (uplink?.source.index && uplink?.target.index) {
+      const key = physicalConnectionKey(normalized)
+      physicalKeys.add(key)
+    }
+    linksById.set(edge.id, normalized)
+    return normalized
   })
   const groups = value.groups === undefined ? [] : value.groups
   if (!Array.isArray(groups) || groups.length > 100) throw new Error('Invalid redundancy groups.')
   const groupIds = new Set()
+  const roots = value.roots ?? []
+  if (!Array.isArray(roots) || new Set(roots).size !== roots.length || roots.some((id) => !routerIds.has(id)))
+    throw new Error('Choose distinct routers as roots.')
   const cleanGroups = groups.map((group) => {
     if (
       !group ||
@@ -92,17 +105,60 @@ export function validateTopology(value) {
       group.links.length < 2 ||
       group.links.length > 16 ||
       new Set(group.links).size !== group.links.length ||
-      group.links.some((id) => !routerLinks.has(id))
+      group.links.some((id) => !linksById.has(id))
     )
-      throw new Error('Each redundancy group needs a name and 2–16 distinct router links.')
-    const links = group.links.map((id) => routerLinks.get(id))
+      throw new Error('Each redundancy group needs a name and 2–16 distinct links.')
+    const links = group.links.map((id) => linksById.get(id))
     const routers = new Set(links.flatMap(({ source, target }) => [source, target]).filter((id) => routerIds.has(id)))
-    if (routers.size < 2 || new Set(links.map(connectionKey)).size !== links.length)
+    const protectedDevice = group.protectedDevice
+    if (
+      protectedDevice !== undefined &&
+      (!ids.has(protectedDevice) ||
+        links.some(
+          (edge) =>
+            ![edge.source, edge.target].includes(protectedDevice) ||
+            !edge.uplink?.source.index ||
+            !edge.uplink?.target.index,
+        ) ||
+        new Set(
+          links.flatMap((edge) =>
+            ['source', 'target'].map((side) => JSON.stringify([edge[side], edge.uplink[side].index])),
+          ),
+        ).size !==
+          links.length * 2)
+    )
+      throw new Error('A baseline requires distinct mapped connections to the protected device.')
+    if (
+      protectedDevice === undefined &&
+      (routers.size < 2 ||
+        links.some((edge) => !routerIds.has(edge.source) && !routerIds.has(edge.target)) ||
+        new Set(links.map(connectionKey)).size !== links.length)
+    )
       throw new Error('Choose different connections that include at least two routers.')
     groupIds.add(group.id)
-    return { id: group.id, name: group.name.trim(), links: [...group.links] }
+    return {
+      id: group.id,
+      name: group.name.trim(),
+      links: [...group.links],
+      ...(protectedDevice !== undefined && { protectedDevice }),
+    }
   })
-  return { schemaVersion: 1, nodes, edges, ...(cleanGroups.length && { groups: cleanGroups }) }
+  const version =
+    value.schemaVersion === 2 ||
+    roots.length ||
+    edges.some((edge) => edge.role) ||
+    cleanGroups.some((group) => group.protectedDevice) ||
+    physicalKeys.size >
+      new Set(edges.filter((edge) => edge.uplink?.source.index && edge.uplink?.target.index).map(connectionKey)).size
+      ? 2
+      : 1
+  return {
+    schemaVersion: version,
+    nodes,
+    edges,
+    ...(cleanGroups.length && { groups: cleanGroups }),
+    ...(roots.length && { roots }),
+  }
 }
 
 export function validateUplink(value) {

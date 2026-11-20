@@ -55,10 +55,15 @@ function Preview({ action, onClose, onConfirm, busy }) {
             {action.topology.groups.map((group) => (
               <li key={group.id}>
                 {group.name} · {group.links.length} links
+                {group.protectedDevice && ' · reviewed baseline'}
               </li>
             ))}
           </ul>
         </details>
+      )}
+      {!!action.topology.roots?.length && (
+        <p>Root routers: {action.topology.roots.map((id) =>
+          action.topology.nodes.find((node) => node.id === id)?.data.label).join(', ')}</p>
       )}
       <div className="modal-actions">
         <button data-initial-focus className="button secondary" disabled={busy} onClick={onClose}>
@@ -71,7 +76,7 @@ function Preview({ action, onClose, onConfirm, busy }) {
     </dialog>
   )
 }
-export default forwardRef(function HostStorage({ nodes, edges, groups, onLoad, paused, importGeneration }, ref) {
+export default forwardRef(function HostStorage({ nodes, edges, groups, roots, onLoad, paused, importGeneration }, ref) {
   const [host, setHost] = useState(null)
   const [action, setAction] = useState(null)
   const [message, setMessage] = useState('Your draft is separate from the network being monitored.')
@@ -107,7 +112,7 @@ export default forwardRef(function HostStorage({ nodes, edges, groups, onLoad, p
   }
   const preview = (kind, saved = host, settingsOverride = monitoring) => {
     try {
-      const topology = validateTopology(kind === 'load' ? saved.topology : { nodes, edges, groups })
+      const topology = validateTopology(kind === 'load' ? saved.topology : { nodes, edges, groups, roots })
       const unchanged = new Map(saved.topology.nodes.map((n) => [n.id, n]))
       const settings = Object.fromEntries(
         topology.nodes.map((n) => [

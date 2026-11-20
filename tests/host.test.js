@@ -53,7 +53,7 @@ test('snapshot chooses newest timestamp then sequence, including after rebuildin
  assert.equal(store.snapshot().observations.length,1);assert.equal(store.snapshot().observations[0].status,'down')
  const saved=store.read(),history=store.history('r1');store.db.exec('DROP INDEX checks_device_latest');store.close()
  const reopened=openStore(path,{now:()=>now});try {
- assert.equal(reopened.db.prepare('PRAGMA user_version').get().user_version,10)
+ assert.equal(reopened.db.prepare('PRAGMA user_version').get().user_version,11)
  assert.deepEqual(reopened.read(),saved);assert.deepEqual(reopened.history('r1'),history)
  assert.equal(reopened.snapshot().observations[0].status,'down')
  assert.ok(reopened.db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='checks_device_latest'").get())
@@ -85,8 +85,8 @@ test('cleanup trims devices first, then evicts the network-wide oldest rows', t=
 test('failed initial migration rolls back schema; future schemas are rejected without modification',t=>{
  const dir=mkdtempSync(join(tmpdir(),'netwatch-migration-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));const path=join(dir,'db')
  assert.throws(()=>openStore(path,{migrate:()=>{throw new Error('migration interrupted')}}),/interrupted/)
- const db=new DatabaseSync(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,0);assert.equal(db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name='inventory'").get().n,0);db.exec('PRAGMA user_version=11');db.close()
- assert.throws(()=>openStore(path),/newer/);const check=new DatabaseSync(path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,11);check.close()
+ const db=new DatabaseSync(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,0);assert.equal(db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name='inventory'").get().n,0);db.exec('PRAGMA user_version=12');db.close()
+ assert.throws(()=>openStore(path),/newer/);const check=new DatabaseSync(path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,12);check.close()
 })
 test('offline backup/restore validates data, advances revision and rejects corrupt backups and active locks',t=>{
  const {dir,path,store}=fixture(t);store.write(input({r1:true}),0);store.append([{deviceId:'r1',status:'up',checkedAt:new Date().toISOString()}]);store.close()
@@ -128,6 +128,7 @@ test('v10 removes operator credentials and sessions while preserving other acces
  const previous=new DatabaseSync(path)
  previous.exec("UPDATE auth_config SET admin_hash='existing-admin', viewer_hash='existing-viewer', operator_hash='former-operator'; INSERT INTO sessions VALUES('legacy','admin','csrf',1,1,2,'192.0.2.1'),('viewer','viewer','csrf',1,1,2,'192.0.2.2'),('operator','operator','csrf',1,1,2,'192.0.2.3'); INSERT INTO audit_log(at,source,role,action) VALUES(1,'remote','operator','login_success');")
  previous.close()
+ backupDatabase(path,path+'.pre-v11.bak')
  const migrated=openStore(path)
  try {
   assert.throws(()=>migrated.db.prepare('SELECT operator_hash FROM auth_config'),/no such column/)
@@ -165,11 +166,12 @@ test('ordered migrations upgrade v1 through v9 and preserve existing data', asyn
    const restored=join(dir,'restored')
    assert.equal(validateDatabase(path),3)
    restoreDatabase(restored,path)
+   backupDatabase(restored,restored+'.pre-v11.bak')
    const migrated=openStore(restored)
    try{
-    assert.equal(migrated.db.prepare('PRAGMA user_version').get().user_version,10)
+    assert.equal(migrated.db.prepare('PRAGMA user_version').get().user_version,11)
     assert.equal(migrated.revision(),4)
-    assert.deepEqual(migrated.read().topology,topology)
+    assert.deepEqual(migrated.read().topology,{...topology,schemaVersion:2})
     const [row]=migrated.history('r1').checks
     assert.equal(row.id,31)
     assert.equal(migrated.snapshot().observations[0].status,'up')
@@ -230,6 +232,7 @@ test('v6 backfill takes newest timestamp then sequence and validates the latest 
   const insert=legacy.prepare("INSERT INTO checks(device_id,status,checked_at,outcome,reason) VALUES('r1',?,?,'unreachable',?)")
   insert.run('up',now-100,'tied older');insert.run('unknown',now-1000,'old timestamp');insert.run('down',now-100,'tied newer');insert.run('up',now-1100,'late insert')
  }finally{legacy.close()}
+ backupDatabase(path,path+'.pre-v11.bak')
  const migrated=openStore(path,{now:()=>now})
  try{
   assert.equal(migrated.snapshot().observations[0].reason,'tied newer')

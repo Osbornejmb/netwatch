@@ -37,7 +37,7 @@ test('missing storage loads defaults; corrupt and inaccessible storage preserve 
 
 test('accepts legacy exports and rejects future schemas and size limits', () => {
   assert.equal(validateTopology(topology()).schemaVersion, 1)
-  assert.throws(() => validateTopology({ ...topology(), schemaVersion: 2 }), /schema/)
+  assert.throws(() => validateTopology({ ...topology(), schemaVersion: 3 }), /schema/)
   assert.throws(() => validateTopology({ nodes: Array(2001).fill(null), edges: [] }), /2,000/)
 })
 

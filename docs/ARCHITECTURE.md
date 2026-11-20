@@ -4,7 +4,7 @@ The current UI uses one off-white theme across the map, editor, dialogs and Wind
 
 ## Opt-in interface collection (#7, local implementation)
 
-Configured uplinks bind source and target interface indexes to saved links. The dashboard snapshot projects fresh-capable port status and timestamps for mapped links from authorized IF-MIB samples. The browser ages those samples independently from device reachability and derives the state of each configured redundancy group. See SNMP-INTERFACES.md.
+Configured uplinks bind source and target interface indexes to saved links. The dashboard snapshot projects fresh-capable port status and timestamps for mapped links from authorized IF-MIB samples. The browser ages legacy port summaries independently from device reachability. The host also evaluates reviewed baselines from current port evidence in a pure engine and exposes role-filtered results through snapshots and SSE. The engine evaluates physical path availability against designated roots and reports structural failure points to admins. See [Host API](HOST-API.md) and [SNMP interfaces](SNMP-INTERFACES.md).
 
 The authenticated read-only SNMP poll also collects bounded LLDP observations for review. Pending observations are held in memory. An admin can save an approved neighbor link against the current inventory revision. Port and LLDP observations leave reachability independent.
 
@@ -53,7 +53,7 @@ Snapshots read one `latest_check` row per device from the v6 table in a single q
 
 Device details enable/disable only saved host devices using the snapshot revision and complete saved host inventory, preserving other devices and rejecting conflicts without retry. A missing address prevents authorization. `DeviceHistory.jsx` fetches 25 checks per page up to 200 displayed, validates device IDs/sequence/revision, cancels obsolete requests and labels adjacent retained transitions in local time. New checks reset pagination to the newest page. No uptime percentage or continuity is inferred. History is collapsible; service/errors use everyday language.
 
-System fonts replace the starter's Google Fonts import so the dashboard does not need a font CDN at runtime. `src/dashboard.css` contains the light dashboard tokens; the editor retains its original dark workspace. The dashboard itself adds no runtime dependencies. Host SQLite schema v6 (with ordered transactional migrations) is separate from the unchanged browser v1 JSON contract.
+System fonts replace the starter's Google Fonts import so the dashboard does not need a font CDN at runtime. `src/dashboard.css` contains the light dashboard tokens; the editor retains its original dark workspace. The dashboard itself adds no runtime dependencies. Host SQLite schema v11 and the versioned topology JSON are separate contracts. Topology v1 imports remain supported, and v2 represents accepted links with parallel port endpoints, roots, roles, and reviewed baselines.
 
 ## Device selection
 

@@ -3,6 +3,8 @@ import { validateTopology } from '../src/topology.js'
 import { validateInterfaces, interfaceRates } from './interfaces.js'
 import { randomUUID } from 'node:crypto'
 import { normalizeAddress } from '../src/inventory.js'
+import { verifyUpgradeBackup } from './upgrade-backup.js'
+import { evaluateLinks } from '../src/link-health.js'
 const normalizeDiscoveryIp = (value) => {
   try {
     const ip = normalizeAddress(value)
@@ -175,6 +177,16 @@ const MIGRATIONS = [
         DROP TABLE sessions_v9;`)
     },
   },
+  {
+    version: 11,
+    up(db) {
+      const row = db.prepare('SELECT payload FROM inventory WHERE singleton=1').get()
+      const state = JSON.parse(row.payload)
+      state.topology = { ...state.topology, schemaVersion: 2 }
+      validateTopology(state.topology)
+      db.prepare('UPDATE inventory SET payload=? WHERE singleton=1').run(JSON.stringify(state))
+    },
+  },
 ]
 
 export function openStore(
@@ -191,6 +203,7 @@ export function openStore(
     migrateV8,
     migrateV9,
     migrateV10,
+    migrateV11,
   } = {},
 ) {
   const db = new DatabaseSync(path)
@@ -211,11 +224,13 @@ export function openStore(
     migrateV8,
     migrateV9,
     migrateV10,
+    migrateV11,
   ]
   try {
     for (const migration of MIGRATIONS) {
       if (migration.version <= version) continue
       db.exec('BEGIN IMMEDIATE')
+      if (version > 0 && migration.version === version + 1) verifyUpgradeBackup(db, path)
       migration.up(db, now)
       hooks[migration.version - 1]?.(db)
       db.exec('PRAGMA user_version=' + migration.version + '; COMMIT')
@@ -236,6 +251,7 @@ export function openStore(
     resolvedAt: r.resolved_at === null ? null : new Date(r.resolved_at).toISOString(),
   })
   let observationVersion = 0
+  const interfaceHistory = new Map()
   let cachedInventory
   const transaction = (fn, readOnly = false) => {
     db.exec(readOnly ? 'BEGIN' : 'BEGIN IMMEDIATE')
@@ -316,6 +332,7 @@ export function openStore(
           db.prepare('DELETE FROM incidents WHERE device_id=?').run(n.id)
           db.prepare('DELETE FROM snmp_targets WHERE device_id=?').run(n.id)
           db.prepare('DELETE FROM interface_samples WHERE device_id=?').run(n.id)
+          interfaceHistory.delete(n.id)
         }
       cachedInventory = undefined
       hook?.(db)
@@ -339,6 +356,7 @@ export function openStore(
   return {
     read: () => structuredClone(readState()),
     revision,
+    snapshotNow: now,
     snapshotVersion: () => [revision(), observationVersion, databaseVersion.get().data_version],
     cleanup,
     discoveryCounts: () =>
@@ -478,13 +496,14 @@ export function openStore(
         db.prepare('DELETE FROM interface_samples WHERE device_id=?').run(id)
         if (authorization !== null) db.prepare('INSERT INTO snmp_targets VALUES(?,?)').run(id, authorization)
       })
+      interfaceHistory.delete(id)
       observationVersion++
     },
     appendInterfaces(id, value, { revision, authorization } = {}) {
       const clean = validateInterfaces(value),
         time = Date.parse(clean.checkedAt)
       if (time > now() || time < now() - 180000) throw invalid('Invalid interface time.')
-      transaction(() => {
+      const previous = transaction(() => {
         if (
           readState().revision !== revision ||
           db.prepare('SELECT authorization FROM snmp_targets WHERE device_id=?').get(id)?.authorization !==
@@ -503,7 +522,16 @@ export function openStore(
         db.prepare(
           'INSERT INTO interface_samples VALUES(?,?,?) ON CONFLICT(device_id) DO UPDATE SET checked_at=excluded.checked_at,payload=excluded.payload',
         ).run(id, time, JSON.stringify(payload))
+        return row && JSON.parse(row.payload)
       })
+      if (previous && previous.uptime <= clean.uptime) {
+        const ports = new Map(previous.interfaces.map(({ index, admin, oper, speedBps }) =>
+          [index, { checkedAt: previous.checkedAt, admin, oper, speed: speedBps }],
+        ))
+        interfaceHistory.set(id, [ports, ...(interfaceHistory.get(id) ?? []).slice(0, 1)])
+      } else {
+        interfaceHistory.delete(id)
+      }
       observationVersion++
     },
     interfaces(id, { after = 0, limit = 50 } = {}) {
@@ -641,7 +669,7 @@ export function openStore(
         return { revision: state.revision, checks, nextBefore: rows.length > limit ? checks.at(-1).id : null }
       }, true)
     },
-    snapshot({ uplinkPorts = false } = {}) {
+    snapshot({ uplinkPorts = false, portFreshness, linkHealth = false } = {}) {
       return transaction(() => {
         const state = readState()
         const latest = new Map(
@@ -652,6 +680,7 @@ export function openStore(
         )
         const observations = state.topology.nodes.map((node) => latest.get(node.id)).filter(Boolean)
         const ports = []
+        const linkReadings = []
         if (
           uplinkPorts &&
           state.topology.edges.some((edge) => edge.uplink?.source.index || edge.uplink?.target.index)
@@ -667,22 +696,48 @@ export function openStore(
           )
           for (const edge of state.topology.edges) {
             const evidence = { id: edge.id }
+            const readings = { id: edge.id }
             for (const side of ['source', 'target']) {
               const sample = samples.get(edge[side])
               const row = sample?.ports.get(edge.uplink?.[side].index)
-              if (row) evidence[side] = { checkedAt: sample.checkedAt, admin: row.admin, oper: row.oper }
+              if (row) {
+                evidence[side] = { checkedAt: sample.checkedAt, admin: row.admin, oper: row.oper }
+                const previous = (interfaceHistory.get(edge[side]) ?? []).map((ports) => ports.get(row.index))
+                readings[side] = [{ ...evidence[side], speed: row.speedBps }]
+                for (const prior of previous) {
+                  if (!prior) break
+                  readings[side].push(prior)
+                }
+              }
             }
-            if (evidence.source || evidence.target) ports.push(evidence)
+            if (evidence.source || evidence.target) {
+              ports.push(evidence)
+              linkReadings.push(readings)
+            }
+          }
+        }
+        const generatedAt = now()
+        let linkHealthExpiresAt = Infinity
+        if (linkHealth) {
+          for (const reading of linkReadings) {
+            for (const port of [...(reading.source ?? []), ...(reading.target ?? [])]) {
+              const expiresAt = Date.parse(port.checkedAt) + portFreshness + 1
+              if (expiresAt > generatedAt) linkHealthExpiresAt = Math.min(linkHealthExpiresAt, expiresAt)
+            }
           }
         }
         return {
           inventory: structuredClone(state),
+          ...(linkHealth && state.topology.edges.length && {
+            linkHealth: evaluateLinks(state.topology, linkReadings, generatedAt, portFreshness ?? 0),
+          }),
           ...(ports.length && { uplinkPorts: ports }),
           activeIncidents: db
             .prepare('SELECT * FROM incidents WHERE resolved_at IS NULL ORDER BY id DESC')
             .all()
             .map(incidentRow),
-          generatedAt: new Date(now()).toISOString(),
+          ...(linkHealth && { linkHealthExpiresAt }),
+          generatedAt: new Date(generatedAt).toISOString(),
           collector: { state: 'not-implemented', lastSeenAt: null },
           freshness: { staleAfterMs: 90000 },
           observations: observations.map((r) => ({

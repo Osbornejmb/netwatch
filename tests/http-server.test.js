@@ -174,11 +174,12 @@ test('every host route declares access and unknown API paths stay outside the st
 })
 
 test('viewer snapshot projects dashboard data and omits administrative metadata', () => {
-  const inventory = { revision: 1, topology: { nodes: [], edges: [] }, monitoring: {} }
+  const inventory = { revision: 1, topology: { schemaVersion: 1, nodes: [], edges: [] }, monitoring: {} }
   const result = createSnapshotRoute('test')({
     role: 'viewer', requestHeaders: {}, response: {},
     store: {
       snapshotVersion: () => 1,
+      snapshotNow: () => 0,
       snapshot: () => ({ inventory, snmpEnrollment: true, databasePath: '/db', observations: [] }),
     },
     collector: { snapshot: () => ({ state: 'running', path: '/helper', freshness: { staleAfterMs: 90000 } }) },

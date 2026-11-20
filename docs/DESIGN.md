@@ -8,7 +8,7 @@ Circle packs busy hubs into a staggered arrangement and splits wide branches int
 
 Configured operators can sign in to the Dashboard, Devices and Discovered views. Map editing and access settings remain separate. The local Access log includes a redacted JSON download.
 
-Uplinks & redundancy keeps configuration within the draft editor. Device details display mapped port status separately from reachability. The dashboard shows redundancy groups in a collapsible section only when groups are configured.
+Uplinks & redundancy keeps link roles, parallel port mappings, root routers, and redundancy baseline selection within the draft editor. The map replacement preview identifies reviewed baselines and roots before applying them. Device details display mapped port status separately from reachability. The dashboard keeps its collapsible port summary for legacy router groups.
 
 The admin-only Network neighbors panel opens on demand in saved-device details. It shows the observation time, reported ports, and whether the evidence is current. Operators review each proposal, choose a saved peer or name a new unmonitored device, and explicitly save or dismiss the link.
 

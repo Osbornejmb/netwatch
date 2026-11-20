@@ -135,7 +135,7 @@ export default function Dashboard({
   }, [deadline, clockOffset, localNow])
   const edges = useMemo(() => uniqueConnections(sourceEdges), [sourceEdges])
   const dense = edges.length >= 30
-  const groups = live ? (live.inventory.topology.groups ?? []) : draftGroups
+  const groups = (live ? (live.inventory.topology.groups ?? []) : draftGroups).filter((group) => !group.protectedDevice)
   const paths = useMemo(
     () =>
       new Map(
