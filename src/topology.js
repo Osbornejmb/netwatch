@@ -35,14 +35,23 @@ export function validateTopology(value) {
     const ip = normalizeAddress(node.data.ip || '')
     if (ip && addresses.has(ip)) throw new Error('Duplicate management address in topology.')
     if (ip) addresses.add(ip)
+    if (
+      node.chassisKey !== undefined &&
+      (typeof node.chassisKey !== 'string' ||
+        !/^(mac:(?:[a-f\d]{2}:){5}[a-f\d]{2}|lldp:[1-7]:[a-f\d]{64})$/.test(node.chassisKey))
+    )
+      throw new Error('Invalid chassis identity.')
     ids.add(node.id)
     return {
+      ...(node.chassisKey !== undefined && { chassisKey: node.chassisKey }),
       id: node.id,
       type: node.type,
       position: { x: node.position.x, y: node.position.y },
       data: { label: node.data.label.trim(), ip, description: node.data.description || '' },
     }
   })
+  const chassisKeys = nodes.flatMap((node) => (node.chassisKey ? [node.chassisKey] : []))
+  if (new Set(chassisKeys).size !== chassisKeys.length) throw new Error('Duplicate chassis identity.')
   const edgeIds = new Set()
   const routerIds = new Set(nodes.filter((node) => node.type === 'router').map((node) => node.id))
   const linksById = new Map()
@@ -145,6 +154,7 @@ export function validateTopology(value) {
   })
   const version =
     value.schemaVersion === 2 ||
+    chassisKeys.length ||
     roots.length ||
     edges.some((edge) => edge.role) ||
     cleanGroups.some((group) => group.protectedDevice) ||

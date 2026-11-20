@@ -52,7 +52,7 @@ export function createSnapshotRoute(instance) {
       const { schemaVersion, nodes, edges, groups } = topology
       const visibleTopology = {
         schemaVersion,
-        nodes,
+        nodes: nodes.map(({ id, type, position, data }) => ({ id, type, position, data })),
         edges: edges.map(({ role, ...edge }) => edge),
         ...(groups && { groups: groups.filter((group) => !group.protectedDevice) }),
       }

@@ -1,5 +1,9 @@
 # Working checkpoint
 
+## Current status (2026-11-20) — topology discovery
+
+- Admins can start an enrolled-device LLDP run and stage reviewed links in the draft. Nearby discovery records hints for review. The v12 upgrade requires a verified offline backup. See the [Phase 2 report](refocus/REPORT-PHASE-2.md).
+
 ## Current status (2026-11-20) — refocus foundations
 
 - Phase 1 adds versioned port-level links, reviewed baselines, and role-filtered link evidence. The v11 upgrade requires a verified offline backup. Physical switch behavior remains unverified. See the [Phase 1 report](refocus/REPORT-PHASE-1.md).

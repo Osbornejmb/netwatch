@@ -141,5 +141,18 @@ export function linkScannedSwitchPorts(store, ports, rows) {
     const port = node && switchPortFor(ports, node, row)
     if (port && saveSwitchPortLink(topology, node, port)) changed = true
   }
-  if (changed) store.write({ source: 'inventory', topology, monitoring: current.monitoring }, current.revision)
+  if (changed) {
+    const original = new Map(current.topology.edges.map((edge) => [edge.id, edge]))
+    const hints = topology.edges
+      .filter((edge) => original.get(edge.id) !== edge)
+      .map((edge) => ({
+        ...edge,
+        id:
+          'hint-' +
+          createHash('sha256')
+            .update(JSON.stringify([edge.source, edge.target, edge.label]))
+            .digest('hex'),
+      }))
+    store.recordTopologyHints(hints)
+  }
 }

@@ -48,7 +48,9 @@ Keep the NetWatch PC awake, connected, and signed in while you want checks to ru
 
 1. In the Windows NetWatch app, click **Stop** and wait for it to finish. Turn on **Discover local network neighbors on next start**, then click **Start** and **Open dashboard**.
 2. In the dashboard, open **Discovered devices → Scan now** and wait for the scan to finish. NetWatch looks on the nearby private networks the PC is directly connected to.
-3. If you recognize your device, choose **Add to map**. On the NetWatch PC, **Add to map** allows checks for that device. Checks run when **Check devices on next start** was enabled at startup. If you can’t find the device, ask for its address and add it manually. [Discovery guide](docs/DISCOVERY.md)
+3. Choose **Add to draft** for a device you recognize. Review the draft in **Edit map** and choose **Use this map**, then **Confirm replacement**. Enable checks separately after saving the device. [Discovery guide](docs/DISCOVERY.md)
+
+To discover switch-to-switch connections, enroll the devices for SNMPv3 port checks. Under **Discovered → Topology proposals**, choose a router or switch and select **Find connections**. Review the proposed ports and devices before adding them to the draft.
 
 ### Set up from the project files
 

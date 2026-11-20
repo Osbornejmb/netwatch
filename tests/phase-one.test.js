@@ -79,7 +79,7 @@ test('v11 requires a current verified offline backup and preserves v10 inventory
   for (let i = 0; i < 2; i++) {
     const store = openStore(path)
     try {
-      assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 11)
+      assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 12)
       assert.deepEqual(store.read().topology, { ...topology, schemaVersion: 2 })
       assert.deepEqual(store.read().monitoring, { r: true, s: false })
       assert.equal(store.revision(), 7)

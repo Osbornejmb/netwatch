@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import snmp from 'net-snmp'
+import { chassisKey as normalizeChassis } from './discovery-lldp.js'
 
 const ROOT = '1.0.8802.1.1.2.1.4.1.1'
 const FIELDS = [4, 5, 6, 7, 9].map((column) => `${ROOT}.${column}`)
@@ -84,6 +85,7 @@ export async function readLldp(request, checkedAt) {
     neighbors.set(id, {
       id,
       chassisKey,
+      normalizedChassisKey: normalizeChassis(chassisType, chassis),
       localPort,
       chassis: chassisMac ?? (text(chassis) || chassis.toString('hex').slice(0, 80)),
       ...(chassisMac && { chassisMac }),

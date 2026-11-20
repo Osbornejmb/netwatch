@@ -17,6 +17,8 @@ import { createInterfaceCollector } from './snmp-collector.js'
 import { createDiscovery, DISCOVERY_POLICY } from './discovery.js'
 import { linkScannedSwitchPorts } from './switch-ports.js'
 import { createProbeGate } from './probe-gate.js'
+import { configuredCrawlLimits, createTopologyDiscovery, discoveryScope } from './topology-discovery.js'
+import { setTimeout as delay } from 'node:timers/promises'
 const port = readPort()
 const allowLan = process.env.NETWATCH_LAN === '1'
 let tls
@@ -73,7 +75,29 @@ const discovery = createDiscovery(store, {
 const audit = createAudit(store.db)
 audit.purge()
 const auth = createSessions(store.db, { lan: allowLan, audit })
-const hostOptions = { port, collector, interfaces, discovery, routes: createRoutes(discovery), auth, audit, tls }
+const topologyDiscovery = createTopologyDiscovery(store, {
+  allowed: discoveryScope({ additional: process.env.NETWATCH_LLDP_CIDRS }),
+  limits: configuredCrawlLimits(),
+  audit,
+  async read(id, signal, expected) {
+    let result
+    do {
+      result = await interfaces.topologySample(id, signal, expected)
+      if (result.error === 'monitoring_busy') await delay(250, undefined, { signal }).catch(() => {})
+    } while (!signal.aborted && result.error === 'monitoring_busy')
+    return result
+  },
+})
+const hostOptions = {
+  port,
+  collector,
+  interfaces,
+  discovery,
+  routes: createRoutes(discovery, undefined, topologyDiscovery),
+  auth,
+  audit,
+  tls,
+}
 const lan = allowLan
   ? createLanListeners({
       port,
@@ -112,7 +136,7 @@ async function shutdown(code = 0) {
   clearInterval(sessionCleanup)
   const closed = new Promise((resolve) => server.close(resolve))
   server.closeAllConnections()
-  await Promise.all([collector.stop(), interfaces.stop(), discovery.stop(), lan?.stop()])
+  await Promise.all([collector.stop(), topologyDiscovery.stop(), interfaces.stop(), discovery.stop(), lan?.stop()])
   await closed
   await accessUpdate
   store.close()

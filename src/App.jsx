@@ -8,6 +8,8 @@ import AccessLog from './AccessLog'
 import Dashboard from './Dashboard'
 import HostStorage from './HostStorage'
 import DiscoveredDevices from './DiscoveredDevices'
+import { mergeDiscoveryDraft } from './discovery-draft.js'
+import { hostFetch } from './auth.js'
 import DeviceDialog from './DeviceDialog'
 import RecoveryDialog from './RecoveryDialog'
 import ConfirmDialog from './ConfirmDialog'
@@ -101,6 +103,22 @@ export default function App({ viewer = false, remote = false, accessControls }) 
   const [autosavePaused, setAutosavePaused] = useState(Boolean(saved.error))
   const [recovery, setRecovery] = useState(saved.recovery)
   const [pendingAction, setPendingAction] = useState(null)
+  async function stageDiscovery(patch, preview = false) {
+    if (autosavePaused) throw Error('Resolve draft recovery before adding proposals.')
+    let base = { nodes, edges, groups, roots }
+    if (!nodes.length) {
+      const response = await hostFetch('/api/v1/topology')
+      if (!response.ok) throw Error('Could not read the saved map.')
+      const saved = await response.json()
+      base = saved.topology
+    }
+    const next = mergeDiscoveryDraft(base, patch)
+    if (preview) return next
+    setNodes(next.nodes)
+    setEdges(next.edges)
+    setDraftGroups(next.groups ?? [])
+    setDraftRoots(next.roots ?? [])
+  }
   const [importError, setImportError] = useState('')
   const [importBusy, setImportBusy] = useState(false)
   const [backupNotice, setBackupNotice] = useState('')
@@ -451,9 +469,10 @@ export default function App({ viewer = false, remote = false, accessControls }) 
         {showAccessLog && <AccessLog onClose={() => setShowAccessLog(false)} />}
 
         {view === 'discovered' ? (
-          <DiscoveredDevices remote={remote} />
+          <DiscoveredDevices remote={remote} stageDiscovery={stageDiscovery} />
         ) : view !== 'editor' ? (
           <Dashboard
+            stageDiscovery={stageDiscovery}
             nodes={nodes}
             edges={edges}
             groups={groups}

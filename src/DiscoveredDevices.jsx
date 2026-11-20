@@ -1,5 +1,6 @@
 import { hostFetch } from './auth.js'
 import ConfirmDialog from './ConfirmDialog'
+import TopologyDiscovery from './TopologyDiscovery.jsx'
 import { useCallback, useEffect, useState } from 'react'
 import InfoTooltip from './InfoTooltip'
 import { guessDeviceType } from './discoveryType.js'
@@ -8,7 +9,7 @@ import { refreshLocalWriteToken, writeHeaders } from './monitoring.js'
 const statusLabel = { new: 'New', changed: 'Changed', added: 'Added', gone: 'Not seen' }
 const seenAt = (value) =>
   new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
-export default function DiscoveredDevices({ remote }) {
+export default function DiscoveredDevices({ remote, stageDiscovery }) {
   const [confirm, setConfirm] = useState(null)
   const [devices, setDevices] = useState([]),
     [pending, setPending] = useState({ count: 0 }),
@@ -69,20 +70,9 @@ export default function DiscoveredDevices({ remote }) {
       })
       if (!r.ok) throw Error()
       const result = await r.json()
+      if (result.draft) await stageDiscovery(result.draft)
       await refresh(after)
-      setMessage(
-        remote && kind === 'add-to-map' && device.status !== 'added'
-          ? 'Added with checks off. Turn checks on in device details.'
-          : result.promotedRouter
-            ? 'Updated device to Router.'
-            : result.discoveryLink
-              ? `Linked to ${result.discoveryLink.label}${result.discoveryLink.port ? ` · ${result.discoveryLink.port}` : ''}`
-              : kind === 'remove'
-                ? 'Removed from discovered devices.'
-                : device.status === 'added'
-                  ? 'No gateway change was needed.'
-                  : 'Added to the map.',
-      )
+      setMessage(result.draft ? 'Added to the draft map.' : 'Removed from discovered devices.')
     } catch {
       setMessage('Could not update this device. Refresh and try again.')
     } finally {
@@ -122,8 +112,11 @@ export default function DiscoveredDevices({ remote }) {
         return
       }
       if (!response.ok) throw Error()
-      const { addedCount, existingCount } = await response.json()
-      setMessage(`Added ${addedCount} to the map.${existingCount ? ` Already on the map: ${existingCount}.` : ''}`)
+      const { addedCount, existingCount, draft } = await response.json()
+      await stageDiscovery(draft)
+      setMessage(
+        `Added ${addedCount} to the draft map.${existingCount ? ` Already on the map: ${existingCount}.` : ''}`,
+      )
       await refresh(after).catch(() => {})
     } catch {
       setMessage('Could not add the scanned devices.')
@@ -183,7 +176,7 @@ export default function DiscoveredDevices({ remote }) {
         result.diagnostics?.length
           ? 'Scan could not finish. Showing previous results.'
           : result.upstreamLinks
-            ? `Scan complete. Saved ${result.upstreamLinks} router ${result.upstreamLinks === 1 ? 'link' : 'links'}.`
+            ? `Scan complete. Proposed ${result.upstreamLinks} router ${result.upstreamLinks === 1 ? 'link' : 'links'}.`
             : 'Scan complete.',
       )
     } catch {
@@ -213,6 +206,7 @@ export default function DiscoveredDevices({ remote }) {
               : 'Starting scan…'
   return (
     <section className="page-content discovery-page" aria-labelledby="discovery-title">
+      <TopologyDiscovery stageDiscovery={stageDiscovery} />
       <header className="page-heading">
         <h1 id="discovery-title">Discovered devices</h1>
         <div className="discovery-heading-actions">
@@ -221,14 +215,14 @@ export default function DiscoveredDevices({ remote }) {
             disabled={busy || !pending.count}
             onClick={() =>
               setConfirm({
-                title: 'Add all to map?',
-                message: `Add ${pending.count} results from the latest scan across all pages. New devices start with checks ${remote ? 'off' : 'on'}.`,
+                title: 'Add all to draft?',
+                message: `Add ${pending.count} results from the latest scan across all pages. New devices start with checks off.`,
                 label: 'Add all',
                 onConfirm: addAll,
               })
             }
           >
-            Add all to map
+            Add all to draft
           </button>
           <button
             className="button secondary"
@@ -307,9 +301,9 @@ export default function DiscoveredDevices({ remote }) {
                   <button className="button secondary" disabled={busy} onClick={() => action(device, 'add-to-map')}>
                     {device.status === 'added'
                       ? device.switchPort
-                        ? 'Update port link'
-                        : 'Update gateway link'
-                      : 'Add to map'}
+                        ? 'Review port hint'
+                        : 'Review gateway hint'
+                      : 'Add to draft'}
                   </button>
                   <button
                     className="button secondary"

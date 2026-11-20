@@ -16,6 +16,7 @@ export function createInterfaceCollector(
   let timer,
     active,
     controller,
+    discoveryController,
     stopped = false
   const devices = new Map(),
     neighbors = new Map(),
@@ -150,6 +151,7 @@ export function createInterfaceCollector(
   function runOnce() {
     if (stopped || !enabled || platform !== 'win32') return Promise.resolve()
     if (active) return active
+    discoveryController?.abort('monitoring_busy')
     controller = new AbortController()
     active = cycle()
       .catch(() => {
@@ -189,6 +191,64 @@ export function createInterfaceCollector(
   }
   return {
     runOnce,
+    async topologySample(id, signal, expected) {
+      if (!enabled || platform !== 'win32' || stopped) return { error: 'collection_unavailable' }
+      if (active || discoveryController) return { error: 'monitoring_busy' }
+      const revision = store.revision()
+      const target = store.interfaceTargets().find(({ deviceId }) => deviceId === id)
+      if (
+        !target ||
+        signal.aborted ||
+        (expected && (target.address !== expected.address || target.authorization !== expected.authorization))
+      )
+        return { error: 'cancelled' }
+      const work = new AbortController()
+      discoveryController = work
+      const timeLimit = AbortSignal.timeout(policy.deadlineMs + (policy.credentialBudgetMs ?? 5000))
+      const requestSignal = AbortSignal.any([signal, work.signal, timeLimit])
+      const guard = setInterval(() => {
+        if (store.revision() !== revision) work.abort()
+      }, 100)
+      try {
+        const user = await vault.load(target, { signal: requestSignal })
+        const current = store.interfaceTargets().find(({ deviceId }) => deviceId === id)
+        if (requestSignal.aborted || store.revision() !== revision || current?.authorization !== target.authorization)
+          return {
+            error:
+              work.signal.reason === 'monitoring_busy'
+                ? 'monitoring_busy'
+                : timeLimit.aborted
+                  ? 'snmp_timeout'
+                  : 'cancelled',
+          }
+        const value = await runner(target.address, user, { signal: requestSignal, discovery: true })
+        const latest = store.interfaceTargets().find(({ deviceId }) => deviceId === id)
+        if (work.signal.aborted)
+          return { error: work.signal.reason === 'monitoring_busy' ? 'monitoring_busy' : 'cancelled' }
+        if (timeLimit.aborted) return { error: 'snmp_timeout' }
+        if (
+          requestSignal.aborted ||
+          latest?.authorization !== target.authorization ||
+          latest?.address !== target.address
+        )
+          return { error: 'cancelled' }
+        return value
+      } catch {
+        return {
+          error:
+            work.signal.reason === 'monitoring_busy'
+              ? 'monitoring_busy'
+              : timeLimit.aborted
+                ? 'snmp_timeout'
+                : requestSignal.aborted
+                  ? 'cancelled'
+                  : 'credentials_unavailable',
+        }
+      } finally {
+        clearInterval(guard)
+        if (discoveryController === work) discoveryController = undefined
+      }
+    },
     snapshot: () => ({ ...info, freshness: { staleAfterMs: freshness() } }),
     device: (id) => ({ ...devices.get(id), collectorState: info.state, staleAfterMs: freshness() }),
     switchPorts: readSwitchPorts,
@@ -211,6 +271,7 @@ export function createInterfaceCollector(
       stopped = true
       clearTimeout(timer)
       controller?.abort()
+      discoveryController?.abort()
       await active
       await vault?.stop?.()
       info.state = 'stopped'

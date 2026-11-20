@@ -1,3 +1,4 @@
+import { applyDiscoveryPatch } from './fixtures/discovery-draft.js'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -100,11 +101,10 @@ test('LLDP review protects writes, preserves manual links, and blocks applicatio
     fetch(url, { method: 'PUT', headers: writeHeaders, body: JSON.stringify({ ...body, ...selection }) })
   assert.equal((await save({ peerId: 'existing' }, {})).status, 403)
   assert.deepEqual(await (await save({ peerId: 'existing' })).json(), { revision: 1, added: false })
-  assert.deepEqual(await (await save({ peerId: null, label: 'Reviewed peer', type: 'switch' })).json(), {
-    revision: 2,
-    added: true,
-  })
-  const saved = store.read()
+  const proposed = await (await save({ peerId: null, label: 'Reviewed peer', type: 'switch' })).json()
+  assert.equal(proposed.added, true)
+  assert.equal(store.revision(), 1)
+  const saved = applyDiscoveryPatch(store, proposed.draft)
   const peer = saved.topology.nodes[2]
   assert.deepEqual(saved.topology.nodes[0], savedSource)
   assert.equal(peer.data.label, 'Reviewed peer')

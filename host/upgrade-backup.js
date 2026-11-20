@@ -19,8 +19,8 @@ function databaseDigest(db) {
   return hash.digest('hex')
 }
 
-export function verifyUpgradeBackup(db, path) {
-  const backupPath = path + '.pre-v11.bak'
+export function verifyUpgradeBackup(db, path, version = 11) {
+  const backupPath = path + '.pre-v' + version + '.bak'
   let backup
   try {
     const source = statSync(path)

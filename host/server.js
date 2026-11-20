@@ -15,6 +15,7 @@ import { createSnapshotEvents } from './routes/events.js'
 import { listDiscovered, scanNow, clearDiscovered, addDiscoveredToMap, removeDiscovered } from './routes/discovered.js'
 import { deviceChecks, deviceIncidents, deviceInterfaces } from './routes/devices.js'
 import { applyNeighbor, readNeighbors } from './routes/neighbors.js'
+import { discoveryRoutes } from './routes/topology-discovery.js'
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -54,8 +55,9 @@ async function parseBody(req, bodyType) {
   }
 }
 
-export function createRoutes(discovery, eventOptions) {
+export function createRoutes(discovery, eventOptions, topologyDiscovery) {
   const snapshot = createSnapshotRoute(randomUUID())
+  const topology = discoveryRoutes(topologyDiscovery)
   return [
     { method: 'GET', pattern: /^\/api\/v1\/audit$/, handler: readAudit, access: 'local' },
     { method: 'GET', pattern: /^\/api\/v1\/audit\/export$/, handler: exportAudit, access: 'local' },
@@ -81,6 +83,23 @@ export function createRoutes(discovery, eventOptions) {
       access: 'viewer',
     },
     { method: 'GET', pattern: /^\/api\/v1\/discovered$/, handler: listDiscovered, access: 'admin' },
+    { method: 'GET', pattern: /^\/api\/v1\/discovery\/runs$/, handler: topology.read, access: 'admin' },
+    { method: 'GET', pattern: /^\/api\/v1\/discovery\/runs\/([^/]+)$/, handler: topology.get, access: 'admin' },
+    ...[
+      ['runs', topology.start, 'topology_discovery_started', 'json'],
+      ['runs/([^/]+)/cancel', topology.cancel, 'topology_discovery_cancelled'],
+      ['runs/([^/]+)/accept', topology.accept, null, 'json'],
+      ['runs/([^/]+)/reject', topology.reject, 'topology_proposal_rejected', 'json'],
+      ['hints/([^/]+)/accept', topology.hint, null, 'json'],
+    ].map(([path, handler, auditAction, bodyType]) => ({
+      method: 'POST',
+      pattern: new RegExp('^/api/v1/discovery/' + path + '$'),
+      handler,
+      auditAction,
+      bodyType,
+      access: 'admin',
+      requiresWrite: true,
+    })),
     {
       method: 'POST',
       pattern: /^\/api\/v1\/discovered\/scan-now$/,
@@ -130,7 +149,7 @@ export function createRoutes(discovery, eventOptions) {
       method: 'PUT',
       pattern: /^\/api\/v1\/devices\/([^/]+)\/neighbors$/,
       handler: applyNeighbor,
-      auditAction: 'topology_applied',
+      auditAction: 'topology_proposal_accepted',
       access: 'admin',
       requiresWrite: true,
       bodyType: 'json',
@@ -147,7 +166,8 @@ export function createHost(
     collector,
     interfaces,
     discovery,
-    routes = createRoutes(discovery),
+    topologyDiscovery,
+    routes = createRoutes(discovery, undefined, topologyDiscovery),
     lanAuthorities,
     auth,
     audit,

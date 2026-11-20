@@ -17,7 +17,7 @@ export function readNeighbors({ store, interfaces, id }) {
 export function applyNeighbor({ store, interfaces, id, body }) {
   const current = store.read()
   if (body?.baseRevision !== current.revision) throw invalid('Inventory changed.', 409)
-  const { topology, monitoring, revision } = current
+  const { topology, revision } = current
   const source = topology.nodes.find((node) => node.id === id)
   if (!source) throw invalid('Device not found.', 404)
   const sample = interfaces?.neighbors?.(id)
@@ -36,9 +36,19 @@ export function applyNeighbor({ store, interfaces, id, body }) {
     const peerId =
       'lldp-' +
       createHash('sha256')
+        .update(neighbor.normalizedChassisKey ?? neighbor.chassisKey)
+        .digest('hex')
+    const legacyId =
+      'lldp-' +
+      createHash('sha256')
         .update(JSON.stringify([id, neighbor.chassisKey]))
         .digest('hex')
-    target = nodes.find((node) => node.id === peerId)
+    target = nodes.find(
+      (node) =>
+        node.id === peerId ||
+        node.id === legacyId ||
+        (neighbor.normalizedChassisKey && node.chassisKey === neighbor.normalizedChassisKey),
+    )
     if (!target) {
       target = {
         id: peerId,
@@ -49,6 +59,13 @@ export function applyNeighbor({ store, interfaces, id, body }) {
       nodes.push(target)
     }
   }
+  if (neighbor.normalizedChassisKey) {
+    if (target.chassisKey && target.chassisKey !== neighbor.normalizedChassisKey)
+      throw invalid('The reported chassis conflicts with the saved peer.', 409)
+    if (nodes.some((node) => node.id !== target.id && node.chassisKey === neighbor.normalizedChassisKey))
+      throw invalid('The reported chassis already belongs to a different saved device.', 409)
+    target = { ...target, chassisKey: neighbor.normalizedChassisKey }
+  }
   const link = { source: id, target: target.id }
   if (topology.edges.some((edge) => connectionKey(edge) === connectionKey(link))) return { revision, added: false }
   const edge = {
@@ -56,9 +73,5 @@ export function applyNeighbor({ store, interfaces, id, body }) {
     id: randomUUID(),
     label: `LLDP · Port ${neighbor.localPort} ↔ ${neighbor.remotePort}`.slice(0, 100),
   }
-  const saved = store.write(
-    { source: 'inventory', topology: { ...topology, nodes, edges: [...topology.edges, edge] }, monitoring },
-    revision,
-  )
-  return { revision: saved.revision, added: true }
+  return { revision, added: true, draft: { nodes: [source, target], edges: [edge] } }
 }

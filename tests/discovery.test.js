@@ -1,3 +1,4 @@
+import { applyDiscoveryPatch } from './fixtures/discovery-draft.js'
 import { fetchWriteToken, writeTokenFixture } from './fixtures/write-token.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -63,14 +64,14 @@ test('successful scans mark missing rows gone only after three misses; errors fr
 test('v4 to v5 discovery migration rolls back, and backups preserve discovery rows',t=>{
  const dir=mkdtempSync(join(tmpdir(),'nw-discovery-migration-')),path=join(dir,'db');t.after(()=>rmSync(dir,{recursive:true,force:true}))
  let store=openStore(path);store.recordDiscovery([{ip:'192.168.1.5',mac:'aa:bb:cc:dd:ee:ff',source:'neighbor'}]);store.close()
- const db=new DatabaseSync(path);db.exec('DROP TABLE audit_log;DROP TABLE sessions;DROP TABLE auth_config;DROP TABLE latest_check;DROP TABLE discovered_devices;PRAGMA user_version=4');db.close()
+ const db=new DatabaseSync(path);db.exec('DROP TABLE topology_runs;DROP TABLE topology_hints;DROP TABLE audit_log;DROP TABLE sessions;DROP TABLE auth_config;DROP TABLE latest_check;DROP TABLE discovered_devices;PRAGMA user_version=4');db.close()
  backupDatabase(path,path+'.pre-v11.bak')
  assert.throws(()=>openStore(path,{migrateV5:()=>{throw Error('rollback')}}),/rollback/)
  const check=new DatabaseSync(path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,4);check.close()
  store=openStore(path);store.recordDiscovery([{ip:'192.168.1.5',mac:'aa:bb:cc:dd:ee:ff',source:'neighbor'}]);store.close()
  const backup=join(dir,'backup');backupDatabase(path,backup);restoreDatabase(path,backup);store=openStore(path);assert.equal(store.discovered().devices[0].ip,'192.168.1.5');store.close()
 })
-test('discovery API paginates, rate limits scan requests and adds with monitoring enabled',async t=>{
+test('discovery API paginates, rate limits scan requests and previews a draft without enabling monitoring',async t=>{
  const dir=mkdtempSync(join(tmpdir(),'nw-discovery-api-')),store=openStore(join(dir,'db'));t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true})})
  store.write({source:'inventory',topology:{schemaVersion:1,nodes:[{id:'gateway',type:'router',position:{x:0,y:0},data:{label:'Main router',ip:'192.168.1.1'}}],edges:[]},monitoring:{}},0)
  store.recordDiscovery([{ip:'192.168.1.5',mac:'aa:bb:cc:dd:ee:ff',source:'neighbor'},{ip:'192.168.1.6',mac:null,source:'neighbor'}])
@@ -80,14 +81,16 @@ test('discovery API paginates, rate limits scan requests and adds with monitorin
  assert.equal((await fetch(`${base}/discovered/scan-now`,{method:'POST',headers})).status,200);assert.equal((await fetch(`${base}/discovered/scan-now`,{method:'POST',headers})).status,429)
  const id=page.devices[0].id;assert.equal((await fetch(`${base}/discovered/${id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:99})})).status,409)
  const added=await fetch(`${base}/discovered/${id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:1})}).then(r=>r.json())
- assert.equal(added.discoveryLink.label,'Main router');assert.equal(added.topology.edges[0].label,'Gateway route');assert.equal(added.topology.edges[0].target,'gateway');assert.equal(added.topology.edges[0].source,added.topology.nodes[1].id)
- assert.equal(added.monitoring[added.topology.nodes[1].id],true);assert.equal(store.discovered().devices[0].status,'added')
+ assert.equal(added.draft.edges[0].label,'Gateway route');assert.equal(added.draft.edges[0].target,'gateway')
+ assert.equal(store.revision(),1);assert.equal(store.discovered().devices[0].status,'new')
+ const saved=applyDiscoveryPatch(store,added.draft)
+ assert.equal(saved.monitoring[added.draft.edges[0].source],false);assert.equal(store.discovered().devices[0].status,'added')
  assert.equal((await fetch(`${base}/discovered/${id}/remove`,{method:'POST',headers,body:'{}'})).status,200);assert.equal(store.discovered().devices.length,1)
- const remaining=store.discovered({after:page.nextAfter-1,limit:1}).devices[0],addedWithoutRouter=await fetch(`${base}/discovered/${remaining.id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:added.revision})}).then(r=>r.json());assert.equal(addedWithoutRouter.discoveryLink,null);assert.equal(addedWithoutRouter.topology.edges.length,1)
+ const remaining=store.discovered({after:page.nextAfter-1,limit:1}).devices[0],addedWithoutRouter=await fetch(`${base}/discovered/${remaining.id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:saved.revision})}).then(r=>r.json());assert.equal(addedWithoutRouter.draft.edges.length,0);applyDiscoveryPatch(store,addedWithoutRouter.draft)
  assert.equal((await fetch(`${base}/discovered/${remaining.id}/remove`,{method:'POST',headers,body:'{}'})).status,200);assert.equal(store.discovered().devices.length,0);assert.equal(store.read().topology.nodes.length,3)
  store.recordDiscovery([{ip:'192.168.1.20',mac:null,source:'neighbor'},{ip:'192.168.1.21',mac:null,source:'neighbor'}]);assert.equal((await fetch(`${base}/discovered/clear`,{method:'POST'})).status,403);assert.equal((await fetch(`${base}/discovered/clear`,{method:'POST',headers,body:'{}'})).status,400);assert.equal((await fetch(`${base}/discovered/clear`,{method:'POST',headers})).status,200);assert.equal(store.discovered().devices.length,0);assert.equal(store.read().topology.nodes.length,3)
 })
-test('an already-added gateway can be corrected and existing clients can be linked without duplicates',async t=>{
+test('drafting an already-saved gateway preserves its manually chosen type',async t=>{
  const dir=mkdtempSync(join(tmpdir(),'nw-discovery-gateway-fix-')),store=openStore(join(dir,'db'));t.after(()=>{store.close();rmSync(dir,{recursive:true,force:true})})
  store.write({source:'inventory',topology:{schemaVersion:1,nodes:[{id:'gateway',type:'switch',position:{x:0,y:0},data:{label:'Router',ip:'192.168.100.1'}},{id:'client',type:'switch',position:{x:0,y:0},data:{label:'PC',ip:'192.168.100.20'}}],edges:[]},monitoring:{}},0)
  store.recordDiscovery([{ip:'192.168.100.1',mac:null,source:'neighbor'},{ip:'192.168.100.20',mac:null,source:'neighbor'}])
@@ -95,11 +98,11 @@ test('an already-added gateway can be corrected and existing clients can be link
  const server=createHost(store,{port:0,dist:writeTokenFixture(dir),discovery:{gatewayFor:async()=> '192.168.100.1'}});server.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)))
  const base=`http://127.0.0.1:${server.address().port}/api/v1`,headers={'X-NetWatch-Write':await fetchWriteToken(base),'Content-Type':'application/json'}
  const promote=await fetch(`${base}/discovered/${rows[0].id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:1})}).then(r=>r.json())
- assert.equal(promote.promotedRouter,true);assert.equal(promote.topology.nodes.find(node=>node.id==='gateway').type,'router');assert.equal(promote.topology.nodes.length,2)
- const linked=await fetch(`${base}/discovered/${rows[1].id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:promote.revision})}).then(r=>r.json())
- assert.equal(linked.discoveryLink.label,'Router');assert.equal(linked.topology.edges.length,1);assert.equal(linked.topology.edges[0].label,'Gateway route');assert.equal(linked.monitoring.client,false)
- const repeat=await fetch(`${base}/discovered/${rows[1].id}/add-to-map`,{method:'POST',headers,body:JSON.stringify({baseRevision:linked.revision})}).then(r=>r.json())
- assert.equal(repeat.topology.edges.length,1);assert.equal(repeat.revision,linked.revision)
+ assert.equal(promote.draft.nodes.find(node=>node.id==='gateway').type,'switch')
+ assert.equal(store.revision(),1)
+ const linked=await fetch(base+'/discovered/'+rows[1].id+'/add-to-map',{method:'POST',headers,body:JSON.stringify({baseRevision:1})}).then(r=>r.json())
+ assert.equal(linked.draft.edges.length,0)
+ assert.equal(store.read().topology.nodes.length,2)
 })
 
 test('discovery actions find later pages and leave the map intact if a record is removed during lookup',async t=>{
@@ -118,7 +121,8 @@ test('discovery actions find later pages and leave the map intact if a record is
  const add=(id,baseRevision)=>fetch(`http://127.0.0.1:${server.address().port}/api/v1/discovered/${id}/add-to-map`,{
   method:'POST',headers:{'X-NetWatch-Write':token,'Content-Type':'application/json'},body:JSON.stringify({baseRevision})
  })
- assert.equal((await add(later.id,0)).status,200)
+ const drafted=await add(later.id,0);assert.equal(drafted.status,200)
+ assert.equal(store.revision(),0);applyDiscoveryPatch(store,(await drafted.json()).draft)
  assert.equal(store.discovered({after:nextAfter}).devices[0].status,'added')
  assert.equal((await add(later.id,1)).status,200)
  assert.equal((await add(removed.id,1)).status,404)
@@ -196,10 +200,10 @@ test('a previously scanned gateway is recognized at another local address by its
  const alias=store.discovered().devices.find(device=>device.ip==='192.168.100.4')
  const {addDiscoveredToMap}=await import('../host/routes/discovered.js')
  const saved=await addDiscoveredToMap({store,discovery,id:alias.id,body:{baseRevision:0}})
- assert.equal(saved.topology.nodes[0].type,'router')
+ assert.equal(saved.draft.nodes[0].type,'router')
 })
 
-test('active discovery saves a two-hop route between saved routers only with both replies',async t=>{
+test('active discovery proposes a two-hop route between saved routers only with both replies',async t=>{
  const store=openStore(':memory:')
  t.after(()=>store.close())
  const routers=[['tenda','192.168.0.1'],['main','192.168.100.1'],['public','8.8.8.8']]
@@ -219,16 +223,17 @@ test('active discovery saves a two-hop route between saved routers only with bot
  firstHop='1   <1 ms   *   1 ms   192.168.0.1'
  await discovery.runOnce()
  const {revision,monitoring,topology}=store.read()
- assert.equal(revision,2)
+ assert.equal(revision,1)
  assert.deepEqual(monitoring,{tenda:false,main:true,public:false})
- assert.deepEqual(topology.edges.map(({source,target,label})=>[source,target,label]),[
+ assert.equal(topology.edges.length,0)
+ assert.deepEqual(store.topologyHints().map(({source,target,label})=>[source,target,label]),[
   ['tenda','main','Observed upstream route'],
  ])
  assert.equal(discovery.snapshot().upstreamLinks,1)
  await discovery.runOnce()
- assert.equal(store.read().revision,2)
- assert.equal(discovery.snapshot().upstreamLinks,0)
- assert.deepEqual(calls,['192.168.100.1','192.168.100.1'])
+ assert.equal(store.read().revision,1)
+ assert.equal(store.topologyHints().length,1)
+ assert.deepEqual(calls,['192.168.100.1','192.168.100.1','192.168.100.1'])
 })
 
 test('bulk discovery adds every current page once, reuses map entries and links clients to the router',async t=>{
@@ -264,7 +269,9 @@ test('bulk discovery adds every current page once, reuses map entries and links 
  store.recordDiscovery([...changed,{ip:'192.168.0.1',source:'gateway'}])
  assert.equal((await add(1,result.pendingVersion)).status,409)
  const reviewed=await fetch(`${base}/discovered?limit=1`).then(r=>r.json())
- assert.deepEqual(await (await add(1,reviewed.pendingVersion)).json(),{addedCount:202,existingCount:1})
+ const proposed=await (await add(1,reviewed.pendingVersion)).json()
+ assert.equal(proposed.addedCount,202);assert.equal(proposed.existingCount,1);assert.equal(store.revision(),1)
+ applyDiscoveryPatch(store,proposed.draft)
  const {revision,topology,monitoring}=store.read()
  assert.equal(revision,2)
  assert.equal(topology.nodes.length,203)
@@ -273,6 +280,6 @@ test('bulk discovery adds every current page once, reuses map entries and links 
  assert.equal(monitoring.existing,false)
  assert.equal((await add(1,result.pendingVersion)).status,409)
  const empty=await fetch(`${base}/discovered?limit=1`).then(r=>r.json())
- assert.deepEqual(await (await add(2,empty.pendingVersion)).json(),{addedCount:0,existingCount:0})
+ assert.deepEqual(await (await add(2,empty.pendingVersion)).json(),{addedCount:0,existingCount:0,revision:2,draft:{nodes:[],edges:[]}})
  assert.equal(store.revision(),2)
 })
