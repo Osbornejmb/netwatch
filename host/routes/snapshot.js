@@ -16,9 +16,15 @@ export function createSnapshotRoute(instance) {
     if (cached?.store !== store || cached.key !== snapshotKey || store.snapshotNow() >= cached.expiresAt) {
       const snapshot = store.snapshot({ uplinkPorts: portFreshness > 0, portFreshness, linkHealth: true })
       const { linkHealthExpiresAt, ...result } = snapshot
-      cached = { store, key: snapshotKey, expiresAt: linkHealthExpiresAt ?? Infinity,
-        healthKey: createHash('sha256').update(JSON.stringify(result.linkHealth ?? null)).digest('base64url'),
-        result }
+      cached = {
+        store,
+        key: snapshotKey,
+        expiresAt: linkHealthExpiresAt ?? Infinity,
+        healthKey: createHash('sha256')
+          .update(JSON.stringify(result.linkHealth ?? null))
+          .digest('base64url'),
+        result,
+      }
     }
     const result = { ...cached.result, generatedAt: new Date(store.snapshotNow()).toISOString() }
     const version = createHash('sha256')

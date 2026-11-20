@@ -525,9 +525,12 @@ export function openStore(
         return row && JSON.parse(row.payload)
       })
       if (previous && previous.uptime <= clean.uptime) {
-        const ports = new Map(previous.interfaces.map(({ index, admin, oper, speedBps }) =>
-          [index, { checkedAt: previous.checkedAt, admin, oper, speed: speedBps }],
-        ))
+        const ports = new Map(
+          previous.interfaces.map(({ index, admin, oper, speedBps }) => [
+            index,
+            { checkedAt: previous.checkedAt, admin, oper, speed: speedBps },
+          ]),
+        )
         interfaceHistory.set(id, [ports, ...(interfaceHistory.get(id) ?? []).slice(0, 1)])
       } else {
         interfaceHistory.delete(id)
@@ -728,9 +731,10 @@ export function openStore(
         }
         return {
           inventory: structuredClone(state),
-          ...(linkHealth && state.topology.edges.length && {
-            linkHealth: evaluateLinks(state.topology, linkReadings, generatedAt, portFreshness ?? 0),
-          }),
+          ...(linkHealth &&
+            state.topology.edges.length && {
+              linkHealth: evaluateLinks(state.topology, linkReadings, generatedAt, portFreshness ?? 0),
+            }),
           ...(ports.length && { uplinkPorts: ports }),
           activeIncidents: db
             .prepare('SELECT * FROM incidents WHERE resolved_at IS NULL ORDER BY id DESC')

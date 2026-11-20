@@ -62,8 +62,12 @@ function Preview({ action, onClose, onConfirm, busy }) {
         </details>
       )}
       {!!action.topology.roots?.length && (
-        <p>Root routers: {action.topology.roots.map((id) =>
-          action.topology.nodes.find((node) => node.id === id)?.data.label).join(', ')}</p>
+        <p>
+          Root routers:{' '}
+          {action.topology.roots
+            .map((id) => action.topology.nodes.find((node) => node.id === id)?.data.label)
+            .join(', ')}
+        </p>
       )}
       <div className="modal-actions">
         <button data-initial-focus className="button secondary" disabled={busy} onClick={onClose}>
