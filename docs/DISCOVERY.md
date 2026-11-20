@@ -10,6 +10,8 @@ Discovery is an opt-in convenience for reviewing Windows neighbor-table entries 
 
 The host derives subnets from active non-loopback, non-link-local RFC1918 IPv4 interfaces and filters neighbor entries to those directly attached ranges. Results have a separate SQLite table and are shown in Discovered devices. Add to map requires an explicit action and current inventory revision. New map entries have normal monitoring checks enabled; ICMP authorization remains separately off and is never granted by adding a device. Discovery errors preserve prior results. A device becomes Not seen after three successful scans omit it.
 
+The scan includes the host's own MAC from its local network adapter because its own address may be absent from the Windows ARP table.
+
 When adding or updating a discovered device, NetWatch checks the local IPv4 route table. A device matching its subnet's default gateway is typed as a router (including correcting an already-added switch); other devices without a switch port match get a `Gateway route` link when that gateway matches a saved router address. This is a logical next-hop hint, not a verified physical connection; switch-port topology requires separately configured LLDP/SNMP evidence. If the route cannot be read or no saved router matches, the device is added without a link.
 
 For up to 128 results per scan, NetWatch may make bounded reverse-DNS lookups (600 ms each, four concurrent) and display a name hint. A simple hostname match may suggest Router, Switch, Phone or PC; these labels are guesses from names, not device fingerprinting or verified hardware types. DNS may provide no name or a misleading one, so Unknown is expected. Port scans, operating-system fingerprints, SNMP and vendor/OUI lookup are not part of this feature.
@@ -23,5 +25,7 @@ Validation in this branch uses synthetic interfaces and fake neighbor output onl
 ## Switch port matches
 
 Save the managed switch as a switch using its management IP, enroll it for read-only SNMPv3 port polling, and run discovery. When the scan has an IP-to-MAC match and one enrolled switch reports that MAC on a port with only that learned address, Discovered devices shows the switch and its interface name. NetWatch adds or updates the **Last seen on** link for devices already on the map. For a new device, the link is saved when you choose **Add to map** or **Add all to map**. When adding devices without a port match, the existing gateway lookup still applies.
+
+When an LLDP chassis MAC matches a discovered address, NetWatch can link the adjacent peer and show both port identifiers. Other MACs learned on that LLDP port are excluded as direct attachments. To locate their access ports, save and enroll the downstream switch as well. SNMP polls retry linking recently scanned devices already added to the map.
 
 The read-only SNMPv3 view must include the bridge-port to interface mapping and the forwarding table. NetWatch checks Q-BRIDGE-MIB first and falls back to BRIDGE-MIB when the VLAN-aware table returns no entries. It uses the table visible to the configured SNMPv3 context. A missing, incomplete, expired, or ambiguous observation supplies no new link. A saved label records the last match, which can still be a port leading to an unmanaged device or downstream switch.

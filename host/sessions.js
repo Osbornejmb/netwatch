@@ -45,7 +45,7 @@ export function createSessions(db, { lan, now = Date.now, audit } = {}) {
     ).run(at, at - limits.viewer[0], at - limits.admin[0])
     for (const [ip, entry] of failures) if (at - entry.last >= 10 * minute) failures.delete(ip)
   }
-  function inspect(req) {
+  function inspect(req, touch = true) {
     const prefix = cookieName(req.socket.encrypted)
     const token = req.headers.cookie
       ?.split(';')
@@ -65,7 +65,7 @@ export function createSessions(db, { lan, now = Date.now, audit } = {}) {
       (config.viewer_mode === 'disabled' || (config.viewer_mode === 'password' && !config.viewer_hash))
     )
       return
-    if (at - session.last_seen_at >= minute)
+    if (touch && at - session.last_seen_at >= minute)
       db.prepare('UPDATE sessions SET last_seen_at=? WHERE id_hash=?').run(at, session.id_hash)
     return { ...session, token }
   }

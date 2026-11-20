@@ -9,8 +9,10 @@ export function createSnapshotRoute(instance) {
     const portFreshness = ['running', 'degraded'].includes(portCollector?.state)
       ? portCollector.freshness?.staleAfterMs
       : undefined
+    const visibleStatus =
+      viewer && status ? { state: status.state, freshness: { staleAfterMs: status.freshness.staleAfterMs } } : status
     const version = createHash('sha256')
-      .update(JSON.stringify([store.snapshotVersion(), status, discoveryStatus, viewer, portFreshness]))
+      .update(JSON.stringify([store.snapshotVersion(), visibleStatus, discoveryStatus, viewer, portFreshness]))
       .digest('base64url')
     // The wall-clock generatedAt field can advance while the represented state is unchanged.
     const tag = '"' + instance + '.' + version + '"'

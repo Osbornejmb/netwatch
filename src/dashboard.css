@@ -127,6 +127,9 @@
   opacity: 0;
   pointer-events: none;
 }
+.health-map-large .health-node {
+  box-shadow: none;
+}
 .health-map .react-flow__node:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 5px;

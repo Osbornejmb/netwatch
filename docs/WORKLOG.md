@@ -1,5 +1,16 @@
 # Working checkpoint
 
+## Current status (2026-11-20) — live dashboard updates
+
+- The dashboard receives coalesced server-sent snapshots with the existing read policy and an eight-second HTTP fallback. Freshness continues locally using host time. Second-PC HTTPS verification remains pending.
+- A loopback Edge run with 44 devices and eight status changes measured 60 periodic requests/minute with polling and zero after one SSE connection. Median host-commit-to-card latency was 481 ms with polling and 114 ms with SSE. The largest observed latencies were 782 ms and 206 ms.
+- Large dashboard maps reuse card and route data, render only the viewport when zoomed in, and use simpler links during a drag. The freshness clock wakes at state boundaries.
+
+## Current status (2026-11-20) — discovery port links
+
+- Discovery uses the local adapter MAC and LLDP adjacency for switch-port matching. Poll completion backfills recent map entries when a downstream switch supplies its port data. The two-switch VLAN fixture covers access ports and both ends of the trunk. Hardware validation remains pending.
+- The dashboard shows discovered port labels on links. Dense maps spread cards out and focus links on the selected device, with an optional all-links overview.
+
 ## Current status (2026-11-19) — launcher port setup
 
 - The Windows launcher selects a saved device, tests read-only SNMPv3 port access and protects the profile locally. It remembers whether to check ports on start. Physical Cisco validation remains pending.

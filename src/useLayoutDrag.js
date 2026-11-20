@@ -15,26 +15,32 @@ export default function useLayoutDrag(nodes, edges, context, sizes) {
   )
   const saved = move?.context === context ? move : null
   const positions = saved?.signature === signature ? saved.positions : EMPTY
-  const onPositionChanges = (changes) => {
-    const moved = changes.filter((change) => change.type === 'position' && change.position)
-    if (!moved.length) return
-    setMove((previous) => {
-      const current = previous?.context === context && previous.signature === signature ? previous : null
-      let positions = current?.positions || EMPTY
-      for (const change of moved) positions = pushNodes(change.id, change.position, nodes, positions, sizes)
-      return { context, signature, positions, committed: current?.committed || EMPTY }
-    })
-  }
-  const moveByKey = (event, node) => {
-    const delta = { ArrowLeft: [-10, 0], ArrowRight: [10, 0], ArrowUp: [0, -10], ArrowDown: [0, 10] }[event.key]
-    if (!delta) return false
-    event.preventDefault()
-    event.stopPropagation()
-    onPositionChanges([
-      { type: 'position', id: node.id, position: { x: node.position.x + delta[0], y: node.position.y + delta[1] } },
-    ])
-    return true
-  }
+  const onPositionChanges = useCallback(
+    (changes) => {
+      const moved = changes.filter((change) => change.type === 'position' && change.position)
+      if (!moved.length) return
+      setMove((previous) => {
+        const current = previous?.context === context && previous.signature === signature ? previous : null
+        let positions = current?.positions || EMPTY
+        for (const change of moved) positions = pushNodes(change.id, change.position, nodes, positions, sizes)
+        return { context, signature, positions, committed: current?.committed || EMPTY }
+      })
+    },
+    [context, signature, nodes, sizes],
+  )
+  const moveByKey = useCallback(
+    (event, node) => {
+      const delta = { ArrowLeft: [-10, 0], ArrowRight: [10, 0], ArrowUp: [0, -10], ArrowDown: [0, 10] }[event.key]
+      if (!delta) return false
+      event.preventDefault()
+      event.stopPropagation()
+      onPositionChanges([
+        { type: 'position', id: node.id, position: { x: node.position.x + delta[0], y: node.position.y + delta[1] } },
+      ])
+      return true
+    },
+    [onPositionChanges],
+  )
   const finish = useCallback(
     () =>
       setMove((current) => {

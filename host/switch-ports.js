@@ -44,7 +44,7 @@ async function walk(request, root, repetitions, limit, consume) {
   }
 }
 
-export async function readSwitchPorts(request, interfaces, policy) {
+export async function readSwitchPorts(request, interfaces, policy, neighbors = []) {
   const indexes = new Map()
   const names = new Map(interfaces.map(({ index, name }) => [index, name]))
   await walk(request, BRIDGE_PORT_INDEX, policy.repetitions, policy.maxInterfaces, (suffix, index) => {
@@ -66,21 +66,37 @@ export async function readSwitchPorts(request, interfaces, policy) {
     addMac(suffix.slice(1), port)
   })
   if (!vlanRows) await walk(request, BRIDGE_FDB_PORT, policy.repetitions, 2048, addMac)
-  // A MAC learned on multiple interfaces or a port carrying multiple MACs is ambiguous.
+  const neighborsByIndex = new Map()
+  for (const peer of neighbors) {
+    if (!peer.chassisMac || !peer.remotePort) continue
+    const index = indexes.get(peer.localPort)
+    if (!index) continue
+    neighborsByIndex.set(index, neighborsByIndex.has(index) ? null : peer)
+  }
   const byMac = new Map()
   for (const [index, macs] of macsByPort) {
     for (const mac of macs) {
       const name = names.get(index)
-      const port = macs.size === 1 && name ? { index, name } : null
+      const port = macs.size === 1 && !neighborsByIndex.has(index) && name ? { index, name } : null
       byMac.set(mac, byMac.has(mac) ? null : port)
     }
   }
+  // LLDP locates the adjacent peer. Other MACs on that interface may be downstream.
+  const direct = new Map()
+  for (const [index, peer] of neighborsByIndex) {
+    const name = names.get(index)
+    if (!name || !peer) continue
+    direct.set(peer.chassisMac, direct.has(peer.chassisMac) ? null : { index, name, remotePort: peer.remotePort })
+  }
+  for (const [mac, port] of direct) byMac.set(mac, port)
   return [...byMac].flatMap(([mac, port]) => (port ? [{ mac, ...port }] : []))
 }
 
 export function switchPortFor(ports, node, discovery) {
   if (!discovery.mac || node.data.ip !== discovery.ip) return null
   const matches = ports.get(discovery.mac)?.filter(({ switchId }) => switchId !== node.id)
+  const direct = matches?.filter(({ remotePort }) => remotePort)
+  if (direct?.length) return direct.length === 1 ? direct[0] : null
   return matches?.length === 1 ? matches[0] : null
 }
 
@@ -88,14 +104,17 @@ export function saveSwitchPortLink(topology, node, port) {
   const owner = topology.nodes.find(({ id, type }) => id === port.switchId && type === 'switch')
   if (!owner) return null
   const id = 'discovery-port-' + createHash('sha256').update(node.id).digest('hex')
-  const link = { id, source: node.id, target: owner.id, label: `Last seen on ${port.name}`.slice(0, 100) }
+  const label = port.remotePort
+    ? `LLDP · ${port.name.slice(0, 45)} ↔ ${port.remotePort.slice(0, 45)}`
+    : `Last seen on ${port.name}`.slice(0, 100)
+  const link = { id, source: node.id, target: owner.id, label }
   const key = connectionKey(link)
   const index = topology.edges.findIndex((edge) => edge.id === id)
   if (index >= 0) {
     const prior = topology.edges[index]
     if (
       prior.source !== node.id ||
-      !prior.label.startsWith('Last seen on ') ||
+      !(prior.label.startsWith('Last seen on ') || prior.label.startsWith('LLDP · ')) ||
       prior.uplink ||
       topology.groups?.some((group) => group.links.includes(id))
     )

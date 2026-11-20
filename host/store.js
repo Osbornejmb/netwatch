@@ -357,6 +357,13 @@ export function openStore(
     observedGatewayAddresses() {
       return db.prepare("SELECT ip,mac FROM discovered_devices WHERE source='gateway' AND mac IS NOT NULL").all()
     },
+    recentDiscoveryAddresses(since) {
+      return db
+        .prepare(
+          "SELECT ip,mac FROM discovered_devices WHERE status='added' AND misses=0 AND mac IS NOT NULL AND last_seen>=?",
+        )
+        .all(since)
+    },
     pendingDiscovery() {
       return db
         .prepare(

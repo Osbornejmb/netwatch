@@ -223,6 +223,13 @@ export function createDiscovery(
             .filter((r) => allowed.has(r.ip))
             .map((r) => [r.ip, r]),
         )
+        const localIps = new Set(subnets.map(({ interfaceAddress }) => interfaceAddress))
+        for (const adapter of Object.values(currentInterfaces).flat()) {
+          if (adapter?.family !== 'IPv4' || !localIps.has(adapter.address)) continue
+          const mac = adapter.mac?.toLowerCase()
+          if (mac && /^[\da-f][02468ace](?::[\da-f]{2}){5}$/.test(mac) && mac !== '00:00:00:00:00:00')
+            byIp.set(adapter.address, { ip: adapter.address, mac, source: 'neighbor', seenAt: now() })
+        }
         const observedGateways = store.observedGatewayAddresses()
         const knownByIp = new Map(observedGateways.map(({ ip, mac }) => [ip, mac]))
         const knownMacs = new Set(knownByIp.values())

@@ -10,6 +10,7 @@ export function createInterfaceCollector(
     runner = createSnmpProbe(),
     now = () => Date.now(),
     policy = INTERFACE_POLICY,
+    onSwitchPorts,
   } = {},
 ) {
   let timer,
@@ -144,6 +145,7 @@ export function createInterfaceCollector(
     }
     info.state = signal.aborted ? 'starting' : info.errors ? 'degraded' : 'running'
     info.lastSeenAt = stamp()
+    if (!signal.aborted && store.revision() === revision) onSwitchPorts?.(readSwitchPorts())
   }
   function runOnce() {
     if (stopped || !enabled || platform !== 'win32') return Promise.resolve()
@@ -165,30 +167,31 @@ export function createInterfaceCollector(
     await runOnce()
     if (!stopped) timer = setTimeout(poll, Math.max(1000, policy.intervalMs - (now() - start)))
   }
+  function readSwitchPorts() {
+    const matches = new Map()
+    if (stopped || !enabled || platform !== 'win32') return matches
+    for (const target of store.interfaceTargets()) {
+      const sample = switchPorts.get(target.deviceId)
+      if (
+        target.type !== 'switch' ||
+        sample?.address !== target.address ||
+        sample.authorization !== target.authorization
+      )
+        continue
+      const age = now() - Date.parse(sample.checkedAt)
+      if (!Number.isFinite(age) || age < 0 || age > freshness()) continue
+      for (const { mac, ...port } of sample.ports) {
+        if (!matches.has(mac)) matches.set(mac, [])
+        matches.get(mac).push({ ...port, switchId: target.deviceId })
+      }
+    }
+    return matches
+  }
   return {
     runOnce,
     snapshot: () => ({ ...info, freshness: { staleAfterMs: freshness() } }),
     device: (id) => ({ ...devices.get(id), collectorState: info.state, staleAfterMs: freshness() }),
-    switchPorts() {
-      const matches = new Map()
-      if (stopped || !enabled || platform !== 'win32') return matches
-      for (const target of store.interfaceTargets()) {
-        const sample = switchPorts.get(target.deviceId)
-        if (
-          target.type !== 'switch' ||
-          sample?.address !== target.address ||
-          sample.authorization !== target.authorization
-        )
-          continue
-        const age = now() - Date.parse(sample.checkedAt)
-        if (!Number.isFinite(age) || age < 0 || age > freshness()) continue
-        for (const { mac, index, name } of sample.ports) {
-          if (!matches.has(mac)) matches.set(mac, [])
-          matches.get(mac).push({ switchId: target.deviceId, index, name })
-        }
-      }
-      return matches
-    },
+    switchPorts: readSwitchPorts,
     neighbors(id) {
       const target = store.interfaceTargets().find((row) => row.deviceId === id)
       if (!target) return { state: 'unconfigured', neighbors: [] }

@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { ReactFlow } from '@xyflow/react'
 import MapControls from './MapControls'
 import { ArrowDownCircle, ArrowUpRight, CheckCircle2, CircleHelp, Clock3, Network, Router, Search } from 'lucide-react'
-import { HEALTH, deviceHealth, summarizeHealth, connectionHealth } from './health'
+import { HEALTH, deviceHealth, summarizeHealth, connectionHealth, nextEvidenceChange } from './health'
 import DeviceDetails from './DeviceDetails'
 import useMonitoring from './useMonitoring'
 import useLayoutDrag from './useLayoutDrag'
@@ -54,8 +54,23 @@ function HealthNode({ data, selected }) {
   )
 }
 
-const nodeTypes = { health: HealthNode }
+const nodeTypes = {
+  health: memo(HealthNode, (previous, next) => {
+    const a = previous.data,
+      b = next.data
+    return (
+      previous.selected === next.selected &&
+      a.label === b.label &&
+      a.ip === b.ip &&
+      a.kind === b.kind &&
+      a.status === b.status &&
+      a.checkedAt === b.checkedAt &&
+      a.connectionRole === b.connectionRole
+    )
+  }),
+}
 const NO_CHECKS = {}
+const NO_OBSTACLES = []
 
 export default function Dashboard({
   nodes: inventory,
@@ -79,20 +94,18 @@ export default function Dashboard({
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState(null)
   const [highlightedId, setHighlightedId] = useState(null)
-  const [nodeSizes, setNodeSizes] = useState({})
-  const [now, setNow] = useState(() => Date.now())
+  const [showPortLabels, setShowPortLabels] = useState(true)
+  const [showAllLinks, setShowAllLinks] = useState(false)
+  const [dragging, setDragging] = useState(false)
   useEffect(() => {
-    const update = () => setNow(Date.now())
-    update()
-    const timer = window.setInterval(update, 1000)
-    window.addEventListener('focus', update)
-    document.addEventListener('visibilitychange', update)
-    return () => {
-      window.clearInterval(timer)
-      window.removeEventListener('focus', update)
-      document.removeEventListener('visibilitychange', update)
-    }
-  }, [])
+    if (!dragging) return
+    const stop = () => setDragging(false)
+    window.addEventListener('blur', stop)
+    return () => window.removeEventListener('blur', stop)
+  }, [dragging])
+  const [nodeSizes, setNodeSizes] = useState({})
+  const [localNow, setNow] = useState(() => Date.now())
+  const now = Math.max(localNow, Date.parse(host.receivedAt) || 0) + (host.clockOffset ?? 0)
   const {
     nodes,
     edges: sourceEdges,
@@ -100,25 +113,52 @@ export default function Dashboard({
   } = live
     ? { nodes: live.inventory.topology.nodes, edges: live.inventory.topology.edges, checks: live.checks }
     : { nodes: inventory, edges: inventoryEdges, checks: NO_CHECKS }
+  const portEvidence = live?.uplinkPorts
+  const portFreshness = live?.uplinkStaleAfterMs
+  const deadline = useMemo(
+    () => nextEvidenceChange(checks, staleAfterMs, portEvidence, portFreshness, now),
+    [checks, staleAfterMs, portEvidence, portFreshness, now],
+  )
+  const clockOffset = host.clockOffset ?? 0
+  useEffect(() => {
+    const update = () => setNow(Date.now())
+    const timer = Number.isFinite(deadline)
+      ? window.setTimeout(update, Math.min(2147483647, Math.max(1, deadline - (Date.now() + clockOffset))))
+      : undefined
+    window.addEventListener('focus', update)
+    document.addEventListener('visibilitychange', update)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('focus', update)
+      document.removeEventListener('visibilitychange', update)
+    }
+  }, [deadline, clockOffset, localNow])
   const edges = useMemo(() => uniqueConnections(sourceEdges), [sourceEdges])
+  const dense = edges.length >= 30
   const groups = live ? (live.inventory.topology.groups ?? []) : draftGroups
-  const paths = new Map(
-    sourceEdges.map((edge) => [
-      edge.id,
-      {
-        edge,
-        state: uplinkState(edge, live?.uplinkPorts?.get(edge.id), now, live?.uplinkStaleAfterMs),
-      },
-    ]),
+  const paths = useMemo(
+    () =>
+      new Map(
+        sourceEdges.map((edge) => [
+          edge.id,
+          {
+            edge,
+            state: uplinkState(edge, portEvidence?.get(edge.id), now, portFreshness),
+          },
+        ]),
+      ),
+    [sourceEdges, portEvidence, now, portFreshness],
   )
   const effectiveCenterId = nodes.some((node) => node.id === centerId) ? centerId : ''
-  const layoutNodes = useMemo(
-    () =>
+  const layoutNodes = useMemo(() => {
+    const layout =
       mapLayout === 'radial'
         ? radialLayout(nodes, edges, effectiveCenterId, nodeSizes)
-        : tidyLayout(nodes, edges, nodeSizes),
-    [nodes, edges, mapLayout, effectiveCenterId, nodeSizes],
-  )
+        : tidyLayout(nodes, edges, nodeSizes)
+    return dense
+      ? layout.map((node) => ({ ...node, position: { x: node.position.x * 1.25, y: node.position.y * 1.25 } }))
+      : layout
+  }, [nodes, edges, mapLayout, effectiveCenterId, nodeSizes, dense])
   const layoutKey = `${live ? 'host' : 'draft'}-${mapLayout}`
   const {
     positions: positionOverrides,
@@ -136,7 +176,8 @@ export default function Dashboard({
       for (const change of measured) {
         const size = change.dimensions
         if (previous[change.id]?.width !== size.width || previous[change.id]?.height !== size.height) {
-          next = { ...next, [change.id]: size }
+          if (next === previous) next = { ...previous }
+          next[change.id] = size
         }
       }
       return next
@@ -144,60 +185,97 @@ export default function Dashboard({
   }, [])
   const openIncidents = new Set((live?.activeIncidents || []).map((item) => item.deviceId))
   const needsAttention = (node) => ['down', 'stale'].includes(node.health) || openIncidents.has(node.id)
-  const counts = summarizeHealth(nodes, checks, now, staleAfterMs)
-  const devices = layoutNodes.map((node) => ({
-    ...node,
-    position: Object.hasOwn(positionOverrides, node.id) ? positionOverrides[node.id] : node.position,
-    health: deviceHealth(checks[node.id], now, staleAfterMs),
-  }))
+  const counts = useMemo(() => summarizeHealth(nodes, checks, now, staleAfterMs), [nodes, checks, now, staleAfterMs])
+  const positioned = useMemo(
+    () =>
+      layoutNodes.map((node) => ({
+        ...node,
+        position: Object.hasOwn(positionOverrides, node.id) ? positionOverrides[node.id] : node.position,
+      })),
+    [layoutNodes, positionOverrides],
+  )
+  const devices = useMemo(
+    () =>
+      layoutNodes.map((node) => ({
+        ...node,
+        health: deviceHealth(checks[node.id], now, staleAfterMs),
+      })),
+    [layoutNodes, checks, now, staleAfterMs],
+  )
 
   const attention = devices.filter(needsAttention)
-  const visible = devices.filter(
-    (node) =>
-      (statusFilter === 'all' || node.health === statusFilter) &&
-      `${node.data.label} ${node.data.ip}`.toLowerCase().includes(query.trim().toLowerCase()),
+  const visible = useMemo(
+    () =>
+      devices.filter(
+        (node) =>
+          (statusFilter === 'all' || node.health === statusFilter) &&
+          `${node.data.label} ${node.data.ip}`.toLowerCase().includes(query.trim().toLowerCase()),
+      ),
+    [devices, statusFilter, query],
   )
-  const visibleIds = new Set(visible.map((node) => node.id))
-  const cardsById = new Map(visible.map((node) => [node.id, mapCard({ ...node, measured: nodeSizes[node.id] })]))
-  const cards = [...cardsById.values()]
+  const visibleIds = useMemo(() => new Set(visible.map((node) => node.id)), [visible])
+  const cardsById = useMemo(
+    () => new Map(positioned.map((node) => [node.id, mapCard({ ...node, measured: nodeSizes[node.id] })])),
+    [positioned, nodeSizes],
+  )
+  const cards = useMemo(() => [...cardsById.values()], [cardsById])
+  const routeCards =
+    dense && (showAllLinks || dragging)
+      ? NO_OBSTACLES
+      : visibleIds.size === positioned.length
+        ? cards
+        : visible.map(({ id }) => cardsById.get(id))
   const selected = devices.find((node) => node.id === selectedId)
   const devicesById = new Map(devices.map((node) => [node.id, node]))
   const highlightedDevice = devicesById.get(highlightedId)
   const connectedIds = useMemo(() => connectedDevices(highlightedId, nodes, edges), [highlightedId, nodes, edges])
-  const mapEdges = edges.map((edge) => {
-    const source = devicesById.get(edge.source),
-      target = devicesById.get(edge.target)
-    const status = connectionHealth(source?.health, target?.health)
-    const label = {
-      up: 'Both endpoints up',
-      down: 'Endpoint down',
-      stale: 'Stale endpoint data',
-      unknown: 'Endpoint reachability unknown',
-    }[status]
-    return {
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      sourceHandle: 'radial-source-right',
-      targetHandle: 'radial-target-left',
-      data: {
-        source: cardsById.get(edge.source),
-        target: cardsById.get(edge.target),
-        cards,
-        layered: mapLayout === 'tidy',
-      },
-      hidden: !visibleIds.has(edge.source) || !visibleIds.has(edge.target),
-      type: 'mapLink',
-      ariaLabel: `${source?.data.label} and ${target?.data.label}: ${label}`,
-      className: `health-path-${status}${highlightedDevice && (edge.source === highlightedId || edge.target === highlightedId) ? ' health-path-highlighted' : ''}`,
-      style: {
-        stroke: HEALTH[status].color,
-        strokeWidth: highlightedDevice && (edge.source === highlightedId || edge.target === highlightedId) ? 3.5 : 1.75,
-        opacity: highlightedDevice && edge.source !== highlightedId && edge.target !== highlightedId ? 0.18 : 1,
-        strokeDasharray: status === 'down' ? '7 5' : status === 'unknown' ? '3 5' : undefined,
-      },
-    }
-  })
+  const mapEdges = edges
+    .filter(
+      (edge) =>
+        visibleIds.has(edge.source) &&
+        visibleIds.has(edge.target) &&
+        (!dense || showAllLinks || edge.source === highlightedId || edge.target === highlightedId),
+    )
+    .map((edge) => {
+      const source = devicesById.get(edge.source),
+        target = devicesById.get(edge.target)
+      const status = connectionHealth(source?.health, target?.health)
+      const label = {
+        up: 'Both endpoints up',
+        down: 'Endpoint down',
+        stale: 'Stale endpoint data',
+        unknown: 'Endpoint reachability unknown',
+      }[status]
+      const portLabel = /^(?:Last seen on |LLDP · )/.test(edge.label)
+        ? edge.label.replace(/^(?:Last seen on |LLDP · )/, '')
+        : undefined
+      return {
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        sourceHandle: 'radial-source-right',
+        targetHandle: 'radial-target-left',
+        data: {
+          source: cardsById.get(edge.source),
+          target: cardsById.get(edge.target),
+          cards: routeCards,
+          maxBlockers: dense ? 8 : undefined,
+          layered: mapLayout === 'tidy',
+        },
+        type: 'mapLink',
+        label: showPortLabels && !(dense && (showAllLinks || dragging)) ? portLabel : undefined,
+        labelStyle: { fill: 'var(--text)', fontSize: 14, fontWeight: 650 },
+        ariaLabel: `${source?.data.label} and ${target?.data.label}: ${label}${portLabel ? `, ${edge.label}` : ''}`,
+        className: `health-path-${status}${highlightedDevice && (edge.source === highlightedId || edge.target === highlightedId) ? ' health-path-highlighted' : ''}`,
+        style: {
+          stroke: HEALTH[status].color,
+          strokeWidth:
+            highlightedDevice && (edge.source === highlightedId || edge.target === highlightedId) ? 3.5 : 1.75,
+          opacity: highlightedDevice && edge.source !== highlightedId && edge.target !== highlightedId ? 0.18 : 1,
+          strokeDasharray: status === 'down' ? '7 5' : status === 'unknown' ? '3 5' : undefined,
+        },
+      }
+    })
   const connections = selected
     ? edges
         .filter((edge) => edge.source === selected.id || edge.target === selected.id)
@@ -217,10 +295,75 @@ export default function Dashboard({
         .filter((item) => item.device)
     : []
 
-  const selectDevice = (node) => {
+  const selectDevice = useCallback((node) => {
     setHighlightedId(node.id)
     setSelectedId(node.id)
-  }
+  }, [])
+  const keyboard = useCallback(
+    (node) => ({
+      onKeyUp: (event) => {
+        if (event.key.startsWith('Arrow')) finishDrag()
+      },
+      onKeyDown: (event) => {
+        if (event.target !== event.currentTarget || moveByKey(event, node)) return
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          event.stopPropagation()
+          selectDevice(node)
+        }
+      },
+    }),
+    [finishDrag, moveByKey, selectDevice],
+  )
+  const baseMapNodes = useMemo(
+    () =>
+      showInventory
+        ? []
+        : devices.map((node) => ({
+            ...node,
+            measured: nodeSizes[node.id],
+            type: 'health',
+            ariaRole: 'group',
+            domAttributes: keyboard(node),
+            hidden: !visibleIds.has(node.id),
+            selected: selectedId === node.id,
+            ariaLabel: `${node.data.label}, ${node.type === 'router' ? 'Router' : 'Switch'}, ${HEALTH[node.health].label}.${highlightedDevice ? (node.id === highlightedId ? ' Connection focus.' : connectedIds.has(node.id) ? ` Directly connected to ${highlightedDevice.data.label}.` : '') : ''} Open device details`,
+            data: {
+              ...node.data,
+              kind: node.type,
+              status: node.health,
+              checkedAt: checks[node.id]?.checkedAt,
+              connectionRole: highlightedDevice
+                ? node.id === highlightedId
+                  ? 'focus'
+                  : connectedIds.has(node.id)
+                    ? 'connected'
+                    : 'muted'
+                : '',
+            },
+          })),
+    [
+      showInventory,
+      devices,
+      nodeSizes,
+      keyboard,
+      visibleIds,
+      selectedId,
+      highlightedDevice,
+      highlightedId,
+      connectedIds,
+      checks,
+    ],
+  )
+  const mapNodes = useMemo(
+    () =>
+      baseMapNodes.map((node) => {
+        if (!Object.hasOwn(positionOverrides, node.id)) return node
+        const moved = { ...node, position: positionOverrides[node.id] }
+        return { ...moved, domAttributes: keyboard(moved) }
+      }),
+    [baseMapNodes, positionOverrides, keyboard],
+  )
 
   return (
     <section
@@ -237,7 +380,7 @@ export default function Dashboard({
           >
             {source === 'browser'
               ? 'Draft map · No live checks'
-              : `${host.state === 'connected' ? 'Connected' : host.hasConnected ? 'Connection lost, reconnecting' : 'Waiting for host'}${live ? '' : ' · Showing draft'}`}
+              : `${host.state === 'connected' ? (host.transport === 'sse' ? 'Live' : 'Connected · Checking periodically') : host.state === 'reconnecting' ? 'Reconnecting…' : host.state === 'disconnected' ? 'Disconnected' : 'Waiting for host'}${live ? '' : ' · Showing draft'}`}
           </p>
           {live && (
             <InfoTooltip label="Monitoring information">
@@ -277,6 +420,15 @@ export default function Dashboard({
               placeholder="Find a device"
             />
           </label>
+          {!showInventory && dense && (
+            <button
+              className="health-button"
+              aria-pressed={showAllLinks}
+              onClick={() => setShowAllLinks((shown) => !shown)}
+            >
+              Show all links
+            </button>
+          )}
           {showInventory && highlightedDevice && (
             <button
               className="health-button"
@@ -292,6 +444,15 @@ export default function Dashboard({
           <details className="health-view-options">
             <summary>View options{statusFilter !== 'all' || query ? ' · Filtered' : ''}</summary>
             <div>
+              {!showInventory && (
+                <button
+                  className="health-button"
+                  aria-pressed={showPortLabels}
+                  onClick={() => setShowPortLabels((shown) => !shown)}
+                >
+                  Port labels
+                </button>
+              )}
               {!viewer && (
                 <label className="health-filter">
                   Show{' '}
@@ -512,48 +673,14 @@ export default function Dashboard({
           </div>
         </section>
       ) : (
-        <div className="health-map">
+        <div className={`health-map${dense || nodes.length >= 120 ? ' health-map-large' : ''}`}>
           <ReactFlow
             key={`${layoutKey}-${effectiveCenterId}`}
             onNodesChange={(changes) => {
               onDimensionsChange(changes)
               onPositionChanges(changes)
             }}
-            nodes={devices.map((node) => ({
-              ...node,
-              measured: nodeSizes[node.id],
-              type: 'health',
-              ariaRole: 'group',
-              domAttributes: {
-                onKeyUp: (event) => {
-                  if (event.key.startsWith('Arrow')) finishDrag()
-                },
-                onKeyDown: (event) => {
-                  if (event.target !== event.currentTarget || moveByKey(event, node)) return
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault()
-                    event.stopPropagation()
-                    selectDevice(node)
-                  }
-                },
-              },
-              hidden: !visibleIds.has(node.id),
-              selected: selectedId === node.id,
-              ariaLabel: `${node.data.label}, ${node.type === 'router' ? 'Router' : 'Switch'}, ${HEALTH[node.health].label}.${highlightedDevice ? (node.id === highlightedId ? ' Connection focus.' : connectedIds.has(node.id) ? ` Directly connected to ${highlightedDevice.data.label}.` : '') : ''} Open device details`,
-              data: {
-                ...node.data,
-                kind: node.type,
-                status: node.health,
-                checkedAt: checks[node.id]?.checkedAt,
-                connectionRole: highlightedDevice
-                  ? node.id === highlightedId
-                    ? 'focus'
-                    : connectedIds.has(node.id)
-                      ? 'connected'
-                      : 'muted'
-                  : '',
-              },
-            }))}
+            nodes={mapNodes}
             edges={mapEdges}
             nodeTypes={nodeTypes}
             edgeTypes={mapEdgeTypes}
@@ -564,15 +691,20 @@ export default function Dashboard({
               setHighlightedId(null)
             }}
             nodesDraggable={!viewer}
+            onlyRenderVisibleElements={nodes.length >= 120}
             nodesConnectable={false}
             multiSelectionKeyCode={null}
             nodeDragThreshold={3}
             nodeClickDistance={3}
             onNodeDragStart={(_, node) => {
+              if (dense) setDragging(true)
               setHighlightedId(node.id)
               setSelectedId(null)
             }}
-            onNodeDragStop={finishDrag}
+            onNodeDragStop={() => {
+              setDragging(false)
+              finishDrag()
+            }}
             edgesFocusable={false}
             deleteKeyCode={null}
             fitView
@@ -627,6 +759,11 @@ export default function Dashboard({
               >
                 Clear highlight
               </button>
+            </div>
+          )}
+          {dense && !showAllLinks && !highlightedDevice && visible.length > 0 && (
+            <div className="health-map-focus-controls">
+              <p className="health-highlight-status">Select a device to trace its links.</p>
             </div>
           )}
         </div>

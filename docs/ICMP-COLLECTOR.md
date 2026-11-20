@@ -57,7 +57,7 @@ Let **B = max(10 seconds, ceil(enabled devices / 8) × 4 seconds)**. This estima
 
 Examples: 1–8 enabled devices give B=10 seconds, conservative down planning allowance about 32 seconds and recovery about 21 seconds before dashboard transport delay; 100 devices give B=52 seconds, down about 158 seconds; 2,000 devices give B=1,000 seconds and impractically long detection for most operators. Measure and reduce the enabled inventory/adjust architecture before claiming a large-company deployment.
 
-Snapshot `freshness.staleAfterMs = max(30,000, 2B + 10,000)` accounts for worker capacity. Collector errors or a stopped host never create fresh down observations; existing evidence eventually becomes stale. Consumers must use the exposed freshness, raw outcome and collector metadata. The dashboard polls the snapshot every second without overlapping requests. Small healthy networks typically detect down in roughly 10–22 seconds (two checks plus timeout/display delay); this is an estimate, not measured hardware acceptance. Large or slow inventories can exceed the ten-second target cadence.
+Snapshot `freshness.staleAfterMs = max(30,000, 2B + 10,000)` accounts for worker capacity. Collector errors or a stopped host never create fresh down observations; existing evidence eventually becomes stale. Consumers must use the exposed freshness, raw outcome and collector metadata. The dashboard receives snapshots over SSE and falls back to non-overlapping conditional HTTP requests when the stream is unavailable. Small healthy networks typically detect down in roughly 10–22 seconds (two checks plus timeout/display delay); this is an estimate, not measured hardware acceptance. Large or slow inventories can exceed the ten-second target cadence.
 
 ## Data/API changes
 

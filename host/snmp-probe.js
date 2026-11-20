@@ -196,7 +196,7 @@ export function createSnmpProbe({
       const lldp = await readLldp(request, interfaces.checkedAt).catch(() => ({ state: 'unavailable' }))
       if (!collectSwitchPorts) return { ...interfaces, lldp }
       try {
-        const ports = await readSwitchPorts(request, interfaces.interfaces, policy)
+        const ports = await readSwitchPorts(request, interfaces.interfaces, policy, lldp.neighbors)
         if ((await uptime()) < endUptime) throw new Error('Switch restarted')
         return { ...interfaces, lldp, switchPorts: ports }
       } catch {

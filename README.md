@@ -40,6 +40,8 @@ Screenshots use a test inventory with documentation addresses.
 4. Click **Test connection**. If the test passes, choose **Enable monitoring**, then close the setup window and click **Start**.
 5. Open the dashboard, select the switch, and expand **Ports** to see whether its ports are up. Expand **Network neighbors** to see connected devices that announce themselves using **LLDP**, a way for devices to share their name and port with a directly connected neighbor. [Port and neighbor setup](docs/SNMP-INTERFACES.md)
 
+Discovered port matches appear under **Connections** after the device is added to the map. Set up port monitoring on each managed switch to locate devices behind a trunk. [Discovery port matching](docs/DISCOVERY.md#switch-port-matches)
+
 Keep the NetWatch PC awake, connected, and signed in while you want checks to run. Start NetWatch again after signing back in. For updates and uninstall steps, see the [Windows launcher guide](docs/WINDOWS-LAUNCHER.md).
 
 ### Find a device automatically
@@ -88,7 +90,7 @@ Use **Edit map → Uplinks & redundancy** to map ports to connections and group 
 - **Overdue:** the last check is too old to describe the device's current state.
 - **Not monitored:** monitoring is disabled, no address is configured, or no confirmed result is available.
 
-The collector normally checks every 10 seconds. The dashboard polls every second, reuses unchanged snapshots, and ages checks using the host's freshness policy (at least 30 seconds, increasing with device count). Host disconnection preserves the last-known result and its timestamp; it does not turn devices Down. Device details show last check, measured response time, service state and collapsible recent history, 25 checks per page up to 200 displayed. No uptime percentage is inferred.
+The collector normally checks every 10 seconds. The dashboard receives live snapshots from the host and checks periodically if the live connection is unavailable. The browser uses host time and the freshness policy (at least 30 seconds, increasing with device count) to age checks locally. Host disconnection preserves the last-known result and its timestamp. Device details show last check, measured response time, service state and collapsible recent history, 25 checks per page up to 200 displayed. No uptime percentage is inferred.
 
 Per-check history keeps roughly the most recent 5,000 stored checks per device. That covers about 3.5 days of stable one-minute samples and less when status or outcomes change often. Status, outcome and reason changes and outage transitions are always stored. A network-wide safety cap of 1,000,000 rows and a 30-day age ceiling can shorten that history.
 

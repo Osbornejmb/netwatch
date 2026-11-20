@@ -24,3 +24,22 @@ export function connectionHealth(source, target) {
   if (![source, target].every((status) => ['up', 'stale'].includes(status))) return 'unknown'
   return source === 'stale' || target === 'stale' ? 'stale' : 'up'
 }
+
+export function nextEvidenceChange(checks, staleAfterMs, ports, portStaleAfterMs, now) {
+  let next = Infinity
+  const consider = (sample, freshness) => {
+    if (!(Number.isFinite(freshness) && freshness > 0)) return
+    const time = Date.parse(sample?.checkedAt)
+    if (!Number.isFinite(time)) return
+    const deadline = time > now ? time : Math.floor(time + freshness) + 1
+    if (deadline > now && deadline < next) next = deadline
+  }
+  for (const check of Object.values(checks)) {
+    if (check.status === 'up' || check.status === 'down') consider(check, staleAfterMs)
+  }
+  for (const evidence of ports?.values() ?? []) {
+    consider(evidence.source, portStaleAfterMs)
+    consider(evidence.target, portStaleAfterMs)
+  }
+  return next
+}

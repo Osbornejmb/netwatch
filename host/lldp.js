@@ -80,14 +80,13 @@ export async function readLldp(request, checkedAt) {
     }
     const chassisKey = hash([chassisType, chassis.toString('hex')])
     const id = hash([localPort, chassisKey, portType, port.toString('hex')])
+    const chassisMac = chassisType === 4 ? chassis.toString('hex').match(/../g).join(':') : null
     neighbors.set(id, {
       id,
       chassisKey,
       localPort,
-      chassis:
-        chassisType === 4
-          ? chassis.toString('hex').match(/../g).join(':')
-          : text(chassis) || chassis.toString('hex').slice(0, 80),
+      chassis: chassisMac ?? (text(chassis) || chassis.toString('hex').slice(0, 80)),
+      ...(chassisMac && { chassisMac }),
       remotePort:
         portType === 3 ? port.toString('hex').match(/../g).join(':') : text(port) || port.toString('hex').slice(0, 80),
       name: name ? text(name) : '',
