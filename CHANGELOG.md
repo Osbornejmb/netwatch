@@ -2,6 +2,13 @@
 
 This Windows x64 prerelease consolidates the Phase 0–5 work on link health, topology discovery, redundancy, and failure impact. It includes an unsigned installer and SHA-256 checksum.
 
+## Changes since v0.1.5
+
+- Improved port matching for discovered devices and LLDP peers. The host reconciles hints after SNMP polling, and the map shows discovered port labels.
+- Reduced dashboard rendering work for large inventories. Browser coverage includes live-update fallback and reconnect, link visibility, drag, pan, and zoom on a 240-device fixture.
+- Upgraded React and React DOM to 19, Lucide, Vite to 8 and its React plugin, ESLint to 10.15, and the GitHub Actions used for checkout, Node setup, scripting, and artifact uploads. Updated compatibility and removed superseded JSX lint rules.
+- Recorded the Phase 0 audit, baseline verification, scope, and acceptance templates. Phase planning now records explicit owner decisions before implementation.
+
 ## Topology and evidence
 
 - Added a port-level model for accepted links. Parallel physical connections retain distinct IDs, and unresolved links retain their labels and IDs. The editor supports manual roles, root routers, protected devices, and reviewed redundancy baselines.
