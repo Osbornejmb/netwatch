@@ -10,7 +10,7 @@ The Windows helper cache uses source-hash filenames and a SHA-256 sidecar for ea
 Requires Windows 10/11, Node 22.13+, the Windows .NET Framework v4 runtime/compiler, and OS permission to send ICMP. No administrator elevation or PowerShell execution-policy change is requested. The framework compiler must be present and permitted by application control. On a non-Windows host the enabled collector reports `unsupported`; it never substitutes another platform's ping command.
 
 1. Back up the database before upgrading (`npm.cmd run db -- backup C:\NetWatchBackups\before-2.2.sqlite`, host stopped). Schema v1 upgrades transactionally to v2, preserving inventory, sequence IDs, revisions and existing checks. V1 and v2 backups remain accepted. A compatible host migrates a restored v1 backup on its next start. Older hosts reject v2 rather than guessing its shape.
-2. Start the host normally and prepare **only your approved device inventory**. In Backup → Local host storage, save the inventory, choose each authorized host device, check Authorize ICMP checks, and preview/confirm Save to host. New/imported entries default disabled. Do not opt in the starter placeholders or sample devices.
+2. Start the host normally and prepare **only your approved device inventory**. In Edit map, choose Use this map and confirm the replacement. Open each approved saved device in Devices, then enable its checks in the device details. New and imported entries start with checks disabled.
 3. Stop the host, then explicitly enable the collector in the PowerShell session:
 
 ```powershell

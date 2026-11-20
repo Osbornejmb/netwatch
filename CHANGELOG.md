@@ -1,5 +1,11 @@
 # NetWatch changelog
 
+## Unreleased
+
+- Keep the dashboard map visible above expandable link details, with one connection list and quick device status filters.
+- Keep discovery actions visible while scrolling and use separate start-device controls for scheduled and manual topology discovery.
+- Move Clear draft map next to Use this map, with the existing draft-only confirmation.
+
 ## v0.2.2 Windows prerelease
 
 - Added a way to clear the draft map.
@@ -7,7 +13,7 @@
 
 Download the Windows x64 installer and verify it against SHA256SUMS.txt. The installer is unsigned. Back up your database before upgrading.
 
-## Unreleased
+### Changes included in v0.2.2
 
 - Nearby discovery adds devices without a supported switch or router identity as endpoints. Choose Endpoint, Computer, Printer, Switch, or Router in Edit map. Device shapes and icons distinguish endpoints and infrastructure without changing the health colors.
 

@@ -2,7 +2,7 @@
 
 ## Current status (2026-11-21)
 
-- The dashboard opens on the map with compact status filters. Connection and redundancy details scroll below the map. Discovered devices keeps scan actions visible and separates manual runs from scheduled discovery.
+- The dashboard opens on the map with compact status filters. Connection and redundancy details scroll below the map. Discovered devices keeps scan actions visible and separates manual runs from scheduled discovery. Clear draft map sits next to Use this map. See the [repository audit](../AUDIT.md) for remaining issues and verification limits.
 
 ## Current status (2026-11-20) — richer link evidence
 
