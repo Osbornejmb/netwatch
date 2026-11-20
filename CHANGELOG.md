@@ -1,6 +1,6 @@
 # NetWatch changelog
 
-## Unreleased
+## v0.2.1 Windows prerelease
 
 - Added optional per-switch SNMPv3 contexts for access-port discovery on switches that expose their MAC forwarding table per VLAN. Existing interface polling and connection review use their current workflows.
 
@@ -11,6 +11,10 @@
 - Fixed port-hint review so a moved endpoint updates its existing discovered link in the draft and shows the updated port once the map is saved.
 
 - Added a per-switch VLAN context field in Windows Port monitoring. Save it during enrollment or change it without re-entering credentials.
+
+- Updated the README and switch setup guide with console commands for SNMPv3, VLAN forwarding tables, LLDP, and CDP.
+
+Existing v0.2.0 databases already use schema v14. Install over v0.2.0 to keep the saved map, settings, and credentials.
 
 ## v0.2.0 Windows prerelease
 
