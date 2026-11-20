@@ -64,7 +64,7 @@ test('successful scans mark missing rows gone only after three misses; errors fr
 test('v4 to v5 discovery migration rolls back, and backups preserve discovery rows',t=>{
  const dir=mkdtempSync(join(tmpdir(),'nw-discovery-migration-')),path=join(dir,'db');t.after(()=>rmSync(dir,{recursive:true,force:true}))
  let store=openStore(path);store.recordDiscovery([{ip:'192.168.1.5',mac:'aa:bb:cc:dd:ee:ff',source:'neighbor'}]);store.close()
- const db=new DatabaseSync(path);db.exec('DROP TABLE interface_link_evidence;DROP TABLE topology_runs;DROP TABLE topology_hints;DROP TABLE audit_log;DROP TABLE sessions;DROP TABLE auth_config;DROP TABLE latest_check;DROP TABLE discovered_devices;PRAGMA user_version=4');db.close()
+ const db=new DatabaseSync(path);db.exec('DROP TABLE redundancy_incidents;DROP TABLE topology_changes;DROP TABLE dynamics_state;DROP TABLE interface_link_evidence;DROP TABLE topology_runs;DROP TABLE topology_hints;DROP TABLE audit_log;DROP TABLE sessions;DROP TABLE auth_config;DROP TABLE latest_check;DROP TABLE discovered_devices;PRAGMA user_version=4');db.close()
  backupDatabase(path,path+'.pre-v11.bak')
  assert.throws(()=>openStore(path,{migrateV5:()=>{throw Error('rollback')}}),/rollback/)
  const check=new DatabaseSync(path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,4);check.close()

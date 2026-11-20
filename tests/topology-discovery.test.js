@@ -354,7 +354,7 @@ test('v11 to v12 migration requires the matching offline backup and preserves sa
   for (let i = 0; i < 2; i++) {
     const store = openStore(path)
     try {
-      assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 13)
+      assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 14)
       assert.equal(store.revision(), 7)
       assert.deepEqual(store.read().topology, topology)
       assert.deepEqual(store.read().monitoring, { seed: true })

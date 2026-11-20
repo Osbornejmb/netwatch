@@ -33,6 +33,7 @@ export function discoveryRoutes(discovery) {
     return {
       seeds: topology.nodes.filter((node) => ids.has(node.id)).map(({ id, data }) => ({ id, label: data.label })),
       run: view(store, service().latest()),
+      schedule: store.dynamics.schedule(),
       hints: store
         .topologyHints()
         .filter((edge) => byId.has(edge.source) && byId.has(edge.target) && !pairs.has(connectionKey(edge)))
@@ -43,6 +44,17 @@ export function discoveryRoutes(discovery) {
     if (typeof body?.seedId !== 'string') throw invalid('Choose an enrolled device.')
     response.status = 202
     return service().start(body.seedId)
+  }
+  const schedule = ({ store, body }) => {
+    const intervalMinutes = body?.intervalMinutes
+    if (
+      !Number.isInteger(intervalMinutes) ||
+      (intervalMinutes !== 0 && (intervalMinutes < 15 || intervalMinutes > 1440))
+    )
+      throw invalid('Choose an interval from 15 to 1,440 minutes, or turn it off.')
+    if (intervalMinutes && !service().seeds().includes(body.seedId))
+      throw invalid('Choose an enrolled device in scope.')
+    return store.dynamics.setSchedule({ seedId: intervalMinutes ? body.seedId : '', intervalMinutes })
   }
   const cancel = ({ id }) => service().cancel(id)
   const get = ({ id, store }) => view(store, service().get(id))
@@ -132,5 +144,5 @@ export function discoveryRoutes(discovery) {
     if (nodes.length !== 2) throw invalid('A device in this proposal changed.', 409)
     return { draft: { nodes, edges: [edge] } }
   }
-  return { read, start, get, cancel, accept: review('accepted'), reject: review('rejected'), hint }
+  return { read, start, get, cancel, schedule, accept: review('accepted'), reject: review('rejected'), hint }
 }

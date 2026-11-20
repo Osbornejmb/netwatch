@@ -53,7 +53,7 @@ test('snapshot chooses newest timestamp then sequence, including after rebuildin
  assert.equal(store.snapshot().observations.length,1);assert.equal(store.snapshot().observations[0].status,'down')
  const saved=store.read(),history=store.history('r1');store.db.exec('DROP INDEX checks_device_latest');store.close()
  const reopened=openStore(path,{now:()=>now});try {
- assert.equal(reopened.db.prepare('PRAGMA user_version').get().user_version,13)
+ assert.equal(reopened.db.prepare('PRAGMA user_version').get().user_version,14)
  assert.deepEqual(reopened.read(),saved);assert.deepEqual(reopened.history('r1'),history)
  assert.equal(reopened.snapshot().observations[0].status,'down')
  assert.ok(reopened.db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='checks_device_latest'").get())
@@ -85,8 +85,8 @@ test('cleanup trims devices first, then evicts the network-wide oldest rows', t=
 test('failed initial migration rolls back schema; future schemas are rejected without modification',t=>{
  const dir=mkdtempSync(join(tmpdir(),'netwatch-migration-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));const path=join(dir,'db')
  assert.throws(()=>openStore(path,{migrate:()=>{throw new Error('migration interrupted')}}),/interrupted/)
- const db=new DatabaseSync(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,0);assert.equal(db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name='inventory'").get().n,0);db.exec('PRAGMA user_version=14');db.close()
- assert.throws(()=>openStore(path),/newer/);const check=new DatabaseSync(path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,14);check.close()
+ const db=new DatabaseSync(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,0);assert.equal(db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name='inventory'").get().n,0);db.exec('PRAGMA user_version=15');db.close()
+ assert.throws(()=>openStore(path),/newer/);const check=new DatabaseSync(path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,15);check.close()
 })
 test('offline backup/restore validates data, advances revision and rejects corrupt backups and active locks',t=>{
  const {dir,path,store}=fixture(t);store.write(input({r1:true}),0);store.append([{deviceId:'r1',status:'up',checkedAt:new Date().toISOString()}]);store.close()
@@ -169,7 +169,7 @@ test('ordered migrations upgrade v1 through v9 and preserve existing data', asyn
    backupDatabase(restored,restored+'.pre-v11.bak')
    const migrated=openStore(restored)
    try{
-    assert.equal(migrated.db.prepare('PRAGMA user_version').get().user_version,13)
+    assert.equal(migrated.db.prepare('PRAGMA user_version').get().user_version,14)
     assert.equal(migrated.revision(),4)
     assert.deepEqual(migrated.read().topology,{...topology,schemaVersion:2})
     const [row]=migrated.history('r1').checks
@@ -228,7 +228,7 @@ test('v6 backfill takes newest timestamp then sequence and validates the latest 
  store.write(input({r1:true}),0);store.close()
  const legacy=new DatabaseSync(path)
  try {
-  legacy.exec('DROP TABLE latest_check; DROP TABLE interface_link_evidence;DROP TABLE topology_runs;DROP TABLE topology_hints;DROP TABLE audit_log;DROP TABLE sessions; DROP TABLE auth_config; PRAGMA user_version=5')
+  legacy.exec('DROP TABLE latest_check; DROP TABLE redundancy_incidents;DROP TABLE topology_changes;DROP TABLE dynamics_state;DROP TABLE interface_link_evidence;DROP TABLE topology_runs;DROP TABLE topology_hints;DROP TABLE audit_log;DROP TABLE sessions; DROP TABLE auth_config; PRAGMA user_version=5')
   const insert=legacy.prepare("INSERT INTO checks(device_id,status,checked_at,outcome,reason) VALUES('r1',?,?,'unreachable',?)")
   insert.run('up',now-100,'tied older');insert.run('unknown',now-1000,'old timestamp');insert.run('down',now-100,'tied newer');insert.run('up',now-1100,'late insert')
  }finally{legacy.close()}

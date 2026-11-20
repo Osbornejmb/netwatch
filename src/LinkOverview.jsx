@@ -1,3 +1,4 @@
+import DynamicsPanel from './DynamicsPanel.jsx'
 import { baselineLabels, formatSpeed, linkLabels, roleLabels, scopeLabels } from './refocus.js'
 import { formatCheckTime } from './monitoring.js'
 import useModal from './useModal'
@@ -5,7 +6,7 @@ import useModal from './useModal'
 const title = (link, names) =>
   [link.edge.source, link.edge.target].map((id) => names.get(id)?.data.label ?? id).join(' ↔ ')
 
-export function LinkOverview({ summary, nodes, tiers, failurePoints, selectDevice, selectLink }) {
+export function LinkOverview({ summary, nodes, tiers, failurePoints, selectDevice, selectLink, topology, dynamics }) {
   const names = new Map(nodes.map((node) => [node.id, node]))
   const ranks = new Map(tiers.map(({ deviceId, tier }) => [deviceId, tier]))
   const tierGroups = new Map()
@@ -14,14 +15,18 @@ export function LinkOverview({ summary, nodes, tiers, failurePoints, selectDevic
     if (!tierGroups.has(tier)) tierGroups.set(tier, { healthy: 0, degraded: 0, isolated: 0, unknown: 0, none: 0 })
     tierGroups.get(tier)[state]++
   }
-  const entries = summary.devices
-    .filter(({ state }) => ['isolated', 'degraded'].includes(state))
-    .map(({ node, state }) => ({
-      rank: state === 'isolated' ? 0 : 1,
-      id: node.id,
-      label: node.data.label + ' · ' + baselineLabels[state],
-      action: () => selectDevice(node),
-    }))
+  const openIncidents = dynamics?.incidents.filter(
+    ({ deviceId, resolvedAt }) => resolvedAt === null && names.has(deviceId),
+  )
+  const attention = openIncidents?.length
+    ? openIncidents.map(({ deviceId, state, affected }) => ({ node: names.get(deviceId), state, affected }))
+    : summary.devices.filter(({ state }) => ['isolated', 'degraded'].includes(state))
+  const entries = attention.map(({ node, state, affected }) => ({
+    rank: state === 'isolated' ? 0 : 1,
+    id: node.id,
+    label: node.data.label + ' · ' + baselineLabels[state] + (affected ? ' · ' + affected + ' downstream' : ''),
+    action: () => selectDevice(node),
+  }))
   for (const link of summary.links) {
     const speedMismatch =
       link.source.fresh &&
@@ -166,6 +171,9 @@ export function LinkOverview({ summary, nodes, tiers, failurePoints, selectDevic
             </details>
           )}
         </div>
+      )}
+      {dynamics && topology && (
+        <DynamicsPanel topology={topology} dynamics={dynamics} bundles={summary.bundles} selectDevice={selectDevice} />
       )}
     </section>
   )

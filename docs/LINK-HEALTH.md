@@ -29,3 +29,9 @@ A port is flagged after three consecutive compatible intervals at or above one e
 NetWatch uses consistent LACP membership from both ends to group physical members. A bundle provides one logical path for redundancy. The admin connection list lets you expand a bundle to inspect its members. An attached aggregate ID establishes membership. Forwarding state requires separate current evidence.
 
 Spanning tree states use the reported bridge context. A VLAN or MST instance outside that context can behave differently. [BRIDGE-MIB specification](https://datatracker.ietf.org/doc/html/rfc4188)
+
+## Topology dynamics
+
+Admins can schedule rediscovery of an enrolled seed, review recent topology changes, and run a saved-map failure estimate. The schedule defaults to off. Complete runs establish and compare a baseline, and scheduled proposals require the same review as manual proposals.
+
+The what-if control estimates shared dependencies using saved connections and roots. A recognized link bundle remains available while any of its member links survives. Current port evidence drives persistent redundancy incidents, and downstream isolation is grouped under an upstream incident where the saved map establishes that dependency.

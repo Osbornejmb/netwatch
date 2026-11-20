@@ -10,6 +10,7 @@ const exportActions = new Set([
   'discovery_add',
   'discovery_remove',
   'topology_discovery_started',
+  'topology_discovery_schedule',
   'topology_discovery_cancelled',
   'topology_discovery_completed',
   'topology_proposal_accepted',
