@@ -171,7 +171,7 @@ export function pollSnapshot(
         )
         cache.etag = reply.etag
         cache.inventory = snapshot.inventory
-        onState({ ...connection, snapshot })
+        onState({ ...connection, snapshot, clockOffset: Date.parse(snapshot.generatedAt) - now() })
       }
     } catch (error) {
       if (!stopped)
@@ -186,6 +186,115 @@ export function pollSnapshot(
     stopped = true
     clearTimeout(timer)
     controller.abort()
+  }
+}
+
+export function subscribeSnapshots(
+  onState,
+  {
+    EventSource = globalThis.EventSource,
+    document = globalThis.document,
+    poll = pollSnapshot,
+    now = Date.now,
+    retryMs = 10000,
+    cache = {},
+  } = {},
+) {
+  let source,
+    timeout,
+    retry,
+    stopPolling,
+    previousId,
+    inventory,
+    stopped = false,
+    failures = 0
+  const stop = () => {
+    source?.close()
+    source = undefined
+    clearTimeout(timeout)
+    clearTimeout(retry)
+    stopPolling?.()
+    stopPolling = undefined
+    failures = 0
+  }
+  const fail = () => {
+    source?.close()
+    source = undefined
+    clearTimeout(timeout)
+    if (EventSource && ++failures === 1) {
+      onState({ state: 'reconnecting', transport: undefined })
+      retry = setTimeout(connect, Math.min(300, retryMs))
+      return
+    }
+    if (!stopPolling) {
+      onState({ state: 'reconnecting', transport: undefined })
+      stopPolling = poll((state) => onState({ ...state, transport: 'poll' }), { intervalMs: 8000, cache })
+    }
+    if (EventSource) retry = setTimeout(connect, retryMs)
+  }
+  function connect() {
+    if (stopped || document?.hidden) return
+    if (!EventSource) return fail()
+    let active
+    try {
+      active = source = new EventSource('/api/v1/events')
+    } catch {
+      return fail()
+    }
+    const resetTimeout = (deadline) => {
+      clearTimeout(timeout)
+      timeout = setTimeout(() => {
+        if (source === active) fail()
+      }, deadline)
+    }
+    resetTimeout(10000)
+    active.onerror = () => {
+      if (source === active) fail()
+    }
+    active.addEventListener('snapshot', (event) => {
+      if (source !== active) return
+      try {
+        const instance = (id) => id?.split('.')[0]
+        const snapshot = validateSnapshot(
+          JSON.parse(event.data),
+          instance(previousId) === instance(event.lastEventId) ? inventory : undefined,
+        )
+        previousId = event.lastEventId
+        inventory = snapshot.inventory
+        failures = 0
+        stopPolling?.()
+        stopPolling = undefined
+        resetTimeout(45000)
+        const received = now()
+        onState({
+          state: 'connected',
+          transport: 'sse',
+          error: '',
+          snapshot,
+          receivedAt: new Date(received).toISOString(),
+          clockOffset: Date.parse(snapshot.generatedAt) - received,
+        })
+      } catch {
+        fail()
+      }
+    })
+    active.addEventListener('clock', (event) => {
+      const serverTime = Number(event.data)
+      if (source !== active || !Number.isFinite(serverTime) || serverTime <= 0) return
+      resetTimeout(45000)
+      onState({ clockOffset: serverTime - now() })
+    })
+  }
+  const visibility = () => {
+    if (document.hidden) stop()
+    else if (!source && !stopPolling) connect()
+  }
+  document?.addEventListener('visibilitychange', visibility)
+  connect()
+  return () => {
+    stopped = true
+    document?.removeEventListener('visibilitychange', visibility)
+    stop()
   }
 }
 

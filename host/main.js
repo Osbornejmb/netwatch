@@ -14,7 +14,7 @@ import { createWindowsProbe } from './windows-probe.js'
 import { prepareWindowsHelper } from './windows-helper.js'
 import { createCredentialVault, credentialDirectory } from './snmp-secrets.js'
 import { createInterfaceCollector } from './snmp-collector.js'
-import { createDiscovery } from './discovery.js'
+import { createDiscovery, DISCOVERY_POLICY } from './discovery.js'
 import { linkScannedSwitchPorts } from './switch-ports.js'
 import { createProbeGate } from './probe-gate.js'
 const port = readPort()
@@ -49,6 +49,10 @@ const collector = createCollector(store, { enabled: process.env.NETWATCH_ICMP ==
 const interfaces = createInterfaceCollector(store, {
   enabled: process.env.NETWATCH_SNMP === '1',
   vault: createCredentialVault(credentialDirectory(path)),
+  onSwitchPorts(ports) {
+    if (ports.size && process.env.NETWATCH_DISCOVERY === '1')
+      linkScannedSwitchPorts(store, ports, store.recentDiscoveryAddresses(Date.now() - DISCOVERY_POLICY.intervalMs * 2))
+  },
 })
 const discoveryPrefix =
   process.env.NETWATCH_DISCOVERY_MAX_PREFIX === undefined ? 24 : Number(process.env.NETWATCH_DISCOVERY_MAX_PREFIX)

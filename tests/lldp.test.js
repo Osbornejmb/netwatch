@@ -45,6 +45,7 @@ test('LLDP ignores incomplete neighbors, collapses duplicate evidence and saniti
   assert.equal(neighbor.localPort, 3)
   assert.equal(neighbor.remotePort, 'Gi1/0/2')
   assert.equal(neighbor.chassis, '02:00:00:00:00:01')
+  assert.equal(neighbor.chassisMac, '02:00:00:00:00:01')
   assert.equal((await readLldp(async (_method, columns) => columns.map(() => [end]), timestamp)).state, 'empty')
   await assert.rejects(
     readLldp(async () => [[cell(4, '9.3.1', 1), cell(4, '8.3.1', 1)]], timestamp),

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { pollSnapshot } from './monitoring'
+import { subscribeSnapshots } from './monitoring'
 
 export default function useMonitoring(enabled) {
   const [value, setValue] = useState({ snapshot: null, state: 'loading', error: '', hasConnected: false })
@@ -7,7 +7,7 @@ export default function useMonitoring(enabled) {
   const cache = useRef({})
   useEffect(() => {
     if (!enabled) return
-    return pollSnapshot(
+    return subscribeSnapshots(
       (next) =>
         setValue((previous) => {
           return { ...previous, ...next, hasConnected: previous.hasConnected || Boolean(next.snapshot) }

@@ -126,7 +126,7 @@ test('route table enforces local, unauthenticated, viewer, and admin access', as
     ['GET', api + 'audit', 200], ['GET', api + 'audit/export', 200],
     ['GET', api + 'auth/session', 200], ['POST', api + 'auth/login', 415], ['POST', api + 'auth/logout', 200],
     ['GET', api + 'health', 200], ['GET', api + 'topology', 200], ['PUT', api + 'topology', 403],
-    ['GET', api + 'snapshot', 200], ['GET', discoveryPath.slice(0, -1), 200], ['POST', discoveryPath + 'scan-now', 403],
+    ['GET', api + 'snapshot', 200], ['GET', api + 'events', 200], ['GET', discoveryPath.slice(0, -1), 200], ['POST', discoveryPath + 'scan-now', 403],
     ['POST', discoveryPath + 'clear', 403], ['POST', discoveryPath + 'missing/add-to-map', 403],
     ['POST', discoveryPath + 'missing/remove', 403], ['GET', idPath + 'checks', 404],
     ['GET', idPath + 'incidents', 404], ['GET', idPath + 'interfaces', 404],
@@ -140,10 +140,43 @@ test('route table enforces local, unauthenticated, viewer, and admin access', as
       const expected = route.access === 'local' && kind !== 'local' ? 403 : route.access !== 'public' && kind === 'unauthenticated' ? 401 :
         route.access === 'admin' && kind === 'viewer' ? 403 : status
       const headers = cookie && !path.endsWith('/logout') ? { cookie } : {}
-      assert.equal((await fetchAt(path, { method, headers })).status, expected, kind + ' ' + method + ' ' + path)
+      const reply = await fetchAt(path, { method, headers })
+      assert.equal(reply.status, expected, kind + ' ' + method + ' ' + path)
+      if (path === api + 'events') await reply.body.cancel()
     }
   }
   assert.equal(audit.read().entries.filter((entry) => entry.action === 'viewer_write_blocked').length, 6)
+})
+
+test('remote event streams use the snapshot projection and close on logout, expiry, role or access changes', async (t) => {
+  const { fetchAt, store, login, clock, auth } = await fixture(t)
+  const open = async (cookie) => {
+    const response = await fetchAt(api + 'events', { headers: { cookie }, signal: AbortSignal.timeout(5000) })
+    assert.equal(response.status, 200)
+    const reader = response.body.getReader()
+    const initial = new TextDecoder().decode((await reader.read()).value)
+    return { initial, reader }
+  }
+  const viewer = () => fetchAt(api + 'auth/session').then(asCookie)
+  const admin = await open(asCookie(await login({ role: 'admin', password })))
+  assert.match(admin.initial, /"discovery"/)
+  await admin.reader.cancel()
+  for (const change of ['logout', 'revocation', 'role', 'idle', 'expiry', 'disabled']) {
+    const cookie = await viewer()
+    const { initial, reader } = await open(cookie)
+    assert.doesNotMatch(initial, /"discovery"/)
+    const hash = hashToken(cookie.split('=')[1])
+    if (change === 'logout') await fetchAt(api + 'auth/logout', { method: 'POST', headers: { cookie } })
+    if (change === 'revocation') store.db.prepare('DELETE FROM sessions WHERE id_hash=?').run(hash)
+    if (change === 'role') store.db.prepare("UPDATE sessions SET role='admin' WHERE id_hash=?").run(hash)
+    if (change === 'idle') clock(8 * 3600000)
+    if (change === 'expiry') store.db.prepare('UPDATE sessions SET expires_at=0 WHERE id_hash=?').run(hash)
+    if (change === 'disabled') {
+      store.db.prepare('UPDATE auth_config SET admin_hash=NULL').run()
+      auth.invalidate()
+    }
+    assert.equal((await reader.read()).done, true, change)
+  }
 })
 
 test('admins can scan with CSRF and password recovery revokes their session', async (t) => {

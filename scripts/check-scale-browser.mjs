@@ -42,6 +42,18 @@ for (const viewport of [{width:1440,height:900},{width:390,height:844}]) {
   run.initialBounds=initialBounds
   console.log(JSON.stringify({viewport,initialBounds,initialUnknownRenderMs:run.initialUnknownRenderMs}))
   assert.equal(initialBounds.outside,0,'Default full map must fit all 100 devices')
+  await page.getByText('Select a device to trace its links.').waitFor()
+  assert.equal(await page.locator('.react-flow__edge').count(),0)
+  const focusedId=initial.nodes[0].id
+  await page.locator(`.react-flow__node[data-id="${focusedId}"]`).press('Enter')
+  await page.getByRole('dialog').waitFor()
+  await page.keyboard.press('Escape')
+  const incidentEdges=initial.edges.filter(edge=>edge.source===focusedId||edge.target===focusedId)
+  await page.waitForFunction(count=>document.querySelectorAll('.react-flow__edge').length===count,incidentEdges.length)
+  await page.getByRole('button',{name:'Clear connection highlight'}).click()
+  const allLinks=page.getByRole('button',{name:'Show all links'})
+  await allLinks.click()
+  await page.waitForFunction(count=>document.querySelectorAll('.react-flow__edge').length===count,initial.edges.length)
   const stored=()=>page.evaluate(()=>localStorage.getItem('netwatch-topology-v1'))
   assert.equal(await stored(),serialized)
   const view=page.locator('.health-view-options > summary')
@@ -146,6 +158,32 @@ for (const viewport of [{width:1440,height:900},{width:390,height:844}]) {
   assert.equal(await stored(),serialized,'Synthetic checks and map positions must never be saved')
   await context.close()
 }
+const large = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+const largeNodes = Array.from({ length: 240 }, (_, index) => ({
+  id: `large-${index}`, type: index === 0 ? 'router' : 'switch', position: { x: 0, y: 0 },
+  data: { label: `Large map device ${index}`, ip: `192.0.2.${index + 1}` },
+}))
+const largeTopology = validateTopology({
+  nodes: largeNodes,
+  edges: largeNodes.slice(1).map(({ id }) => ({ id: `link-${id}`, source: 'large-0', target: id })),
+})
+const largePage = await large.newPage()
+largePage.on('pageerror', error => errors.push(error.message))
+await largePage.route('**/api/v1/snapshot', route => route.fulfill({ json: hostSnapshot(largeTopology) }))
+await largePage.goto(url)
+await largePage.waitForFunction(() => document.querySelectorAll('.react-flow__node').length === 240)
+await largePage.getByRole('button', { name: 'Zoom to 100%', exact: true }).click()
+await largePage.waitForFunction(() => {
+  const count = document.querySelectorAll('.react-flow__node').length
+  return count > 0 && count < 120
+})
+report.zoomedLargeMapCards = await largePage.locator('.react-flow__node').count()
+await largePage.locator('.react-flow__controls-fitview').click()
+await largePage.waitForFunction(() => document.querySelectorAll('.react-flow__node').length === 240)
+await largePage.getByRole('link', { name: 'Devices', exact: true }).click()
+assert.equal(await largePage.locator('tbody tr').count(), 240)
+await large.close()
+
 // Separate empty inventory context, without changing any real browser workspace.
 const empty=await browser.newContext()
 await empty.addInitScript(()=>localStorage.setItem('netwatch-topology-v1',JSON.stringify({nodes:[],edges:[]})))
@@ -154,5 +192,5 @@ await page.getByText('Your network starts here',{exact:true}).waitFor({state:'vi
 await empty.close()
 assert.deepEqual(errors,[])
 await writeFile(fileURLToPath(new URL('../.tools/evidence/scale-results.json',import.meta.url)),JSON.stringify(report,null,2)+'\n')
-console.log('PASS: 100 devices/180 links, full-view default, unknown/multiple-down/stale/empty states, stable counts, filtered-edge endpoints, search, pan/zoom/fit, keyboard inspection, viewport bounds and observation/storage isolation')
+console.log(`PASS: 100-device interaction checks and 240-device viewport culling (${report.zoomedLargeMapCards} cards rendered at 100% zoom) with full inventory access`)
 await browser.close()

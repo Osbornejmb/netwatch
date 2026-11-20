@@ -11,6 +11,7 @@ import { authLogin, authLogout, authSession } from './routes/auth.js'
 import { health } from './routes/health.js'
 import { readTopology, writeTopology } from './routes/topology.js'
 import { createSnapshotRoute } from './routes/snapshot.js'
+import { createSnapshotEvents } from './routes/events.js'
 import { listDiscovered, scanNow, clearDiscovered, addDiscoveredToMap, removeDiscovered } from './routes/discovered.js'
 import { deviceChecks, deviceIncidents, deviceInterfaces } from './routes/devices.js'
 import { applyNeighbor, readNeighbors } from './routes/neighbors.js'
@@ -53,7 +54,8 @@ async function parseBody(req, bodyType) {
   }
 }
 
-export function createRoutes(discovery) {
+export function createRoutes(discovery, eventOptions) {
+  const snapshot = createSnapshotRoute(randomUUID())
   return [
     { method: 'GET', pattern: /^\/api\/v1\/audit$/, handler: readAudit, access: 'local' },
     { method: 'GET', pattern: /^\/api\/v1\/audit\/export$/, handler: exportAudit, access: 'local' },
@@ -71,7 +73,13 @@ export function createRoutes(discovery) {
       requiresWrite: true,
       bodyType: 'json',
     },
-    { method: 'GET', pattern: /^\/api\/v1\/snapshot$/, handler: createSnapshotRoute(randomUUID()), access: 'viewer' },
+    { method: 'GET', pattern: /^\/api\/v1\/snapshot$/, handler: snapshot, access: 'viewer' },
+    {
+      method: 'GET',
+      pattern: /^\/api\/v1\/events$/,
+      handler: createSnapshotEvents(snapshot, eventOptions),
+      access: 'viewer',
+    },
     { method: 'GET', pattern: /^\/api\/v1\/discovered$/, handler: listDiscovered, access: 'admin' },
     {
       method: 'POST',
@@ -231,10 +239,11 @@ export function createHost(
           response,
           dist,
           res,
+          streamAuthorized: () => source === 'local' || (auth.enabled() && auth.inspect(req, false)?.role === role),
           writeToken: source === 'local' ? writeToken : undefined,
         })
         if (auditAction) audit?.record(auditAction, { source, ip, role })
-        if (res.writableEnded) return
+        if (res.headersSent || res.destroyed) return
         return send(response.status ?? 200, result, response.headers)
       }
       throw invalid('Route not found.', 404)

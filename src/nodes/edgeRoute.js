@@ -22,7 +22,7 @@ export function crosses(a, b, box) {
   return Math.max(0, x[0], y[0]) < Math.min(1, x[1], y[1])
 }
 
-export function edgeRoute(source, target, cards, layered = false) {
+export function edgeRoute(source, target, cards, layered = false, maxBlockers = Infinity) {
   const downward = source.y + source.height <= target.y
   const vertical = layered && (downward || target.y + target.height <= source.y)
   const start = vertical
@@ -68,6 +68,8 @@ export function edgeRoute(source, target, cards, layered = false) {
       const blocker = obstacles.find((box) => crosses(a, b, box))
       if (blocker) {
         if (!added.has(blocker)) {
+          // shortcut: bound dense-map interaction cost, use a straight line when the detour budget runs out.
+          if (added.size >= maxBlockers) return [start, end]
           added.add(blocker)
           for (const x of [blocker.x, blocker.x + blocker.width]) {
             for (const y of [blocker.y, blocker.y + blocker.height]) {

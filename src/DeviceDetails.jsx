@@ -162,7 +162,9 @@ export default function DeviceDetails({ device, check, connections, host, onClos
                         {HEALTH[item.device.health].label}
                       </span>
                     </div>
-                    {item.label?.startsWith('LLDP · ') && <small>{item.label}</small>}
+                    {(item.label?.startsWith('LLDP · ') || item.label?.startsWith('Last seen on ')) && (
+                      <small>{item.label}</small>
+                    )}
                     {item.uplink && (
                       <small>
                         {item.uplink.label && `${item.uplink.label} · `}

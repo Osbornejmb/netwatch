@@ -14,6 +14,12 @@ The admin-only Network neighbors panel opens on demand in saved-device details. 
 
 Discovery shows route-check progress and reports newly saved router links at scan completion.
 
+The dashboard map labels discovered links with the access port or both LLDP port identifiers. Port labels can be toggled in View options. The Connections section retains the full observation label.
+
+At 30 distinct connections, the dashboard increases card spacing and shows only the selected device's links by default. **Show all links** draws a simplified overview without port labels. Node health, filters, and device details stay available in either view.
+
+While dragging in a dense map, links follow the moving cards using straight paths. Detailed paths and port labels return when the drag ends. At 120 devices, the dashboard renders the visible part of the map and the Devices view still provides the full list.
+
 Small rings in Circle layout use card height for vertical clearance and card width for horizontal clearance. This keeps the cards above and below a router close even when it also has peers on either side.
 
 Discovered devices shows the default gateway as a router in the result row. Add all to map shows a confirmation with the result count and the starting check setting. The action applies across result pages.

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { setImmediate } from 'node:timers/promises'
-import { validateSnapshot, pollSnapshot } from '../src/monitoring.js'
+import { validateSnapshot, pollSnapshot, subscribeSnapshots } from '../src/monitoring.js'
 import { deviceHealth } from '../src/health.js'
 
 const now = Date.now()
@@ -12,6 +12,49 @@ const snapshot = () => ({
     { id: 'b', type: 'switch', position: { x: 0, y: 200 }, data: { label: 'B', ip: '192.0.2.2' } },
   ], edges: [] } },
   observations: ['a', 'b'].map(deviceId => ({ deviceId, status: 'up', checkedAt: new Date(now - 100000).toISOString(), latencyMs: 3 })),
+})
+
+test('dashboard falls back after stream failure, reconnects, and pauses while hidden', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const sources = [], states = []
+  const document = Object.assign(new EventTarget(), { hidden: false })
+  class Source extends EventTarget {
+    constructor(url) {
+      super()
+      assert.equal(url, '/api/v1/events')
+      sources.push(this)
+    }
+    close() { this.closed = true }
+  }
+  let polls = 0, stops = 0
+  const stop = subscribeSnapshots((state) => states.push(state), {
+    EventSource: Source, document, retryMs: 5, now: () => now + 60000,
+    poll(onState, { intervalMs }) {
+      assert.equal(intervalMs, 8000)
+      polls++
+      onState({ state: 'disconnected' })
+      return () => { stops++ }
+    },
+  })
+  sources[0].onerror()
+  assert.equal(polls, 0)
+  t.mock.timers.tick(5)
+  sources[1].onerror()
+  assert.equal(polls, 1)
+  assert.equal(states.at(-1).transport, 'poll')
+  t.mock.timers.tick(5)
+  sources[2].dispatchEvent(new MessageEvent('snapshot', { data: JSON.stringify(snapshot()), lastEventId: 'host.version' }))
+  assert.equal(stops, 1)
+  assert.equal(states.at(-1).snapshot.checks.a.status, 'up')
+  assert.equal(states.at(-1).clockOffset, -60000)
+  document.hidden = true
+  document.dispatchEvent(new Event('visibilitychange'))
+  assert.equal(sources[2].closed, true)
+  document.hidden = false
+  document.dispatchEvent(new Event('visibilitychange'))
+  assert.equal(sources.length, 4)
+  stop()
+  assert.equal(sources[3].closed, true)
 })
 
 test('host snapshots validate inventory and evidence; disabled devices cannot inherit live status', () => {

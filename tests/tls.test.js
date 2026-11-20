@@ -150,6 +150,17 @@ test('TLS requires a valid pair, rejects HTTP origins, and uses HTTPS-only sessi
   const credentials = cookie.split(';')[0]
   assert.equal((await get('/api/v1/health', { headers: { Cookie: credentials } })).statusCode, 200)
   assert.equal((await get('/api/v1/health', { headers: { Cookie: credentials.slice('__Host-'.length) } })).statusCode, 401)
+  const stream = await new Promise((resolve, reject) => {
+    https.get('https://' + authority + '/api/v1/events', {
+      ca: tls.cert, headers: { Cookie: credentials }, signal: AbortSignal.timeout(5000),
+    }, resolve).on('error', reject)
+  })
+  assert.equal(stream.httpVersion, '1.1')
+  const [chunk] = await once(stream, 'data')
+  assert.match(chunk.toString(), /event: snapshot/)
+  assert.doesNotMatch(chunk.toString(), /"discovery"/)
+  const ended = once(stream, 'end')
   const logout = await get('/api/v1/auth/logout', { method: 'POST', headers: { Cookie: credentials } })
+  await ended
   assert.match(logout.headers['set-cookie'][0], /^__Host-netwatch_session=; .*Max-Age=0; Secure$/)
 })

@@ -1,11 +1,20 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { deviceHealth, summarizeHealth, connectionHealth } from '../src/health.js'
+import { deviceHealth, summarizeHealth, connectionHealth, nextEvidenceChange } from '../src/health.js'
 import { createHealthNetwork } from './fixtures/health-network.js'
 import { validateTopology } from '../src/topology.js'
 
 const now = Date.parse('2026-11-12T00:00:00Z')
 const check = (age, status = 'up') => ({ status, checkedAt: new Date(now - age).toISOString() })
+
+test('the dashboard wakes only when device or port evidence can change state', () => {
+  const checks = { a: check(1000), b: check(-500), c: check(1990, 'unknown') }
+  const ports = new Map([['link', { source: check(1980) }]])
+  assert.equal(nextEvidenceChange(checks, 2000, ports, 2000, now), now + 21)
+  assert.equal(nextEvidenceChange(checks, 2000, ports, 2000, now + 21), now + 500)
+  assert.equal(nextEvidenceChange(checks, 2000, ports, 2000, now + 500), now + 1001)
+  assert.equal(nextEvidenceChange(checks, 2000, ports, 2000, now + 2501), Infinity)
+})
 
 test('a failed router colors only its paths; a responding redundant switch stays up', () => {
   const checks = { a: check(0, 'down'), b: check(0), sw: check(0) }

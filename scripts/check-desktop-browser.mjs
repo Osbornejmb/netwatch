@@ -55,7 +55,7 @@ try {
   await page.keyboard.press('Escape')
   connected = false
   await refreshNetwork(page)
-  await page.getByText('Connection lost, reconnecting', { exact: false }).waitFor()
+  await page.getByText('Disconnected', { exact: false }).waitFor()
   assert.ok(await page.locator('.connection-lost').isVisible())
   connected = true
   await refreshNetwork(page)
@@ -104,7 +104,7 @@ try {
   const offline = await browser.newPage()
   await offline.route('**/api/v1/snapshot', route => route.abort())
   await offline.goto(base)
-  await offline.getByText('Waiting for host', { exact: false }).waitFor()
+  await offline.getByText('Disconnected', { exact: false }).waitFor()
   assert.equal(await offline.locator('.connection-lost').count(), 0)
   assert.deepEqual(errors, [])
   console.log('PASS: summary filters, card dimensions/status labels, solid stale paths, keyboard details, connection lifecycle, hash navigation/reload/back, tidy/add, cancel/confirm removal, desktop/narrow table/cards and backup placement')
