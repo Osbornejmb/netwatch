@@ -1,4 +1,4 @@
-name: Publish NetWatch v0.2.1 prerelease
+name: Publish NetWatch v0.2.3 release
 
 on:
   workflow_run:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: netwatch-v021-prerelease
+  group: netwatch-v023-release
 
 jobs:
   windows:
@@ -33,8 +33,8 @@ jobs:
         shell: pwsh
         run: |
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          if ($version -ne '0.2.1') { exit 0 }
-          gh release view v0.2.1 --repo $env:GITHUB_REPOSITORY *> $null
+          if ($version -ne '0.2.3') { exit 0 }
+          gh release view v0.2.3 --repo $env:GITHUB_REPOSITORY *> $null
           if ($LASTEXITCODE -eq 0) { exit 0 }
           'build=true' >> $env:GITHUB_OUTPUT
           exit 0
@@ -55,12 +55,12 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
           ./scripts/package-windows.ps1 -Compiler $compiler
-          $installer = Get-Item -LiteralPath '.tools/release/NetWatch-0.2.1-Windows-x64-Setup.exe'
+          $installer = Get-Item -LiteralPath '.tools/release/NetWatch-0.2.3-Windows-x64-Setup.exe'
           $prefix = Join-Path $env:RUNNER_TEMP 'netwatch-release-smoke'
           $setup = Start-Process -FilePath $installer.FullName -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="' + $prefix + '"') -WindowStyle Hidden -Wait -PassThru
           if ($setup.ExitCode -ne 0) { throw "Installer exited with code $($setup.ExitCode)." }
           $launcher = Get-Item -LiteralPath (Join-Path $prefix 'NetWatch.exe')
-          if ($launcher.VersionInfo.FileVersion -ne '0.2.1.0') { throw 'Unexpected installed launcher version.' }
+          if ($launcher.VersionInfo.FileVersion -ne '0.2.3.0') { throw 'Unexpected installed launcher version.' }
           Push-Location $prefix
           try {
             $env:NETWATCH_DB = Join-Path $env:RUNNER_TEMP 'netwatch-release-smoke.sqlite'
@@ -69,11 +69,16 @@ jobs:
           } finally { Pop-Location }
           $hash = (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $($installer.Name)" | Set-Content -Encoding ascii '.tools/release/SHA256SUMS.txt'
-      - name: Publish prerelease with installer and checksum
+      - name: Publish release with installer and checksum
         if: steps.release.outputs.build == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          gh release create v0.2.1 '.tools/release/NetWatch-0.2.1-Windows-x64-Setup.exe' '.tools/release/SHA256SUMS.txt' --repo $env:GITHUB_REPOSITORY --target $env:RELEASE_SHA --title 'NetWatch v0.2.1' --notes-file CHANGELOG.md --prerelease
+          $changelog = Get-Content -Raw CHANGELOG.md
+          $notes = [regex]::Match($changelog, '(?ms)^## v0\.2\.3 Windows release\r?\n(.*?)(?=^## |\z)').Groups[1].Value.Trim()
+          if (!$notes) { throw 'Release notes are missing.' }
+          $notesFile = Join-Path $env:RUNNER_TEMP 'netwatch-v0.2.3-notes.md'
+          $notes | Set-Content -Encoding utf8 $notesFile
+          gh release create v0.2.3 '.tools/release/NetWatch-0.2.3-Windows-x64-Setup.exe' '.tools/release/SHA256SUMS.txt' --repo $env:GITHUB_REPOSITORY --target $env:RELEASE_SHA --title 'NetWatch v0.2.3' --notes-file $notesFile --latest
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
