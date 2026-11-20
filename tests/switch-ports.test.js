@@ -1,3 +1,4 @@
+import { applyDiscoveryPatch } from './fixtures/discovery-draft.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
@@ -60,31 +61,29 @@ test('a lone MAC on a known LLDP port is still transit traffic when it differs f
   )
 })
 
-test('scan saves a switch link, updates a moved device, and leaves manual links intact', () => {
+test('scan records switch-port hints and preserves manual links', () => {
   const device = { id: 'device', data: { ip: '192.168.1.42' } }
   const sw = { id: 'switch', type: 'switch', data: { label: 'Switch A', ip: '192.168.1.3' } }
   const manual = { id: 'manual', source: 'device', target: 'router', label: 'Manual' }
   const current = { topology: { nodes: [device, sw], edges: [manual] }, revision: 1, monitoring: {} }
-  let writes = 0
+  const hints = new Map()
   const store = {
     read: () => current,
-    write({ topology }, revision) {
-      assert.equal(revision, 1)
-      current.topology = topology
-      writes++
+    recordTopologyHints(edges) {
+      for (const edge of edges) hints.set(edge.id, edge)
     },
   }
   const scanned = [{ ip: device.data.ip, mac }]
   const scan = (...ports) => linkScannedSwitchPorts(store, new Map([[mac, ports]]), scanned)
   scan({ switchId: sw.id, name: 'Gi1/0/4' })
-  const [, link] = current.topology.edges
+  const [link] = hints.values()
   assert.equal(link.target, sw.id)
   assert.equal(link.label, 'Last seen on Gi1/0/4')
   scan({ switchId: sw.id, name: 'Gi1/0/7' })
   scan({ switchId: sw.id, name: 'Gi1/0/7' })
   scan({ switchId: sw.id, name: 'Gi1/0/4' }, { switchId: 'other', name: 'Gi1/0/9' })
-  assert.equal(writes, 2)
-  assert.deepEqual(current.topology.edges, [manual, { ...link, label: 'Last seen on Gi1/0/7' }])
+  assert.equal(hints.size, 2)
+  assert.deepEqual(current.topology.edges, [manual])
 })
 
 test('discovery shows the matched port and adds the switch link instead of the gateway route', async (t) => {
@@ -114,9 +113,9 @@ test('discovery shows the matched port and adds the switch link instead of the g
     id: page.devices[0].id,
     body: { baseRevision: 1 },
   })
-  assert.deepEqual(added.discoveryLink, { label: 'Switch A', port: 'Gi1/0/4' })
+  assert.equal(store.revision(), 1)
   assert.deepEqual(
-    added.topology.edges.map(({ target, label }) => [target, label]),
+    added.draft.edges.map(({ target, label }) => [target, label]),
     [['Switch A', 'Last seen on Gi1/0/4']],
   )
 })
@@ -209,13 +208,15 @@ test('adds access and LLDP trunk links, then locates a downstream device after i
     switch: 'Switch 2',
     name: 'port 3',
   })
-  await addDiscoveredToMap({
+  const { draft } = await addDiscoveredToMap({
     store,
     discovery,
     interfaces: collector,
     body: { baseRevision: store.revision(), pendingVersion: page.pendingVersion },
   })
 
+  assert.equal(store.revision(), 1)
+  applyDiscoveryPatch(store, draft)
   function links() {
     const { nodes, edges } = store.read().topology
     const addresses = new Map(nodes.map(({ id, data }) => [id, data.ip]))
@@ -233,5 +234,8 @@ test('adds access and LLDP trunk links, then locates a downstream device after i
   store.authorizeInterfaces(switch1.id, randomUUID(), store.revision())
   await collector.runOnce()
   t.diagnostic(`Final links=${JSON.stringify(links())}`)
-  assert.deepEqual(links(), { ...firstLinks, [ip(101)]: [ip(3), 'Last seen on port 5'] })
+  assert.deepEqual(links(), firstLinks)
+  const addresses = new Map(store.read().topology.nodes.map(({ id, data }) => [id, data.ip]))
+  assert.ok(store.topologyHints().some((edge) => addresses.get(edge.source) === ip(101) &&
+    addresses.get(edge.target) === ip(3) && edge.label === 'Last seen on port 5'))
 })

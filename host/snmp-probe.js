@@ -1,3 +1,4 @@
+import { readDiscoveryLldp } from './discovery-lldp.js'
 import snmp from 'net-snmp'
 import { normalizeAddress } from '../src/inventory.js'
 import { INTERFACE_POLICY as POLICY, validateInterfaces } from './interfaces.js'
@@ -71,7 +72,7 @@ export function createSnmpProbe({
   now = () => Date.now(),
   policy = POLICY,
 } = {}) {
-  return async (address, credentials, { signal, collectSwitchPorts = false } = {}) => {
+  return async (address, credentials, { signal, collectSwitchPorts = false, discovery = false } = {}) => {
     let session, timer, onAbort, rejectActive
     try {
       const target = normalizeAddress(address)
@@ -88,8 +89,8 @@ export function createSnmpProbe({
         },
         {
           port: 161,
-          retries: 0,
-          timeout: policy.timeoutMs,
+          retries: discovery ? 1 : 0,
+          timeout: discovery ? 2000 : policy.timeoutMs,
           transport: target.includes(':') ? 'udp6' : 'udp4',
           backwardsGetNexts: false,
           reportOidMismatchErrors: true,
@@ -110,10 +111,22 @@ export function createSnmpProbe({
         return Promise.race([
           failure,
           new Promise((resolve, reject) =>
-            session[method](...args, (error, result) => (error ? reject(new Error('snmp_failed')) : resolve(result))),
+            session[method](...args, (error, result) => {
+              if (!error) return resolve(result)
+              const code =
+                error.status === snmp.ErrorStatus.TooBig
+                  ? 'snmp_too_big'
+                  : discovery && error.status === snmp.ErrorStatus.AuthorizationError
+                    ? 'credentials_rejected'
+                    : discovery && error instanceof snmp.RequestTimedOutError
+                      ? 'snmp_timeout'
+                      : 'snmp_failed'
+              reject(new Error(code))
+            }),
           ),
         ])
       }
+      if (discovery) return await readDiscoveryLldp(request, new Date(now()).toISOString())
       const uptime = async () => {
         const rows = await request('get', [UPTIME])
         if (
@@ -204,7 +217,9 @@ export function createSnmpProbe({
       }
     } catch (error) {
       return {
-        error: ['cancelled', 'snmp_limit', 'snmp_timeout', 'snmp_changed'].includes(error.message)
+        error: ['cancelled', 'snmp_limit', 'snmp_timeout', 'snmp_changed', 'credentials_rejected'].includes(
+          error.message,
+        )
           ? error.message
           : 'snmp_failed',
       }

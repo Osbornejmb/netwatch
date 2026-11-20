@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { formatCheckTime, hostRequest } from './monitoring'
 
-export default function DeviceNeighbors({ deviceId, refreshMap }) {
+export default function DeviceNeighbors({ deviceId, stageDiscovery }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -49,10 +49,10 @@ export default function DeviceNeighbors({ deviceId, refreshMap }) {
           type: fields.get('type'),
         },
       })
+      if (result.draft) await stageDiscovery(result.draft)
       setDismissed((ids) => [...ids, neighbor.id])
-      setMessage(result.added ? 'Neighbor link saved.' : 'These devices are already connected.')
+      setMessage(result.added ? 'Neighbor link added to the draft map.' : 'These devices are already connected.')
       reload()
-      refreshMap()
     } catch {
       reload()
       setMessage('Could not save the link. Review the refreshed results and try again.')
@@ -142,7 +142,7 @@ export default function DeviceNeighbors({ deviceId, refreshMap }) {
                       </>
                     )}
                     <button type="submit" className="button primary" disabled={!editing.peer || busy}>
-                      Save link
+                      Add link to draft
                     </button>
                     <button
                       type="button"

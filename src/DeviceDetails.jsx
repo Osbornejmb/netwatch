@@ -8,7 +8,7 @@ import DeviceIncidents from './DeviceIncidents'
 import DeviceInterfaces from './DeviceInterfaces'
 import DeviceNeighbors from './DeviceNeighbors'
 
-export default function DeviceDetails({ device, check, connections, host, onClose, viewer, remote }) {
+export default function DeviceDetails({ device, check, connections, host, onClose, viewer, remote, stageDiscovery }) {
   const modal = useModal(onClose)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -147,7 +147,9 @@ export default function DeviceDetails({ device, check, connections, host, onClos
               onToggle={(event) => setNeighborsOpen(event.currentTarget.open)}
             >
               <summary>Network neighbors</summary>
-              {neighborsOpen && <DeviceNeighbors key={device.id} deviceId={device.id} refreshMap={host.refresh} />}
+              {neighborsOpen && (
+                <DeviceNeighbors key={device.id} deviceId={device.id} stageDiscovery={stageDiscovery} />
+              )}
             </details>
           )}
           <details className="health-history-options">

@@ -1,6 +1,6 @@
 import os from 'node:os'
 import { execFile } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import { isIPv4 } from 'node:net'
 import { promisify } from 'node:util'
 import { connectionKey } from '../src/connections.js'
@@ -309,7 +309,7 @@ export function createDiscovery(
     return activeRun
   }
   async function traceUpstream(gateways, allowed, signal) {
-    const { topology, monitoring, revision } = store.read()
+    const { topology, revision } = store.read()
     const routers = topology.nodes.filter((node) => node.type === 'router' && privateIPv4(node.data.ip))
     const gatewayIps = new Set(gateways.values())
     const local = new Map(routers.filter((node) => gatewayIps.has(node.data.ip)).map((node) => [node.data.ip, node.id]))
@@ -334,22 +334,24 @@ export function createDiscovery(
       if (typeof output === 'string' && Buffer.byteLength(output) <= 8192) {
         const source = observedPair(output, local, target.data.ip)
         if (source && !links.has(connectionKey({ source, target: target.id }))) {
-          edges.push({ id: randomUUID(), source, target: target.id, label: 'Observed upstream route' })
+          edges.push({
+            id:
+              'route-' +
+              createHash('sha256')
+                .update(connectionKey({ source, target: target.id }))
+                .digest('hex'),
+            source,
+            target: target.id,
+            label: 'Observed upstream route',
+          })
         }
       }
       progress = { ...progress, processed: i + 1 }
     }
     traceOffset = (traceOffset + total) % pending.length
     if (signal.aborted || !edges.length || store.revision() !== revision) return
-    try {
-      store.write(
-        { source: 'inventory', topology: { ...topology, edges: [...topology.edges, ...edges] }, monitoring },
-        revision,
-      )
-      upstreamLinks = edges.length
-    } catch (error) {
-      if (error.status !== 409) throw error
-    }
+    store.recordTopologyHints(edges)
+    upstreamLinks = edges.length
   }
   async function readGateways(currentInterfaces, signal) {
     try {

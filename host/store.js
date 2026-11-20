@@ -187,6 +187,14 @@ const MIGRATIONS = [
       db.prepare('UPDATE inventory SET payload=? WHERE singleton=1').run(JSON.stringify(state))
     },
   },
+  {
+    version: 12,
+    up(db) {
+      db.exec(
+        "CREATE TABLE topology_runs (id TEXT PRIMARY KEY, seed_id TEXT NOT NULL, started_at INTEGER NOT NULL, status TEXT NOT NULL CHECK(status IN ('running','complete','partial')), payload TEXT NOT NULL); CREATE TABLE topology_hints (id TEXT PRIMARY KEY, checked_at INTEGER NOT NULL, payload TEXT NOT NULL)",
+      )
+    },
+  },
 ]
 
 export function openStore(
@@ -204,6 +212,7 @@ export function openStore(
     migrateV9,
     migrateV10,
     migrateV11,
+    migrateV12,
   } = {},
 ) {
   const db = new DatabaseSync(path)
@@ -225,12 +234,13 @@ export function openStore(
     migrateV9,
     migrateV10,
     migrateV11,
+    migrateV12,
   ]
   try {
     for (const migration of MIGRATIONS) {
       if (migration.version <= version) continue
       db.exec('BEGIN IMMEDIATE')
-      if (version > 0 && migration.version === version + 1) verifyUpgradeBackup(db, path)
+      if (version > 0 && migration.version === version + 1) verifyUpgradeBackup(db, path, version === 11 ? 12 : 11)
       migration.up(db, now)
       hooks[migration.version - 1]?.(db)
       db.exec('PRAGMA user_version=' + migration.version + '; COMMIT')
@@ -323,6 +333,10 @@ export function openStore(
         new Date(now()).toISOString(),
         JSON.stringify(clean),
       )
+      const markDiscovered = db.prepare(
+        "UPDATE discovered_devices SET status='added',saved_device_id=? WHERE ip=? AND status IN ('new','changed')",
+      )
+      for (const node of clean.topology.nodes) if (node.data.ip) markDiscovered.run(node.id, node.data.ip)
       // Identity/address changes invalidate observations rather than reassigning old evidence.
       const allowed = new Map(clean.topology.nodes.map((n) => [n.id, `${n.type}:${n.data.ip}`]))
       for (const n of previous.topology.nodes)
@@ -356,6 +370,24 @@ export function openStore(
   return {
     read: () => structuredClone(readState()),
     revision,
+    recordTopologyHints(edges) {
+      const timestamp = now()
+      const upsert = db.prepare(
+        'INSERT INTO topology_hints VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET checked_at=excluded.checked_at,payload=excluded.payload',
+      )
+      transaction(() => {
+        for (const edge of edges) upsert.run(edge.id, timestamp, JSON.stringify(edge))
+        db.exec(
+          'DELETE FROM topology_hints WHERE rowid NOT IN (SELECT rowid FROM topology_hints ORDER BY checked_at DESC, rowid DESC LIMIT 512)',
+        )
+      })
+    },
+    topologyHints() {
+      return db
+        .prepare('SELECT payload FROM topology_hints WHERE checked_at>=? ORDER BY checked_at DESC, id')
+        .all(now() - 86400000)
+        .map((row) => JSON.parse(row.payload))
+    },
     snapshotNow: now,
     snapshotVersion: () => [revision(), observationVersion, databaseVersion.get().data_version],
     cleanup,

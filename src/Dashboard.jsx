@@ -73,6 +73,7 @@ const NO_CHECKS = {}
 const NO_OBSTACLES = []
 
 export default function Dashboard({
+  stageDiscovery,
   nodes: inventory,
   edges: inventoryEdges,
   groups: draftGroups = [],
@@ -770,6 +771,7 @@ export default function Dashboard({
       )}
       {selected && (
         <DeviceDetails
+          stageDiscovery={stageDiscovery}
           key={`${source}-${selected.id}`}
           host={live ? host : null}
           viewer={viewer}

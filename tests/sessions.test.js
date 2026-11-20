@@ -1,3 +1,4 @@
+import { applyDiscoveryPatch } from './fixtures/discovery-draft.js'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { once } from 'node:events'
@@ -130,6 +131,10 @@ test('route table enforces local, unauthenticated, viewer, and admin access', as
     ['POST', discoveryPath + 'clear', 403], ['POST', discoveryPath + 'missing/add-to-map', 403],
     ['POST', discoveryPath + 'missing/remove', 403], ['GET', idPath + 'checks', 404],
     ['GET', idPath + 'incidents', 404], ['GET', idPath + 'interfaces', 404],
+    ['GET', api + 'discovery/runs', 503], ['GET', api + 'discovery/runs/missing', 503],
+    ['POST', api + 'discovery/runs', 403], ['POST', api + 'discovery/runs/missing/cancel', 403],
+    ['POST', api + 'discovery/runs/missing/accept', 403], ['POST', api + 'discovery/runs/missing/reject', 403],
+    ['POST', api + 'discovery/hints/missing/accept', 403],
     ['GET', idPath + 'neighbors', 404], ['PUT', idPath + 'neighbors', 403], ['GET', '/', 200],
   ]
   assert.equal(cases.length, createRoutes().length)
@@ -145,7 +150,7 @@ test('route table enforces local, unauthenticated, viewer, and admin access', as
       if (path === api + 'events') await reply.body.cancel()
     }
   }
-  assert.equal(audit.read().entries.filter((entry) => entry.action === 'viewer_write_blocked').length, 6)
+  assert.equal(audit.read().entries.filter((entry) => entry.action === 'viewer_write_blocked').length, 9)
 })
 
 test('remote event streams use the snapshot projection and close on logout, expiry, role or access changes', async (t) => {
@@ -260,7 +265,7 @@ test('password mode, disabled viewers and global and per-address backoff', async
   for (const action of ['login_failure', 'rate_limit_lockout']) assert.ok(audit.read().entries.some((entry) => entry.action === action))
 })
 
-test('discovery adds with checks enabled only from loopback', async (t) => {
+test('nearby discovery stages drafts with checks off for local and remote admins', async (t) => {
   const { fetchAt, login, source, store, audit } = await fixture(t)
   const remote = await login({ role: 'admin', password })
   const { csrfToken } = await remote.json()
@@ -279,9 +284,10 @@ test('discovery adds with checks enabled only from loopback', async (t) => {
       body: JSON.stringify({ baseRevision: store.read().revision }),
     })
     assert.equal(result.status, 200)
-    const saved = await result.json()
-    const device = saved.topology.nodes.find((node) => node.data.ip === address)
-    assert.equal(saved.monitoring[device.id], enabled, kind)
+    const { draft, revision } = await result.json()
+    assert.equal(store.revision(), revision)
+    const device = draft.nodes.find((node) => node.data.ip === address)
+    assert.equal(applyDiscoveryPatch(store, draft).monitoring[device.id], false, kind)
   }
   for (const [path, body] of [[remoteId + '/remove', {}], ['clear'], ['scan-now']]) {
     const response = await fetchAt(discoveryPath + path, { method: 'POST',

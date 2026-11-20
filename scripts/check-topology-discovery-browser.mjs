@@ -1,0 +1,87 @@
+import assert from 'node:assert/strict'
+import { once } from 'node:events'
+import { createHost } from '../host/server.js'
+import { openStore } from '../host/store.js'
+import { crawlLimits, createTopologyDiscovery, discoveryScope } from '../host/topology-discovery.js'
+
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
+const store = openStore(':memory:')
+const key = (i) => 'mac:02:00:00:00:00:0' + i
+const node = (id, type, last) => ({
+  id,
+  type,
+  position: { x: last * 20, y: 0 },
+  data: { label: id, ip: '192.168.9.' + last },
+})
+const nodes = [node('Router', 'router', 1), node('Access switch', 'switch', 2)]
+store.write({ source: 'inventory', topology: { nodes, edges: [] } }, 0)
+for (const { id } of nodes) store.authorizeInterfaces(id, '00000000-0000-0000-0000-000000000001', 1)
+const discovery = createTopologyDiscovery(store, {
+  allowed: discoveryScope({ interfaces: {}, additional: '192.168.9.0/24' }),
+  limits: { ...crawlLimits, spacingMs: 0 },
+  async read(id) {
+    const router = id === 'Router'
+    return {
+      checkedAt: new Date().toISOString(),
+      chassisKey: key(router ? 1 : 2),
+      name: id,
+      state: 'current',
+      neighbors: [
+        {
+          chassisKey: key(router ? 2 : 1),
+          name: router ? 'Access switch' : 'Router',
+          type: router ? 'switch' : 'router',
+          addresses: ['192.168.9.' + (router ? 2 : 1)],
+          localPort: { index: router ? 1 : 2, label: router ? 'port 1' : 'port 2' },
+          peerPort: { index: null, label: router ? 'port 2' : 'port 1' },
+        },
+      ],
+    }
+  },
+})
+const server = createHost(store, { port: 0, topologyDiscovery: discovery })
+server.listen(0, '127.0.0.1')
+await once(server, 'listening')
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] })
+try {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+  const errors = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  page.setDefaultTimeout(12000)
+  await page.goto('http://127.0.0.1:' + server.address().port)
+  await page.getByRole('link', { name: 'Discovered', exact: true }).click()
+  await page.getByLabel('Start device').selectOption('Router')
+  await page.getByRole('button', { name: 'Find connections' }).click()
+  await page
+    .getByRole('status')
+    .getByText(/Discovery complete · 1 connections to review/)
+    .waitFor()
+  assert.equal(store.revision(), 1)
+  const proposals = page.getByRole('region', { name: 'Topology proposals' })
+  await proposals.getByRole('button', { name: 'Review all verified' }).click()
+  const preview = page.getByRole('dialog', { name: 'Add to draft map?' })
+  await preview
+    .getByText(/Router \(port 1\).*Access switch \(port 2\)|Access switch \(port 2\).*Router \(port 1\)/)
+    .waitFor()
+  await preview.getByRole('button', { name: 'Add to draft', exact: true }).click()
+  await proposals.getByText('Added to the draft map. Review it in Edit map.').waitFor()
+  assert.equal(store.revision(), 1)
+  assert.equal(store.read().topology.edges.length, 0)
+  await page.setViewportSize({ width: 390, height: 844 })
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1))
+  await page.getByRole('link', { name: 'Edit map', exact: true }).click()
+  await page.getByRole('button', { name: 'Use this map', exact: true }).click()
+  await page.getByRole('button', { name: 'Confirm replacement' }).click()
+  await page.waitForFunction(() => !document.querySelector('dialog[open]'))
+  const saved = store.read()
+  assert.equal(saved.revision, 2)
+  assert.equal(saved.topology.edges.length, 1)
+  assert.deepEqual(Object.values(saved.monitoring), [false, false])
+  assert.deepEqual(errors, [])
+  console.log('Topology discovery browser walkthrough passed with synthetic SNMP evidence.')
+} finally {
+  await browser.close()
+  await discovery.stop()
+  await new Promise((resolve) => server.close(resolve))
+  store.close()
+}

@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import { connectionKey } from '../../src/connections.js'
 import { invalid } from '../store.js'
 import { queryNumber } from './query.js'
@@ -47,84 +47,63 @@ export function removeDiscovered({ store, id }) {
   return { ok: true }
 }
 
-export async function addDiscoveredToMap({ store, discovery, interfaces, id, body, source = 'local' }) {
+export async function addDiscoveredToMap({ store, discovery, interfaces, id, body }) {
   const bulk = id === undefined
-  const discovered = bulk ? null : store.discoveredDevice(id)
-  if (!bulk && !discovered) throw invalid('Discovered device not found.', 404)
+  const record = bulk ? null : store.discoveredDevice(id)
+  if (!bulk && !record) throw invalid('Discovered device not found.', 404)
   if (body?.baseRevision !== store.revision()) throw invalid('Inventory changed.', 409)
-  let gatewayFor
-  if (bulk) {
-    gatewayFor = await discovery?.gatewayLookup?.()
-  } else {
-    const gatewayIp = await discovery?.gatewayFor?.(discovered.ip)
-    gatewayFor = () => gatewayIp
-  }
-
-  // Use current records after awaiting Windows, then commit without yielding.
+  const gatewayFor = bulk ? await discovery?.gatewayLookup?.() : null
+  const singleGateway = bulk ? null : await discovery?.gatewayFor?.(record.ip)
   const current = store.read()
   if (body.baseRevision !== current.revision) throw invalid('Inventory changed.', 409)
   const items = bulk ? store.pendingDiscovery() : [{ id, ...store.discoveredDevice(id) }]
   if (!bulk && !items[0].ip) throw invalid('Discovered device not found.', 404)
   if (bulk && pendingVersion(items) !== body.pendingVersion) throw invalid('Scan results changed.', 409)
-
   const topology = { ...current.topology, nodes: [...current.topology.nodes], edges: [...current.topology.edges] }
-  const monitoring = { ...current.monitoring }
-  const nodesById = new Map(topology.nodes.map((node) => [node.id, node]))
-  const nodesByIp = new Map(topology.nodes.map((node) => [node.data.ip, node]))
-  const links = new Set(topology.edges.map(connectionKey))
-  const updates = []
-  const routes = []
+  const existing = new Set(topology.edges.map((edge) => edge.id))
+  const members = new Set()
   const ports = interfaces?.switchPorts?.() ?? new Map()
-  let promotedRouter = false,
-    discoveryLink = null,
-    addedCount = 0
-
+  let addedCount = 0
+  const linksToPlan = []
   for (const item of items) {
-    const gatewayIp = gatewayFor?.(item.ip)
-    const isRouter = item.ip === gatewayIp || item.source === 'gateway-mac'
-    let node = nodesById.get(item.savedDeviceId) ?? (item.status === 'added' ? null : nodesByIp.get(item.ip))
-    if (item.status === 'added' && !node) throw invalid('The saved device is missing from the map.', 409)
+    const gateway = bulk ? gatewayFor?.(item.ip) : singleGateway
+    let node = topology.nodes.find((candidate) => candidate.id === item.savedDeviceId || candidate.data.ip === item.ip)
     if (!node) {
+      if (item.status === 'added') throw invalid('The saved device is missing from the map.', 409)
       node = {
-        id: randomUUID(),
-        type: isRouter ? 'router' : 'switch',
+        id: item.id,
+        type: item.ip === gateway || item.source === 'gateway-mac' ? 'router' : 'switch',
         position: { x: 0, y: 0 },
         data: { label: item.hostname || item.ip, ip: item.ip, description: '' },
       }
       topology.nodes.push(node)
-      nodesByIp.set(item.ip, node)
-      monitoring[node.id] = source === 'local'
       addedCount++
-    } else if (!bulk && item.ip === gatewayIp && node.type !== 'router') {
-      const index = topology.nodes.indexOf(node)
-      node = { ...node, type: 'router' }
-      topology.nodes[index] = node
-      nodesByIp.set(item.ip, node)
-      promotedRouter = true
     }
-    if (item.status !== 'added') updates.push([item.id, node.id])
+    members.add(node.id)
+    linksToPlan.push({ node, gateway, item })
+  }
+  for (const { node, gateway, item } of linksToPlan) {
     const port = !item.misses && switchPortFor(ports, node, item)
-    if (port) discoveryLink = saveSwitchPortLink(topology, node, port) ?? discoveryLink
-    else routes.push([node.id, gatewayIp])
+    if (port && saveSwitchPortLink(topology, node, port)) continue
+    const router = topology.nodes.find((candidate) => candidate.type === 'router' && candidate.data.ip === gateway)
+    if (!router || router.id === node.id || topology.edges.length >= 10000) continue
+    const pair = { source: node.id, target: router.id }
+    if (!topology.edges.some((edge) => connectionKey(edge) === connectionKey(pair))) {
+      const key = createHash('sha256').update(connectionKey(pair)).digest('hex')
+      topology.edges.push({ ...pair, id: 'gateway-' + key, label: 'Gateway route' })
+    }
   }
-
-  for (const [deviceId, gatewayIp] of routes) {
-    const gateway = nodesByIp.get(gatewayIp)
-    if (gateway?.type !== 'router' || gateway.id === deviceId || topology.edges.length >= 10000) continue
-    const key = connectionKey({ source: deviceId, target: gateway.id })
-    if (links.has(key)) continue
-    links.add(key)
-    topology.edges.push({ id: randomUUID(), source: deviceId, target: gateway.id, label: 'Gateway route' })
-    discoveryLink = { label: gateway.data.label || gateway.data.ip }
+  const edges = topology.edges.filter((edge) => !existing.has(edge.id))
+  for (const { source, target } of edges) {
+    members.add(source)
+    members.add(target)
   }
-
-  const saved =
-    updates.length || promotedRouter || discoveryLink
-      ? store.write({ source: 'inventory', topology, monitoring }, current.revision, () => {
-          for (const [deviceId, nodeId] of updates) store.discoveryAction(deviceId, 'added', nodeId)
-        })
-      : current
-  return bulk ? { addedCount, existingCount: items.length - addedCount } : { ...saved, discoveryLink, promotedRouter }
+  return {
+    draft: { nodes: topology.nodes.filter((node) => members.has(node.id)), edges },
+    addedCount,
+    existingCount: items.length - addedCount,
+    revision: current.revision,
+  }
 }
 
 function pendingVersion(items) {
