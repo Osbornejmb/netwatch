@@ -8,6 +8,8 @@ import AccessLog from './AccessLog'
 import Dashboard from './Dashboard'
 import HostStorage from './HostStorage'
 import DiscoveredDevices from './DiscoveredDevices'
+import DeviceNode from './nodes/DeviceNode'
+import { deviceTypes, isInfrastructure } from './device-types.js'
 import { mergeDiscoveryDraft } from './discovery-draft.js'
 import { hostFetch } from './auth.js'
 import DeviceDialog from './DeviceDialog'
@@ -35,7 +37,15 @@ const viewFromHash = (hash) =>
     '#discovered': 'discovered',
   })[hash] || 'dashboard'
 
-const nodeTypes = { router: RouterNode, switch: SwitchNode }
+const NO_ROUTING_OBSTACLES = []
+const EndpointNode = (props) => <DeviceNode {...props} kind={props.type} />
+const nodeTypes = {
+  router: RouterNode,
+  switch: SwitchNode,
+  endpoint: EndpointNode,
+  computer: EndpointNode,
+  printer: EndpointNode,
+}
 
 export default function App({ viewer = false, remote = false, accessControls }) {
   const saved = useMemo(
@@ -79,6 +89,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
   const role = viewer ? 'viewer' : 'admin'
   const [currentView, setView] = useState(() => viewFromHash(allowedHash(location.hash, role)))
   const view = viewer ? 'dashboard' : currentView
+  const [savedMapRevision, setSavedMapRevision] = useState()
   const [dashboardView, setDashboardView] = useState({ source: 'host', layout: 'hierarchy', centerId: '' })
   useEffect(() => {
     const navigate = () => {
@@ -190,7 +201,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
     if (showModal === 'edit' && selectedNode) {
       setNodes((ns) =>
         ns.map((node) =>
-          node.id === selectedNode.id ? { ...node, data: { ...node.data, label, ip, description } } : node,
+          node.id === selectedNode.id ? { ...node, type: kind, data: { ...node.data, label, ip, description } } : node,
         ),
       )
       setShowModal(false)
@@ -238,6 +249,21 @@ export default function App({ viewer = false, remote = false, accessControls }) 
     },
     [setNodes, setEdges],
   )
+  const clearDraftMap = () => {
+    setConfirm({
+      title: 'Clear draft map?',
+      message:
+        'Remove every device and connection from the draft? The monitored map stays as it is until you apply the draft.',
+      label: 'Clear draft map',
+      onConfirm: () => {
+        setNodes([])
+        setEdges([])
+        setDraftGroups([])
+        setDraftRoots([])
+        setSelectedId(null)
+      },
+    })
+  }
   const removeSelected = () => {
     if (selectedNode) confirmRemoval([selectedNode])
   }
@@ -287,15 +313,24 @@ export default function App({ viewer = false, remote = false, accessControls }) 
     if (persistent.length) onNodesChange(persistent)
     editorDrag.onPositionChanges(changes)
   }
-  const visibleIds = new Set(
-    nodes
-      .filter((n) => `${n.data.label} ${n.data.ip}`.toLowerCase().includes(query.toLowerCase()))
-      .map((node) => node.id),
+  const visibleIds = useMemo(
+    () =>
+      new Set(
+        nodes
+          .filter((node) => (node.data.label + ' ' + node.data.ip).toLowerCase().includes(query.toLowerCase()))
+          .map((node) => node.id),
+      ),
+    [nodes, query],
   )
+  const denseEditor = mapEdges.length >= 30
   const cardsById = new Map(
     editorNodes.filter((node) => visibleIds.has(node.id)).map((node) => [node.id, mapCard(node)]),
   )
-  const cards = [...cardsById.values()]
+  const cards = denseEditor
+    ? NO_ROUTING_OBSTACLES
+    : editorNodes
+        .filter((node) => isInfrastructure(node.type) && visibleIds.has(node.id))
+        .map(({ id }) => cardsById.get(id))
 
   const download = (content, filename, type) => {
     const url = URL.createObjectURL(new Blob([content], { type }))
@@ -480,6 +515,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
             remote={remote}
             viewOptions={viewer ? { ...dashboardView, source: 'host' } : dashboardView}
             setViewOptions={setDashboardView}
+            savedMapRevision={savedMapRevision}
             showInventory={view === 'inventory'}
             onEdit={() => {
               location.hash = 'topology'
@@ -576,9 +612,11 @@ export default function App({ viewer = false, remote = false, accessControls }) 
                     hidden: !source || !target,
                     data: { source, target, cards, layered: editorLayout === 'tidy' },
                     type: 'mapLink',
+                    focusable: !denseEditor,
                     style: { stroke: 'var(--map-link)', strokeWidth: 2 },
                   }
                 })}
+                onlyRenderVisibleElements={nodes.length >= 120 || mapEdges.length >= 200}
                 onNodesChange={changeEditorNodes}
                 onNodeDragStop={editorDrag.finish}
                 onEdgesChange={changeEditorEdges}
@@ -640,8 +678,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
                     </button>
                   </div>
                   <div className="inspector-type">
-                    <span className={selectedNode.type === 'router' ? 'type-square' : 'type-circle'} />
-                    {selectedNode.type.toUpperCase()}
+                    <span>{deviceTypes[selectedNode.type]}</span>
                   </div>
                   <div className="detail-row">
                     <span>IP address</span>
@@ -675,6 +712,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
                 onSelect={setSelectedId}
                 onEdit={() => setShowModal('edit')}
                 onRemove={removeSelected}
+                onClearDraft={nodes.length ? clearDraftMap : undefined}
                 onConnect={onConnect}
                 onRemoveLink={removeConnection}
               />
@@ -708,6 +746,10 @@ export default function App({ viewer = false, remote = false, accessControls }) 
             groups={groups}
             roots={roots}
             paused={autosavePaused}
+            onSaved={(revision) => {
+              setSavedMapRevision(revision)
+              setDashboardView((view) => ({ ...view, source: 'host' }))
+            }}
             onLoad={(topology) => {
               setNodes(topology.nodes)
               setEdges(topology.edges)

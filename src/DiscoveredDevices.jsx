@@ -206,7 +206,6 @@ export default function DiscoveredDevices({ remote, stageDiscovery }) {
               : 'Starting scan…'
   return (
     <section className="page-content discovery-page" aria-labelledby="discovery-title">
-      <TopologyDiscovery stageDiscovery={stageDiscovery} />
       <header className="page-heading">
         <h1 id="discovery-title">Discovered devices</h1>
         <div className="discovery-heading-actions">
@@ -243,6 +242,7 @@ export default function DiscoveredDevices({ remote, stageDiscovery }) {
           </button>
         </div>
       </header>
+      <TopologyDiscovery stageDiscovery={stageDiscovery} />
       {scanning && (
         <div
           className="discovery-progress"

@@ -50,6 +50,8 @@ try {
   page.setDefaultTimeout(12000)
   await page.goto('http://127.0.0.1:' + server.address().port)
   await page.getByRole('link', { name: 'Discovered', exact: true }).click()
+  assert.equal(await page.getByLabel("Start device").count(), 0)
+  await page.locator(".topology-proposals > summary").click()
   await page.getByText('Scheduled discovery · Off', { exact: true }).click()
   await page.locator('select[name="discoverySeed"]').selectOption('Router')
   await page.locator('input[name="interval"]').fill('60')

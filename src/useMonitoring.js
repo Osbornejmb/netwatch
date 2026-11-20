@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { subscribeSnapshots } from './monitoring'
 
-export default function useMonitoring(enabled) {
+export default function useMonitoring(enabled, minimumRevision) {
   const [value, setValue] = useState({ snapshot: null, state: 'loading', error: '', hasConnected: false })
   const [generation, setGeneration] = useState(0)
   const cache = useRef({})
@@ -12,8 +12,8 @@ export default function useMonitoring(enabled) {
         setValue((previous) => {
           return { ...previous, ...next, hasConnected: previous.hasConnected || Boolean(next.snapshot) }
         }),
-      { cache: cache.current },
+      { cache: cache.current, minimumRevision },
     )
-  }, [enabled, generation])
+  }, [enabled, generation, minimumRevision])
   return { ...value, refresh: () => setGeneration((value) => value + 1) }
 }

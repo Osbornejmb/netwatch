@@ -1,3 +1,4 @@
+import { deviceTypes, isInfrastructure } from './device-types.js'
 import useModal from './useModal'
 import { X } from 'lucide-react'
 import { HEALTH } from './health'
@@ -142,7 +143,7 @@ export default function DeviceDetails({
               </details>
             </>
           )}
-          {host && (
+          {host && isInfrastructure(device.type) && (
             <details
               className="health-history-options"
               onToggle={(event) => setInterfacesOpen(event.currentTarget.open)}
@@ -158,7 +159,7 @@ export default function DeviceDetails({
               )}
             </details>
           )}
-          {host && !viewer && (
+          {host && !viewer && isInfrastructure(device.type) && (
             <details
               className="health-history-options"
               onToggle={(event) => setNeighborsOpen(event.currentTarget.open)}
@@ -218,7 +219,7 @@ export default function DeviceDetails({
             <dl>
               <div>
                 <dt>Type</dt>
-                <dd>{device.type === 'router' ? 'Router' : 'Switch'}</dd>
+                <dd>{deviceTypes[device.type]}</dd>
               </div>
               <div>
                 <dt>Showing</dt>

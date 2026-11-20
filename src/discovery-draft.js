@@ -46,7 +46,12 @@ export function mergeDiscoveryDraft(draft, patch) {
   const indexes = new Map(edges.map(({ id }, index) => [id, index]))
   const replacements = new Map((patch.replaceEdges ?? []).map((edge) => [edge.id, edge]))
   const same = (a, b) =>
-    a?.source === b.source && a.target === b.target && a.label === b.label && a.role === b.role && !a.uplink
+    a?.source === b.source &&
+    a.target === b.target &&
+    a.label === b.label &&
+    a.role === b.role &&
+    a.discoveryMapped === b.discoveryMapped &&
+    JSON.stringify(a.uplink) === JSON.stringify(b.uplink)
   for (const link of patch.edges) {
     const key = physicalConnectionKey(link)
     const index = indexes.get(link.id)

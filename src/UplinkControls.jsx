@@ -57,6 +57,7 @@ export default function UplinkControls({ nodes, edges, groups, roots, onRoots, o
               })
               const parallel = data.get('action') === 'parallel'
               const connection = { ...link, id: parallel ? createId() : link.id, uplink, role: data.get('role') }
+              delete connection.discoveryMapped
               if (parallel && (!uplink?.source.index || !uplink?.target.index))
                 throw new Error('Enter both interface indexes for a parallel link.')
               if (

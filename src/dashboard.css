@@ -198,7 +198,7 @@
   outline-offset: 5px;
 }
 .health-node-muted {
-  opacity: 0.42;
+  box-shadow: none;
 }
 .health-empty-map {
   position: absolute;
@@ -910,13 +910,10 @@
 }
 
 .link-overview {
-  padding: 0.65rem 0.9rem;
+  padding: 0 0.9rem;
   border: 1px solid var(--border);
   border-radius: 0.75rem;
   min-width: 0;
-}
-.link-overview > p {
-  margin: 0;
 }
 .link-overview-actions {
   display: flex;
@@ -970,4 +967,33 @@
   .health-dashboard .react-flow__edge-text {
     font-size: 11px !important;
   }
+}
+
+:is(.health-map, .canvas-wrap) .react-flow__edge-textwrapper {
+  pointer-events: none;
+}
+:is(.health-map, .canvas-wrap)
+  .react-flow__edge:not(:hover, :focus-visible, .health-path-highlighted, .selected)
+  .react-flow__edge-textwrapper {
+  visibility: hidden;
+}
+
+.link-overview-panel[open] .link-overview-actions {
+  padding-bottom: 0.4rem;
+}
+.topology-proposals > summary {
+  cursor: pointer;
+  min-height: 44px;
+  align-content: center;
+}
+.topology-proposal-count {
+  color: var(--muted);
+}
+.topology-proposal-controls {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.25rem 0 0.75rem;
+}
+.topology-proposal-controls > button {
+  justify-self: start;
 }

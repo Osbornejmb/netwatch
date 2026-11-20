@@ -1,5 +1,22 @@
 # NetWatch changelog
 
+## Unreleased
+
+- Nearby discovery adds devices without a supported switch or router identity as endpoints. Choose Endpoint, Computer, Printer, Switch, or Router in Edit map. Device shapes and icons distinguish endpoints and infrastructure without changing the health colors.
+
+
+- Fill in interface indexes when reviewing discovered port hints. A nearby endpoint gets switch-side evidence, and a trunk can use both sides when the peer port matches fresh interface readings.
+
+- Hide port labels on the dashboard until a connection is hovered, focused, or highlighted. Connection details retain the full evidence.
+- Refresh the monitored dashboard after a saved map update, including while the live feed is still sending the previous revision.
+
+
+- Collapse secondary link and topology controls. Keep links visible on large maps, route background links without detours, and draw endpoint cards over passing links.
+
+- Add a confirmed Clear draft map action in Edit map for all devices and connections.
+- Match the dashboard's link display in Edit map so links can pass behind opaque endpoint cards. Show link labels on hover, focus, or selection and use simpler routes on dense drafts.
+
+
 ## v0.2.1 Windows prerelease
 
 - Added optional per-switch SNMPv3 contexts for access-port discovery on switches that expose their MAC forwarding table per VLAN. Existing interface polling and connection review use their current workflows.

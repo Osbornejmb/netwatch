@@ -1,8 +1,9 @@
+import { isInfrastructure } from '../src/device-types.js'
 import { createDynamics } from './dynamics.js'
 import { normalizeLinkEvidence, qualityRates, qualityThresholds } from './link-evidence.js'
 import { DatabaseSync } from 'node:sqlite'
 import { validateTopology } from '../src/topology.js'
-import { validateInterfaces, interfaceRates } from './interfaces.js'
+import { INTERFACE_POLICY, validateInterfaces, interfaceRates } from './interfaces.js'
 import { randomUUID } from 'node:crypto'
 import { normalizeAddress } from '../src/inventory.js'
 import { verifyUpgradeBackup } from './upgrade-backup.js'
@@ -365,9 +366,11 @@ export function openStore(
       )
       for (const node of clean.topology.nodes) if (node.data.ip) markDiscovered.run(node.id, node.data.ip)
       // Identity/address changes invalidate observations rather than reassigning old evidence.
-      const allowed = new Map(clean.topology.nodes.map((n) => [n.id, `${n.type}:${n.data.ip}`]))
+      const evidenceIdentity = (node) =>
+        JSON.stringify([isInfrastructure(node.type) ? node.type : 'endpoint', node.data.ip])
+      const allowed = new Map(clean.topology.nodes.map((n) => [n.id, evidenceIdentity(n)]))
       for (const n of previous.topology.nodes)
-        if (allowed.get(n.id) !== `${n.type}:${n.data.ip}`) {
+        if (allowed.get(n.id) !== evidenceIdentity(n)) {
           db.prepare('DELETE FROM checks WHERE device_id=?').run(n.id)
           db.prepare('DELETE FROM latest_check WHERE device_id=?').run(n.id)
           db.prepare('DELETE FROM incidents WHERE device_id=?').run(n.id)
@@ -546,7 +549,7 @@ export function openStore(
             .map((r) => [r.device_id, r.authorization]),
         )
       return state.topology.nodes
-        .filter((n) => n.data.ip && targets.has(n.id))
+        .filter((n) => n.data.ip && isInfrastructure(n.type) && targets.has(n.id))
         .map((n) => ({ deviceId: n.id, address: n.data.ip, type: n.type, authorization: targets.get(n.id) }))
     },
     authorizeInterfaces(id, authorization, revision) {
@@ -555,6 +558,8 @@ export function openStore(
         if (state.revision !== revision) throw invalid('Inventory changed.', 409)
         if (!state.topology.nodes.some((n) => n.id === id && n.data.ip))
           throw invalid('Saved device with an address required.')
+        if (authorization !== null && !state.topology.nodes.some((n) => n.id === id && isInfrastructure(n.type)))
+          throw invalid('Only saved routers and switches support interface monitoring.')
         if (authorization !== null && (typeof authorization !== 'string' || !/^[a-f0-9-]{36}$/.test(authorization)))
           throw invalid('Invalid authorization.')
         db.prepare('DELETE FROM snmp_targets WHERE device_id=?').run(id)
@@ -622,6 +627,15 @@ export function openStore(
         interfaceHistory.delete(id)
       }
       observationVersion++
+    },
+    currentInterfaces(id, staleAfterMs = INTERFACE_POLICY.staleAfterMs) {
+      const row = db
+        .prepare(
+          'SELECT s.payload,s.checked_at FROM interface_samples s JOIN snmp_targets t ON s.device_id=t.device_id WHERE s.device_id=?',
+        )
+        .get(id)
+      const age = row ? now() - row.checked_at : Infinity
+      return age >= 0 && age <= staleAfterMs ? JSON.parse(row.payload).interfaces : []
     },
     interfaces(id, { after = 0, limit = 50 } = {}) {
       return transaction(() => {

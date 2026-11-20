@@ -1,9 +1,11 @@
-import { hierarchyLayout, refocusSummary, linkLabels, baselineLabels, basisLabels, formatSpeed } from './refocus.js'
+import { deviceTypes, isInfrastructure } from './device-types.js'
+import { deviceIcons } from './nodes/device-icons.js'
+import { hierarchyLayout, refocusSummary, baselineLabels, basisLabels } from './refocus.js'
 import { LinkOverview, LinkDetails } from './LinkOverview.jsx'
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { ReactFlow } from '@xyflow/react'
 import MapControls from './MapControls'
-import { ArrowDownCircle, ArrowUpRight, CheckCircle2, CircleHelp, Clock3, Network, Router, Search } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpRight, CheckCircle2, CircleHelp, Clock3, Network, Search } from 'lucide-react'
 import { HEALTH, deviceHealth, summarizeHealth, connectionHealth, nextEvidenceChange } from './health'
 import DeviceDetails from './DeviceDetails'
 import useMonitoring from './useMonitoring'
@@ -33,20 +35,22 @@ function Status({ status }) {
 
 function HealthNode({ data, selected }) {
   const StatusIcon = healthIcons[data.status]
+  const KindIcon = deviceIcons[data.kind]
   return (
     <div
       style={nodeDimensions}
-      className={`health-node ${data.kind}-node health-node-${data.status}${selected ? ' is-selected' : ''}${data.connectionRole ? ` health-node-${data.connectionRole}` : ''}`}
+      className={`health-node ${data.kind}-node${isInfrastructure(data.kind) ? '' : ' endpoint-card'} health-node-${data.status}${selected ? ' is-selected' : ''}${data.connectionRole ? ` health-node-${data.connectionRole}` : ''}`}
     >
       <NodeHandles />
       <StatusIcon size={16} role="img" aria-label={HEALTH[data.status].label} className="node-status" />
+      <KindIcon size={14} aria-hidden="true" className="map-device-kind" />
       <div className="device-copy">
         <strong className={data.ip && data.label === data.ip ? 'device-ip-label' : undefined}>{data.label}</strong>
       </div>
       <InfoTooltip label={`Information for ${data.label}`}>
         <strong>{data.label}</strong>
         <span>
-          {data.kind === 'router' ? 'Router' : 'Switch'} · {data.ip || 'No address'}
+          {deviceTypes[data.kind]} · {data.ip || 'No address'}
         </span>
         <span>
           {HEALTH[data.status].label} · Last check {formatCheckTime(data.checkedAt)}
@@ -76,6 +80,7 @@ const NO_OBSTACLES = []
 
 export default function Dashboard({
   stageDiscovery,
+  savedMapRevision,
   nodes: inventory,
   edges: inventoryEdges,
   groups: draftGroups = [],
@@ -90,7 +95,7 @@ export default function Dashboard({
   const setSource = (source) => setViewOptions((previous) => ({ ...previous, source }))
   const setMapLayout = (layout) => setViewOptions((previous) => ({ ...previous, layout }))
   const setCenterId = (centerId) => setViewOptions((previous) => ({ ...previous, centerId }))
-  const host = useMonitoring(source === 'host')
+  const host = useMonitoring(source === 'host', savedMapRevision)
   const live = source === 'host' && host.snapshot
   const staleAfterMs = live ? live.freshness.staleAfterMs : 90_000
   const [statusFilter, setStatusFilter] = useState('all')
@@ -98,8 +103,6 @@ export default function Dashboard({
   const [selectedId, setSelectedId] = useState(null)
   const [selectedLinkId, setSelectedLinkId] = useState(null)
   const [highlightedId, setHighlightedId] = useState(null)
-  const [showPortLabels, setShowPortLabels] = useState(true)
-  const [showAllLinks, setShowAllLinks] = useState(false)
   const [dragging, setDragging] = useState(false)
   useEffect(() => {
     if (!dragging) return
@@ -251,83 +254,87 @@ export default function Dashboard({
     () => new Map(positioned.map((node) => [node.id, mapCard({ ...node, measured: nodeSizes[node.id] })])),
     [positioned, nodeSizes],
   )
-  const cards = useMemo(() => [...cardsById.values()], [cardsById])
-  const routeCards =
-    dense && (showAllLinks || dragging)
-      ? NO_OBSTACLES
-      : visibleIds.size === positioned.length
-        ? cards
-        : visible.map(({ id }) => cardsById.get(id))
+  const routeCards = useMemo(
+    () => visible.filter(({ type }) => isInfrastructure(type)).map(({ id }) => cardsById.get(id)),
+    [visible, cardsById],
+  )
   const selected = devices.find((node) => node.id === selectedId)
-  const devicesById = new Map(devices.map((node) => [node.id, node]))
+  const devicesById = useMemo(() => new Map(devices.map((node) => [node.id, node])), [devices])
   const highlightedDevice = devicesById.get(highlightedId)
   const connectedIds = useMemo(() => connectedDevices(highlightedId, nodes, edges), [highlightedId, nodes, edges])
-  const mapEdges = edges
-    .filter(
-      (edge) =>
-        visibleIds.has(edge.source) &&
-        visibleIds.has(edge.target) &&
-        (!dense || showAllLinks || edge.source === highlightedId || edge.target === highlightedId),
-    )
-    .map((edge) => {
-      const source = devicesById.get(edge.source),
-        target = devicesById.get(edge.target)
-      const status = connectionHealth(source?.health, target?.health)
-      const label = {
-        up: 'Both endpoints up',
-        down: 'Endpoint down',
-        stale: 'Stale endpoint data',
-        unknown: 'Endpoint reachability unknown',
-      }[status]
-      const link = linksById.get(edge.id)
-      const hasPorts = !!(edge.uplink?.source.label || edge.uplink?.target.label)
-      const sharedSpeed =
-        link?.source.fresh && link?.target.fresh && link.source.speedBps === link.target.speedBps
-          ? formatSpeed(link.source.speedBps)
-          : ''
-      const endpoint = (side) => {
-        const name = link?.[side].portLabel || edge.uplink?.[side].label || 'Port unknown'
-        const speed = link?.[side].fresh && formatSpeed(link[side].speedBps)
-        return speed && !sharedSpeed ? name + ' · ' + speed : name
-      }
-      const bundle = bundlesByMember.get(edge.id)
-      const portLabel = bundle
-        ? edge.id === bundle.id
-          ? 'Bundle · ' + bundle.up + ' of ' + bundle.total + ' members up'
-          : undefined
-        : hasPorts
-          ? [endpoint('source') + ' ↔ ' + endpoint('target'), sharedSpeed, linkLabels[link?.state ?? 'unknown']]
-              .filter(Boolean)
-              .join(' · ')
-          : /^(?:Last seen on |(?:LLDP|CDP) · )(.*)$/.exec(edge.label)?.[1]
-      return {
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        sourceHandle: 'radial-source-right',
-        targetHandle: 'radial-target-left',
-        data: {
-          source: cardsById.get(edge.source),
-          target: cardsById.get(edge.target),
-          cards: routeCards,
-          maxBlockers: dense ? 8 : undefined,
-          layered: mapLayout === 'tidy' || (mapLayout === 'hierarchy' && tiers.length > 0),
-          parallelOffset: parallelOffsets.get(edge.id),
-        },
-        type: 'mapLink',
-        label: showPortLabels && !(dense && (showAllLinks || dragging)) ? portLabel : undefined,
-        labelStyle: { fill: 'var(--text)', fontSize: 14, fontWeight: 650 },
-        ariaLabel: `${source?.data.label} and ${target?.data.label}: ${label}${portLabel ? `, ${edge.label}` : ''}`,
-        className: `health-path-${status}${highlightedDevice && (edge.source === highlightedId || edge.target === highlightedId) ? ' health-path-highlighted' : ''}`,
-        style: {
-          stroke: HEALTH[status].color,
-          strokeWidth:
-            highlightedDevice && (edge.source === highlightedId || edge.target === highlightedId) ? 3.5 : 1.75,
-          opacity: highlightedDevice && edge.source !== highlightedId && edge.target !== highlightedId ? 0.18 : 1,
-          strokeDasharray: status === 'down' ? '7 5' : status === 'unknown' ? '3 5' : undefined,
-        },
-      }
-    })
+  const mapEdges = useMemo(
+    () =>
+      edges
+        .filter((edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target))
+        .map((edge) => {
+          const source = devicesById.get(edge.source),
+            target = devicesById.get(edge.target)
+          const status = connectionHealth(source?.health, target?.health)
+          const highlighted = edge.source === highlightedId || edge.target === highlightedId
+          const label = {
+            up: 'Both endpoints up',
+            down: 'Endpoint down',
+            stale: 'Stale endpoint data',
+            unknown: 'Endpoint reachability unknown',
+          }[status]
+          const link = linksById.get(edge.id)
+          const mappedLabel = [
+            link?.source.portLabel || edge.uplink?.source.label,
+            link?.target.portLabel || edge.uplink?.target.label,
+          ]
+            .filter(Boolean)
+            .join(' ↔ ')
+          const bundle = bundlesByMember.get(edge.id)
+          const portLabel = bundle
+            ? edge.id === bundle.id
+              ? 'Bundle · ' + bundle.up + ' of ' + bundle.total + ' members up'
+              : undefined
+            : mappedLabel || /^(?:Last seen on |(?:LLDP|CDP) · )(.*)$/.exec(edge.label)?.[1]
+          return {
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            sourceHandle: 'radial-source-right',
+            targetHandle: 'radial-target-left',
+            data: {
+              source: cardsById.get(edge.source),
+              target: cardsById.get(edge.target),
+              cards: dense && (!highlighted || dragging) ? NO_OBSTACLES : routeCards,
+              maxBlockers: dense ? 8 : undefined,
+              layered: mapLayout === 'tidy' || (mapLayout === 'hierarchy' && tiers.length > 0),
+              parallelOffset: parallelOffsets.get(edge.id),
+            },
+            type: 'mapLink',
+            focusable: !dense && !!portLabel,
+            label: !(dense && dragging) ? portLabel : undefined,
+            labelStyle: { fill: 'var(--text)', fontSize: 14, fontWeight: 650 },
+            ariaLabel: `${source?.data.label} and ${target?.data.label}: ${label}${portLabel ? `, ${portLabel}` : ''}`,
+            className: `health-path-${status}${highlightedDevice && highlighted ? ' health-path-highlighted' : ''}`,
+            style: {
+              stroke: HEALTH[status].color,
+              strokeWidth: highlightedDevice && highlighted ? 3.5 : 1.75,
+              opacity: highlightedDevice && !highlighted ? 0.6 : 1,
+              strokeDasharray: status === 'down' ? '7 5' : status === 'unknown' ? '3 5' : undefined,
+            },
+          }
+        }),
+    [
+      edges,
+      visibleIds,
+      devicesById,
+      highlightedId,
+      highlightedDevice,
+      linksById,
+      bundlesByMember,
+      cardsById,
+      dense,
+      dragging,
+      routeCards,
+      mapLayout,
+      tiers.length,
+      parallelOffsets,
+    ],
+  )
   const connections = selected
     ? edges
         .filter((edge) => edge.source === selected.id || edge.target === selected.id)
@@ -380,7 +387,7 @@ export default function Dashboard({
             domAttributes: keyboard(node),
             hidden: !visibleIds.has(node.id),
             selected: selectedId === node.id,
-            ariaLabel: `${node.data.label}, ${node.type === 'router' ? 'Router' : 'Switch'}, ${HEALTH[node.health].label}.${highlightedDevice ? (node.id === highlightedId ? ' Connection focus.' : connectedIds.has(node.id) ? ` Directly connected to ${highlightedDevice.data.label}.` : '') : ''} Open device details`,
+            ariaLabel: `${node.data.label}, ${deviceTypes[node.type]}, ${HEALTH[node.health].label}.${highlightedDevice ? (node.id === highlightedId ? ' Connection focus.' : connectedIds.has(node.id) ? ` Directly connected to ${highlightedDevice.data.label}.` : '') : ''} Open device details`,
             data: {
               ...node.data,
               kind: node.type,
@@ -473,15 +480,6 @@ export default function Dashboard({
               placeholder="Find a device"
             />
           </label>
-          {!showInventory && dense && (
-            <button
-              className="health-button"
-              aria-pressed={showAllLinks}
-              onClick={() => setShowAllLinks((shown) => !shown)}
-            >
-              Show all links
-            </button>
-          )}
           {showInventory && highlightedDevice && (
             <button
               className="health-button"
@@ -497,15 +495,6 @@ export default function Dashboard({
           <details className="health-view-options">
             <summary>View options{statusFilter !== 'all' || query ? ' · Filtered' : ''}</summary>
             <div>
-              {!showInventory && (
-                <button
-                  className="health-button"
-                  aria-pressed={showPortLabels}
-                  onClick={() => setShowPortLabels((shown) => !shown)}
-                >
-                  Port labels
-                </button>
-              )}
               {!viewer && (
                 <label className="health-filter">
                   Show{' '}
@@ -691,11 +680,10 @@ export default function Dashboard({
                   >
                     <th scope="row">
                       <span className="health-table-device">
-                        {node.type === 'router' ? (
-                          <Router size={16} aria-hidden="true" />
-                        ) : (
-                          <Network size={16} aria-hidden="true" />
-                        )}
+                        {(() => {
+                          const Icon = deviceIcons[node.type]
+                          return <Icon size={16} aria-hidden="true" />
+                        })()}
                         {node.data.label}
                       </span>
                     </th>
@@ -764,7 +752,7 @@ export default function Dashboard({
               setHighlightedId(null)
             }}
             nodesDraggable={!viewer}
-            onlyRenderVisibleElements={nodes.length >= 120}
+            onlyRenderVisibleElements={nodes.length >= 120 || edges.length >= 200}
             nodesConnectable={false}
             multiSelectionKeyCode={null}
             nodeDragThreshold={3}
@@ -832,11 +820,6 @@ export default function Dashboard({
               >
                 Clear highlight
               </button>
-            </div>
-          )}
-          {dense && !showAllLinks && !highlightedDevice && visible.length > 0 && (
-            <div className="health-map-focus-controls">
-              <p className="health-highlight-status">Select a device to trace its links.</p>
             </div>
           )}
         </div>

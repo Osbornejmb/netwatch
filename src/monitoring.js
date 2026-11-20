@@ -331,6 +331,7 @@ export function subscribeSnapshots(
     poll = pollSnapshot,
     now = Date.now,
     retryMs = 10000,
+    minimumRevision,
     cache = {},
   } = {},
 ) {
@@ -351,6 +352,20 @@ export function subscribeSnapshots(
     stopPolling = undefined
     failures = 0
   }
+  // Request the saved revision even when an established event stream is still serving an older map.
+  let expected = minimumRevision
+  const syncUntil = now() + 30000
+  const awaitingSave = (snapshot) =>
+    Number.isSafeInteger(expected) && now() < syncUntil && snapshot.inventory.revision < expected
+  const startPolling = () => {
+    if (stopPolling) return
+    stopPolling = poll(
+      (state) => {
+        if (!state.snapshot || !awaitingSave(state.snapshot)) onState({ ...state, transport: 'poll' })
+      },
+      { intervalMs: Number.isSafeInteger(expected) ? 1000 : 8000, cache },
+    )
+  }
   const fail = () => {
     source?.close()
     source = undefined
@@ -362,7 +377,7 @@ export function subscribeSnapshots(
     }
     if (!stopPolling) {
       onState({ state: 'reconnecting', transport: undefined })
-      stopPolling = poll((state) => onState({ ...state, transport: 'poll' }), { intervalMs: 8000, cache })
+      startPolling()
     }
     if (EventSource) retry = setTimeout(connect, retryMs)
   }
@@ -393,6 +408,11 @@ export function subscribeSnapshots(
           JSON.parse(event.data),
           instance(previousId) === instance(event.lastEventId) ? inventory : undefined,
         )
+        if (awaitingSave(snapshot)) {
+          startPolling()
+          return
+        }
+        expected = undefined
         previousId = event.lastEventId
         inventory = snapshot.inventory
         failures = 0
@@ -424,6 +444,7 @@ export function subscribeSnapshots(
     else if (!source && !stopPolling) connect()
   }
   document?.addEventListener('visibilitychange', visibility)
+  if (Number.isSafeInteger(expected) && !document?.hidden && EventSource) startPolling()
   connect()
   return () => {
     stopped = true
