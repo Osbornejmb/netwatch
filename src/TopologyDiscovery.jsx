@@ -72,6 +72,7 @@ export default function TopologyDiscovery({ stageDiscovery }) {
   const [data, setData] = useState(null)
   const [seed, setSeed] = useState('')
   const [interval, setInterval] = useState(null)
+  const [scheduleEnabled, setScheduleEnabled] = useState(null)
   const [filter, setFilter] = useState('all')
   const [busy, setBusy] = useState(false)
   const [matches, setMatches] = useState({})
@@ -163,92 +164,121 @@ export default function TopologyDiscovery({ stageDiscovery }) {
             (filter === 'attention' && link.confidence !== 'verified') ||
             (filter === 'unmanaged' && linkDevices(link).some((device) => device?.state === 'unmanaged')),
         )
+  const proposalCount = proposed.length + (data?.hints?.length ?? 0)
+  const scheduled = scheduleEnabled ?? Boolean(data?.schedule?.intervalMinutes)
   return (
-    <section className="inventory-controls" aria-label="Topology proposals">
+    <section className="discovery-topology" aria-label="Topology proposals">
+      {data?.schedule && (
+        <form
+          className="discovery-schedule"
+          aria-labelledby="discovery-schedule-title"
+          onSubmit={(event) => {
+            event.preventDefault()
+            const fields = new FormData(event.currentTarget)
+            void act(async () => {
+              const schedule = await request('schedule', {
+                seedId: fields.get('discoverySeed'),
+                intervalMinutes: scheduled ? Number(fields.get('interval')) : 0,
+              })
+              setData((previous) => ({ ...previous, schedule }))
+              setScheduleEnabled(null)
+              setInterval(null)
+              setMessage('Discovery schedule saved.')
+            })
+          }}
+        >
+          <h2 id="discovery-schedule-title">Scheduled discovery</h2>
+          <div className="discovery-schedule-fields">
+            <label className="discovery-schedule-toggle">
+              <input
+                type="checkbox"
+                checked={scheduled}
+                onChange={(event) => setScheduleEnabled(event.target.checked)}
+              />
+              Run automatically
+            </label>
+            <label>
+              Every (minutes)
+              <input
+                name="interval"
+                type="number"
+                min="15"
+                max="1440"
+                step="1"
+                required={scheduled}
+                disabled={!scheduled}
+                value={interval ?? (data.schedule.intervalMinutes || 60)}
+                onChange={(event) => setInterval(event.target.value)}
+              />
+            </label>
+            <label>
+              Scheduled start device
+              <select name="discoverySeed" key={data.schedule.seedId} defaultValue={data.schedule.seedId || seed}>
+                <option value="">Choose an enrolled device</option>
+                {data.seeds.map(({ id, label }) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="submit" className="button secondary" disabled={busy}>
+              Save schedule
+            </button>
+          </div>
+        </form>
+      )}
+      {message && (
+        <p className="discovery-message" role="status">
+          {message}
+        </p>
+      )}
       <details className="topology-proposals" onToggle={(event) => setExpanded(event.currentTarget.open)}>
         <summary>
           Topology proposals
-          {(proposed.length > 0 || data?.hints?.length > 0) && (
-            <span className="topology-proposal-count"> · {proposed.length + (data?.hints?.length ?? 0)} to review</span>
-          )}
+          <span className="topology-proposal-count">
+            {running
+              ? ' · Checking connections…'
+              : proposalCount
+                ? ' · ' + proposalCount + ' to review'
+                : data
+                  ? ' · Nothing to review'
+                  : ''}
+          </span>
         </summary>
         {expanded && (
           <div className="topology-proposal-controls">
-            {data?.schedule && (
-              <details>
-                <summary>Scheduled discovery · {data.schedule.intervalMinutes ? 'On' : 'Off'}</summary>
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    void act(async () => {
-                      const fields = new FormData(event.currentTarget)
-                      const schedule = await request('schedule', {
-                        seedId: fields.get('discoverySeed'),
-                        intervalMinutes: Number(fields.get('interval')),
-                      })
-                      setData((previous) => ({ ...previous, schedule }))
-                      setInterval(null)
-                      setMessage('Discovery schedule saved.')
-                    })
-                  }}
+            <div className="discovery-manual">
+              <label>
+                Manual start device
+                <select
+                  id="discovery-seed"
+                  value={seed}
+                  disabled={running || busy}
+                  onChange={(event) => setSeed(event.target.value)}
                 >
-                  <label>
-                    Rediscovery seed
-                    <select name="discoverySeed" key={data.schedule.seedId} defaultValue={data.schedule.seedId || seed}>
-                      <option value="">Choose an enrolled device</option>
-                      {data.seeds.map(({ id, label }) => (
-                        <option key={id} value={id}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Minutes between runs
-                    <input
-                      name="interval"
-                      type="number"
-                      min="0"
-                      max="1440"
-                      step="1"
-                      value={interval ?? data.schedule.intervalMinutes}
-                      onChange={(event) => setInterval(event.target.value)}
-                    />
-                  </label>
-                  <p>Enter 0 to turn scheduling off. Choose 15–1,440 minutes for automatic runs.</p>
-                  <button type="submit" className="button secondary" disabled={busy}>
-                    Save schedule
-                  </button>
-                </form>
-              </details>
-            )}
-            <label htmlFor="discovery-seed">Start device</label>
-            <select
-              id="discovery-seed"
-              value={seed}
-              disabled={running || busy}
-              onChange={(event) => setSeed(event.target.value)}
-            >
-              <option value="">Choose an enrolled device</option>
-              {(data?.seeds ?? []).map(({ id, label }) => (
-                <option key={id} value={id}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <button
-              className="button secondary"
-              disabled={running || busy || !seed}
-              onClick={() =>
-                act(async () => {
-                  const run = await request('runs', { seedId: seed })
-                  setMatches({})
-                  setData((previous) => ({ ...previous, run }))
-                })
-              }
-            >
-              Find connections
-            </button>
+                  <option value="">Choose an enrolled device</option>
+                  {(data?.seeds ?? []).map(({ id, label }) => (
+                    <option key={id} value={id}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className="button secondary"
+                disabled={running || busy || !seed}
+                onClick={() =>
+                  act(async () => {
+                    const run = await request('runs', { seedId: seed })
+                    setMatches({})
+                    setData((previous) => ({ ...previous, run }))
+                  })
+                }
+              >
+                Find connections
+              </button>
+            </div>
             {running && (
               <>
                 <p role="status">Checking connections · {run.progress?.queried ?? 0} devices checked</p>
@@ -450,7 +480,6 @@ export default function TopologyDiscovery({ stageDiscovery }) {
                 </ul>
               </details>
             )}
-            {message && <p role="status">{message}</p>}
             {preview && (
               <ConfirmDialog
                 title="Add to draft map?"

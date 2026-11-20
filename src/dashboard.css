@@ -742,6 +742,23 @@
   width: 100%;
   margin-inline: auto;
 }
+.discovery-page > .page-heading {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding-block: 12px;
+  margin-bottom: 12px;
+  background: var(--canvas);
+  border-bottom: 1px solid var(--border);
+}
+.discovery-page :is(button, input, select, summary) {
+  scroll-margin-block-start: 5rem;
+}
+.discovery-device-name {
+  display: grid;
+  flex-basis: 100%;
+  gap: 2px;
+}
 .discovery-list {
   padding: 0;
   margin: 12px 0;
@@ -843,6 +860,9 @@
   }
 }
 @media (max-width: 720px) {
+  .discovery-page :is(button, input, select, summary) {
+    scroll-margin-block-start: 9rem;
+  }
   .discovery-heading-actions {
     width: 100%;
   }
@@ -1009,6 +1029,40 @@
 
 .link-overview-panel[open] .link-overview-actions {
   padding-bottom: 0.4rem;
+}
+.discovery-schedule {
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--surface);
+}
+.discovery-schedule h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+.discovery-schedule-fields,
+.discovery-manual {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px 16px;
+}
+:is(.discovery-schedule-fields, .discovery-manual) label {
+  display: grid;
+  gap: 4px;
+  max-width: 100%;
+}
+.discovery-schedule input[type='number'] {
+  width: 8rem;
+}
+:is(.discovery-schedule, .discovery-manual) :is(select, input[type='number']) {
+  min-height: 44px;
+  max-width: 100%;
+}
+.discovery-schedule-fields .discovery-schedule-toggle {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
 }
 .topology-proposals > summary {
   cursor: pointer;
