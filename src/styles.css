@@ -701,6 +701,7 @@ label {
   .top-menu {
     order: 3;
     width: 100%;
+    flex-wrap: wrap;
     justify-content: space-between;
     gap: 4px;
   }
