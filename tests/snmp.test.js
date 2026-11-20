@@ -229,3 +229,34 @@ test('encrypted SNMPv3 authPriv exchanges work over isolated loopback UDP and wr
  const rejected=await probe('127.0.0.1',{...user,authKey:'incorrect-fixture-password'})
  assert.equal(rejected.error,'snmp_failed');assert.ok(!JSON.stringify(rejected).includes('password'))
 })
+
+test('switch forwarding reads use the configured SNMPv3 context without moving interface polling', async () => {
+  const iface = fakeSession()
+  const vlan = fakeSession()
+  const bridge = '1.3.6.1.2.1.17.1.4.1.2'
+  const qbridge = '1.3.6.1.2.1.17.7.1.2.2.1.2'
+  const fdb = '1.3.6.1.2.1.17.4.3.1.2'
+  const rows = new Map([
+    [bridge, { oid: bridge + '.9', value: 1, type: snmp.ObjectType.Integer }],
+    [fdb, { oid: fdb + '.2.0.0.0.0.9', value: 9, type: snmp.ObjectType.Integer }],
+  ])
+  vlan.getBulk = ([oid], _nonRepeaters, _repetitions, callback) => {
+    vlan.calls.push(oid)
+    callback(null, [[rows.get(oid) ?? { oid, type: snmp.ObjectType.EndOfMibView }]])
+  }
+  const sessions = []
+  const probe = createSnmpProbe({
+    portContexts: '192.0.2.2=wrong,192.0.2.1=vlan100',
+    createSession(address, _user, options) {
+      sessions.push([address, options.context])
+      return options.context ? vlan : iface
+    },
+  })
+  const result = await probe('192.0.2.1', user, { collectSwitchPorts: true })
+  assert.deepEqual(sessions, [['192.0.2.1', undefined], ['192.0.2.1', 'vlan100']])
+  assert.equal(result.interfaces[0].name, 'Gi1/0/1')
+  assert.deepEqual(result.switchPorts, [{ mac: '02:00:00:00:00:09', index: 1, name: 'Gi1/0/1' }])
+  assert.ok(vlan.calls.includes(qbridge))
+  assert.ok(vlan.calls.includes(fdb))
+  assert.ok(iface.closed && vlan.closed)
+})

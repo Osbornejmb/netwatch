@@ -92,7 +92,7 @@ function resolvePort(interfaces, subtype, value) {
 }
 
 const cdpRoot = '1.3.6.1.4.1.9.9.23.1.2.1.1'
-async function readCdp(request) {
+export async function readCdp(request) {
   const columns = await Promise.all(
     [3, 4, 6, 7, 8, 9].map(async (column) => (await table(request, cdpRoot + '.' + column, 128)).rows),
   )

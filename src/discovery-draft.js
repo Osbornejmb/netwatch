@@ -43,11 +43,31 @@ export function mergeDiscoveryDraft(draft, patch) {
   }
   const edges = [...draft.edges]
   const keys = new Set(edges.map(physicalConnectionKey))
+  const indexes = new Map(edges.map(({ id }, index) => [id, index]))
+  const replacements = new Map((patch.replaceEdges ?? []).map((edge) => [edge.id, edge]))
+  const same = (a, b) =>
+    a?.source === b.source && a.target === b.target && a.label === b.label && a.role === b.role && !a.uplink
   for (const link of patch.edges) {
     const key = physicalConnectionKey(link)
-    if (keys.has(key)) continue
-    keys.add(key)
-    edges.push(link)
+    const index = indexes.get(link.id)
+    const previous = replacements.get(link.id)
+    if (previous) {
+      const current = edges[index]
+      if (same(current, link)) continue
+      if (
+        !same(current, previous) ||
+        draft.groups?.some((group) => group.links.includes(link.id)) ||
+        (physicalConnectionKey(current) !== key && keys.has(key))
+      )
+        throw Error('This connection changed in your draft. Review the existing link before applying the port hint.')
+      keys.delete(physicalConnectionKey(current))
+      keys.add(key)
+      edges[index] = link
+    } else if (index === undefined && !keys.has(key)) {
+      indexes.set(link.id, edges.length)
+      keys.add(key)
+      edges.push(link)
+    }
   }
   return validateTopology({ ...draft, nodes, edges })
 }

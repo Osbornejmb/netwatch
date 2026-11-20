@@ -1,4 +1,18 @@
-# NetWatch v0.2.0 changelog
+# NetWatch changelog
+
+## Unreleased
+
+- Added optional per-switch SNMPv3 contexts for access-port discovery on switches that expose their MAC forwarding table per VLAN. Existing interface polling and connection review use their current workflows.
+
+- Added Cisco CDP neighbor hints and excluded transit MACs from direct attachment on CDP-observed ports.
+
+- Displayed CDP trunk port labels on the dashboard alongside LLDP and access-port labels.
+
+- Fixed port-hint review so a moved endpoint updates its existing discovered link in the draft and shows the updated port once the map is saved.
+
+- Added a per-switch VLAN context field in Windows Port monitoring. Save it during enrollment or change it without re-entering credentials.
+
+## v0.2.0 Windows prerelease
 
 This Windows x64 prerelease consolidates the Phase 0–5 work on link health, topology discovery, redundancy, and failure impact. It includes an unsigned installer and SHA-256 checksum.
 

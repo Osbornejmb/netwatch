@@ -9,6 +9,7 @@ const context = await browser.newContext({ viewport: { width: 1440, height: 900 
 const fixture = createEditorNetwork()
 fixture.edges[0].label = 'Last seen on Gi1/0/3'
 fixture.edges[2].label = 'LLDP · Gi1/0/2 ↔ Gi1/0/1'
+fixture.edges[3].label = 'CDP · Fa1/0/2 ↔ FastEthernet1/0/1'
 fixture.nodes.push({ id: 'isolated', type: 'switch', position: { x: 0, y: 0 }, data: { label: 'Isolated device', ip: '192.0.2.250' } })
 fixture.nodes.forEach(node => { node.position = { x: 0, y: 0 } })
 fixture.edges.push({ id: 'reverse', source: 's1', target: 'r1' }, { id: 'parallel', source: 'r1', target: 's1', sourceHandle: 'legacy' })
@@ -67,6 +68,8 @@ try {
   await page.waitForFunction((count) => document.querySelectorAll('.react-flow__edge').length === count, 4)
   const accessPort = page.getByText('Gi1/0/3', { exact: true })
   const trunkPorts = page.getByText('Gi1/0/2 ↔ Gi1/0/1', { exact: true })
+  const cdpPorts = page.getByText('Fa1/0/2 ↔ FastEthernet1/0/1', { exact: true })
+  await cdpPorts.waitFor()
   await accessPort.waitFor()
   await trunkPorts.waitFor()
   await openView(page)
@@ -74,7 +77,9 @@ try {
   await portLabels.press('Enter')
   await accessPort.waitFor({ state: 'hidden' })
   await trunkPorts.waitFor({ state: 'hidden' })
+  await cdpPorts.waitFor({ state: 'hidden' })
   await portLabels.press('Enter')
+  await cdpPorts.waitFor()
   await accessPort.waitFor()
   await trunkPorts.waitFor()
   await page.locator('.health-view-options > summary').click()

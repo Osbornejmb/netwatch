@@ -44,7 +44,7 @@ async function walk(request, root, repetitions, limit, consume) {
   }
 }
 
-export async function readSwitchPorts(request, interfaces, policy, neighbors = []) {
+export async function readSwitchPorts(request, interfaces, policy, neighbors = [], cdp = []) {
   const indexes = new Map()
   const names = new Map(interfaces.map(({ index, name }) => [index, name]))
   await walk(request, BRIDGE_PORT_INDEX, policy.repetitions, policy.maxInterfaces, (suffix, index) => {
@@ -73,11 +73,13 @@ export async function readSwitchPorts(request, interfaces, policy, neighbors = [
     if (!index) continue
     neighborsByIndex.set(index, neighborsByIndex.has(index) ? null : peer)
   }
+  const cdpPorts = new Set(cdp.filter(({ index }) => names.has(index)).map(({ index }) => index))
   const byMac = new Map()
   for (const [index, macs] of macsByPort) {
     for (const mac of macs) {
       const name = names.get(index)
-      const port = macs.size === 1 && !neighborsByIndex.has(index) && name ? { index, name } : null
+      const port =
+        macs.size === 1 && !neighborsByIndex.has(index) && !cdpPorts.has(index) && name ? { index, name } : null
       byMac.set(mac, byMac.has(mac) ? null : port)
     }
   }
@@ -89,11 +91,18 @@ export async function readSwitchPorts(request, interfaces, policy, neighbors = [
     direct.set(peer.chassisMac, direct.has(peer.chassisMac) ? null : { index, name, remotePort: peer.remotePort })
   }
   for (const [mac, port] of direct) byMac.set(mac, port)
-  return [...byMac].flatMap(([mac, port]) => (port ? [{ mac, ...port }] : []))
+  const cdpNeighbors = cdp.flatMap(({ index, address, peerPort }) => {
+    const name = names.get(index)
+    return name && address ? [{ peerIp: address, index, name, remotePort: peerPort, protocol: 'CDP' }] : []
+  })
+  return [...byMac].flatMap(([mac, port]) => (port ? [{ mac, ...port }] : [])).concat(cdpNeighbors)
 }
 
 export function switchPortFor(ports, node, discovery) {
-  if (!discovery.mac || node.data.ip !== discovery.ip) return null
+  if (node.data.ip !== discovery.ip) return null
+  const cdp = ports.get('ip:' + discovery.ip)?.filter(({ switchId }) => switchId !== node.id)
+  if (cdp?.length) return cdp.length === 1 ? cdp[0] : null
+  if (!discovery.mac) return null
   const matches = ports.get(discovery.mac)?.filter(({ switchId }) => switchId !== node.id)
   const direct = matches?.filter(({ remotePort }) => remotePort)
   if (direct?.length) return direct.length === 1 ? direct[0] : null
@@ -105,7 +114,7 @@ export function saveSwitchPortLink(topology, node, port) {
   if (!owner) return null
   const id = 'discovery-port-' + createHash('sha256').update(node.id).digest('hex')
   const label = port.remotePort
-    ? `LLDP · ${port.name.slice(0, 45)} ↔ ${port.remotePort.slice(0, 45)}`
+    ? `${port.protocol ?? 'LLDP'} · ${port.name.slice(0, 45)} ↔ ${port.remotePort.slice(0, 45)}`
     : `Last seen on ${port.name}`.slice(0, 100)
   const link = { id, source: node.id, target: owner.id, label }
   const key = connectionKey(link)
@@ -114,8 +123,13 @@ export function saveSwitchPortLink(topology, node, port) {
     const prior = topology.edges[index]
     if (
       prior.source !== node.id ||
-      !(prior.label.startsWith('Last seen on ') || prior.label.startsWith('LLDP · ')) ||
+      !(
+        prior.label.startsWith('Last seen on ') ||
+        prior.label.startsWith('LLDP · ') ||
+        prior.label.startsWith('CDP · ')
+      ) ||
       prior.uplink ||
+      prior.role !== undefined ||
       topology.groups?.some((group) => group.links.includes(id))
     )
       return null

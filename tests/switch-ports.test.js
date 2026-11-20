@@ -1,3 +1,4 @@
+import { mergeDiscoveryDraft } from '../src/discovery-draft.js'
 import { applyDiscoveryPatch } from './fixtures/discovery-draft.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -120,6 +121,35 @@ test('discovery shows the matched port and adds the switch link instead of the g
   )
 })
 
+test('reviewing a moved port updates the same saved discovery link in the draft only', async (t) => {
+  const store = openStore(':memory:')
+  t.after(() => store.close())
+  const ip = '192.0.2.10'
+  store.write({ source: 'inventory', topology: {
+    nodes: [{ id: 's1', type: 'switch', position: { x: 0, y: 0 }, data: { ip: '192.0.2.3', label: 'Switch' } }],
+    edges: [],
+  } }, 0)
+  store.recordDiscovery([{ ip, mac, source: 'neighbor' }])
+  const id = store.discovered({}).devices[0].id
+  const review = (port) => addDiscoveredToMap({
+    store,
+    interfaces: { switchPorts: () => new Map([[mac, [{ switchId: 's1', index: port, name: 'Fa1/0/' + port }]]]) },
+    id,
+    body: { baseRevision: store.revision() },
+  })
+  applyDiscoveryPatch(store, (await review(3)).draft)
+  const saved = store.read().topology
+  const old = saved.edges[0]
+  const patch = (await review(4)).draft
+  assert.deepEqual(patch.replaceEdges, [old])
+  const draft = mergeDiscoveryDraft(saved, patch)
+  assert.deepEqual(draft.edges, [{ ...old, label: 'Last seen on Fa1/0/4' }])
+  assert.deepEqual(mergeDiscoveryDraft(draft, patch).edges, draft.edges)
+  assert.equal(store.read().topology.edges[0].label, 'Last seen on Fa1/0/3')
+  assert.throws(() => mergeDiscoveryDraft({ ...saved, edges: [{ ...old, label: 'Manually edited' }] }, patch), /changed in your draft/)
+  assert.deepEqual(applyDiscoveryPatch(store, patch).topology.edges, draft.edges)
+})
+
 test('adds access and LLDP trunk links, then locates a downstream device after its switch is enrolled', async (t) => {
   const store = openStore(':memory:')
   const ip = (last) => `192.168.50.${last}`
@@ -238,4 +268,23 @@ test('adds access and LLDP trunk links, then locates a downstream device after i
   const addresses = new Map(store.read().topology.nodes.map(({ id, data }) => [id, data.ip]))
   assert.ok(store.topologyHints().some((edge) => addresses.get(edge.source) === ip(101) &&
     addresses.get(edge.target) === ip(3) && edge.label === 'Last seen on port 5'))
+})
+
+test('CDP identifies the adjacent switch and excludes a lone transit MAC learned on the trunk', async () => {
+  const sample = await readSwitchPorts(
+    async (_method, [oid]) => [
+      {
+        [bridge]: ports,
+        [vlan]: [row(vlan + '.100.2.0.0.0.0.1', 4), row(vlan + '.100.2.0.0.0.0.9', 7), end],
+      }[oid] ?? [end],
+    ],
+    interfaces,
+    policy,
+    [],
+    [{ index: 104, address: '192.168.50.3', peerPort: 'Fa1/0/1' }],
+  )
+  assert.deepEqual(sample, [
+    { mac: '02:00:00:00:00:09', index: 107, name: 'Gi1/0/7' },
+    { peerIp: '192.168.50.3', index: 104, name: 'Gi1/0/4', remotePort: 'Fa1/0/1', protocol: 'CDP' },
+  ])
 })
