@@ -23,8 +23,8 @@ export function verifyUpgradeBackup(db, path, version = 11) {
   const backupPath = path + '.pre-v' + version + '.bak'
   let backup
   try {
-    const source = statSync(path)
-    const copy = statSync(backupPath)
+    const source = statSync(path, { bigint: true })
+    const copy = statSync(backupPath, { bigint: true })
     if (!copy.isFile() || (copy.dev === source.dev && copy.ino === source.ino)) throw new Error()
     backup = new DatabaseSync(backupPath, { readOnly: true })
     backup.exec('BEGIN')

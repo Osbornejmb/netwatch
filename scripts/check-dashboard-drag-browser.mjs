@@ -62,7 +62,7 @@ try {
   await page.goto(base)
   await page.locator('.health-node').first().waitFor()
   await openView(page)
-  assert.equal(await page.getByLabel('Map layout', { exact: true }).inputValue(), 'radial')
+  assert.equal(await page.getByLabel('Map layout', { exact: true }).inputValue(), 'hierarchy')
   await page.locator('.health-view-options > summary').click()
   await page.waitForFunction((count) => document.querySelectorAll('.react-flow__edge').length === count, 4)
   const accessPort = page.getByText('Gi1/0/3', { exact: true })

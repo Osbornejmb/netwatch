@@ -1,3 +1,4 @@
+import { layoutTiers } from '../../src/refocus.js'
 import { createHash } from 'node:crypto'
 
 export function createSnapshotRoute(instance) {
@@ -24,9 +25,10 @@ export function createSnapshotRoute(instance) {
           .update(JSON.stringify(result.linkHealth ?? null))
           .digest('base64url'),
         result,
+        tiers: layoutTiers(result.inventory.topology),
       }
     }
-    const result = { ...cached.result, generatedAt: new Date(store.snapshotNow()).toISOString() }
+    const result = { ...cached.result, tiers: cached.tiers, generatedAt: new Date(store.snapshotNow()).toISOString() }
     const version = createHash('sha256')
       .update(JSON.stringify([snapshotKey, visibleStatus, discoveryStatus, viewer, cached.healthKey]))
       .digest('base64url')
@@ -68,6 +70,7 @@ export function createSnapshotRoute(instance) {
         inventory: { ...inventory, topology: visibleTopology },
         ...(linkHealth && { linkHealth }),
         activeIncidents: result.activeIncidents,
+        tiers: result.tiers,
         ...portEvidence,
       }
     }

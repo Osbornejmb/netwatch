@@ -79,7 +79,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
   const role = viewer ? 'viewer' : 'admin'
   const [currentView, setView] = useState(() => viewFromHash(allowedHash(location.hash, role)))
   const view = viewer ? 'dashboard' : currentView
-  const [dashboardView, setDashboardView] = useState({ source: 'host', layout: 'radial', centerId: '' })
+  const [dashboardView, setDashboardView] = useState({ source: 'host', layout: 'hierarchy', centerId: '' })
   useEffect(() => {
     const navigate = () => {
       const hash = allowedHash(location.hash, role)

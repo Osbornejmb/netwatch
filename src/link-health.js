@@ -63,8 +63,20 @@ function linkEvidence(edge, readings, now, staleAfterMs, conflictingPorts) {
   }
   return {
     id: edge.id,
-    source: { deviceId: edge.source, portLabel: edge.uplink?.source.label ?? '', checkedAt: source.checkedAt ?? null },
-    target: { deviceId: edge.target, portLabel: edge.uplink?.target.label ?? '', checkedAt: target.checkedAt ?? null },
+    source: {
+      deviceId: edge.source,
+      portLabel: edge.uplink?.source.label ?? '',
+      checkedAt: source.checkedAt ?? null,
+      fresh: !!source.fresh,
+      ...(source.fresh && source.speed > 0 && { speedBps: source.speed }),
+    },
+    target: {
+      deviceId: edge.target,
+      portLabel: edge.uplink?.target.label ?? '',
+      checkedAt: target.checkedAt ?? null,
+      fresh: !!target.fresh,
+      ...(target.fresh && target.speed > 0 && { speedBps: target.speed }),
+    },
     state,
     scope,
     flapping: !!(source.flapping || target.flapping),

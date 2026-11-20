@@ -1,3 +1,4 @@
+import { linkLabels, scopeLabels } from './refocus.js'
 import { csrf, hostFetch } from './auth.js'
 import { validateTopology } from './topology.js'
 
@@ -108,7 +109,67 @@ export function validateSnapshot(value, previousInventory) {
       uplinkPorts.set(edge.id, observation)
     }
   }
-  return { ...value, activeIncidents, inventory, checks, uplinkPorts }
+  const links = new Map(inventory.topology.edges.map((edge) => [edge.id, edge]))
+  const tiers = value.tiers ?? []
+  if (
+    !Array.isArray(tiers) ||
+    tiers.length > ids.size ||
+    new Set(tiers.map((row) => row?.deviceId)).size !== tiers.length ||
+    tiers.some((row) => !ids.has(row?.deviceId) || !Number.isInteger(row.tier) || row.tier < 0 || row.tier >= ids.size)
+  )
+    throw Error('Invalid layout tiers.')
+  const linkHealth = value.linkHealth
+  if (linkHealth !== undefined) {
+    if (
+      !Array.isArray(linkHealth?.links) ||
+      linkHealth.links.length > links.size ||
+      !Array.isArray(linkHealth.redundancy) ||
+      linkHealth.redundancy.length > 100 ||
+      new Set(linkHealth.links.map((row) => row?.id)).size !== linkHealth.links.length
+    )
+      throw Error('Invalid link evidence.')
+    for (const row of linkHealth.links) {
+      const edge = links.get(row?.id)
+      if (!edge || !Object.hasOwn(linkLabels, row.state) || !Object.hasOwn(scopeLabels, row.scope))
+        throw Error('Invalid link state.')
+      for (const side of ['source', 'target']) {
+        const end = row[side]
+        if (
+          !end ||
+          end.deviceId !== edge[side] ||
+          typeof end.portLabel !== 'string' ||
+          end.portLabel.length > 80 ||
+          (end.checkedAt !== null && !Number.isFinite(Date.parse(end.checkedAt))) ||
+          (end.fresh !== undefined && typeof end.fresh !== 'boolean') ||
+          (end.speedBps !== undefined &&
+            (!Number.isSafeInteger(end.speedBps) || end.speedBps < 1 || end.speedBps > 1e15))
+        )
+          throw Error('Invalid link port evidence.')
+      }
+    }
+    if (
+      linkHealth.redundancy.some(
+        (row) =>
+          !ids.has(row?.deviceId) ||
+          !['healthy', 'degraded', 'isolated', 'unknown'].includes(row.state) ||
+          row.basis !== 'linkStatusOnly',
+      )
+    )
+      throw Error('Invalid redundancy evidence.')
+    if (linkHealth.failurePoints !== undefined) {
+      const points = linkHealth.failurePoints
+      if (
+        !Array.isArray(points?.devices) ||
+        points.devices.length > ids.size ||
+        points.devices.some((id) => !ids.has(id)) ||
+        !Array.isArray(points.links) ||
+        points.links.length > links.size ||
+        points.links.some((id) => !links.has(id))
+      )
+        throw Error('Invalid failure points.')
+    }
+  }
+  return { ...value, activeIncidents, inventory, checks, uplinkPorts, tiers, linkHealth }
 }
 
 export function validateIncidents(items, ids, maximum = 25) {

@@ -255,7 +255,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  max-width: calc(100% - 32px);
+  max-width: calc(100% - 80px);
   align-items: center;
   padding: 4px 8px;
   background: var(--surface);
@@ -586,7 +586,7 @@
   .health-map-focus-controls {
     top: 8px;
     right: 8px;
-    max-width: calc(100% - 16px);
+    max-width: calc(100% - 72px);
   }
   .health-empty-map strong {
     font-size: 21px;
@@ -906,5 +906,51 @@
   }
   .health-view-options > div {
     max-height: max(100px, calc(100dvh - 420px));
+  }
+}
+
+.link-overview {
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  min-width: 0;
+}
+.link-overview > p {
+  margin: 0;
+}
+.link-overview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+}
+.link-overview details {
+  min-width: 0;
+  max-width: 100%;
+}
+.link-overview summary {
+  cursor: pointer;
+  min-height: 44px;
+  align-content: center;
+}
+.link-overview ul {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  max-height: 15rem;
+  overflow: auto;
+}
+.link-overview li {
+  margin-bottom: 0.25rem;
+  overflow-wrap: anywhere;
+}
+.link-overview button {
+  max-width: 100%;
+  white-space: normal;
+  text-align: start;
+}
+
+@media (max-width: 540px) {
+  .health-dashboard .react-flow__edge-text {
+    font-size: 11px !important;
   }
 }
