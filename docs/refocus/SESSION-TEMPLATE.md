@@ -26,8 +26,8 @@ Your task this session: **[PHASE-0 | PHASE-1 | PHASE-2 | PHASE-3 | PHASE-4 | PHA
 Reply with:
 1. Confirmation that you read each file above (list them).
 2. A summary of the plan in under 20 lines: files you'll touch, schema changes, tests you'll add.
-3. Anything that is unclear, conflicting, or missing.
-Then wait for me to reply "approved" before you start editing.
+3. **Decisions needed for this phase.** Compare the phase file, shared design, earlier reports, and `DECISIONS.md`. List each unresolved decision for this phase as a direct question. For each question, give your recommendation and explain what it affects. If there are none, say so. Then list any other conflicts or missing information.
+Wait for me to resolve any blocking decisions and reply "approved" before you start editing. Plan approval alone does not resolve an unanswered decision. Leave later-phase decisions for those phases.
 
 ## When the phase is done
 1. Write your report to docs/refocus/REPORT-PHASE-[N].md using the deliverable format in CORRECTNESS-AND-TESTS.md.
