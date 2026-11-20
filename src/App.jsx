@@ -579,14 +579,19 @@ export default function App({ viewer = false, remote = false, accessControls }) 
                     placeholder="Find a device"
                   />
                 </div>
-                <button
-                  className="button primary"
-                  disabled={autosavePaused || importBusy}
-                  onClick={() => void hostStorage.current.reviewSave()}
-                >
-                  <Check size={15} />
-                  Use this map
-                </button>
+                <div className="heading-actions">
+                  <button type="button" className="button secondary" disabled={!nodes.length} onClick={clearDraftMap}>
+                    Clear draft map
+                  </button>
+                  <button
+                    className="button primary"
+                    disabled={autosavePaused || importBusy}
+                    onClick={() => void hostStorage.current.reviewSave()}
+                  >
+                    <Check size={15} />
+                    Use this map
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -712,7 +717,6 @@ export default function App({ viewer = false, remote = false, accessControls }) 
                 onSelect={setSelectedId}
                 onEdit={() => setShowModal('edit')}
                 onRemove={removeSelected}
-                onClearDraft={nodes.length ? clearDraftMap : undefined}
                 onConnect={onConnect}
                 onRemoveLink={removeConnection}
               />
