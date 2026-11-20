@@ -932,6 +932,23 @@
   min-height: 44px;
   align-content: center;
 }
+.link-overview-actions > .map-tools[open] {
+  flex-basis: 100%;
+}
+.map-tools-content {
+  max-height: min(15rem, 30dvh);
+  overflow: auto;
+  padding-inline: 0.75rem 0.5rem;
+}
+.map-tools-content label {
+  display: block;
+}
+.map-tools-content select {
+  display: block;
+  max-width: 100%;
+  margin-bottom: 0.5rem;
+}
+
 .link-overview ul {
   list-style: none;
   margin: 0 0 0.5rem;

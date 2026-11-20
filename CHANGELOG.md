@@ -18,7 +18,7 @@ This Windows x64 prerelease consolidates the Phase 0–5 work on link health, to
 - Added matching CDP evidence to LLDP proposals. Conflicting and unmatched reports remain visible to admins, and advertisements grant no target or credential authorization.
 - Added error and discard rates, configurable sustained-rate thresholds, guarded 64-bit counter wrap handling, spanning tree evidence, LACP bundles and member counts, and inferred roles with manual overrides.
 - Added opt-in scheduled rediscovery, a feed for discovered devices, added or moved links, missing links, and negotiated speed changes. Missing-link reports require sufficient complete coverage. Scheduling starts off.
-- Added dependency-aware redundancy incidents and saved-topology estimates for device and link failures. Admins can inspect changes and estimated isolation or lost paths without changing device configuration.
+- Added dependency-aware redundancy incidents and saved-topology estimates for device and link failures. Admins can open Map tools to review changes and estimate isolation or lost paths. The panel starts collapsed to keep the network map in focus.
 
 ## Dashboard and operations
 
