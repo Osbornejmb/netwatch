@@ -1,6 +1,6 @@
 # How NetWatch decides a link is healthy
 
-Open a connection on the map or in **Connections** to see what each port reported. Lines on the map retain their device reachability colors. Link labels summarize the port evidence separately.
+Open a connection on the map or expand the link health summary below the map and choose **Connections**. Each connection appears once. A shared legend explains the question-mark icon when evidence is unavailable. Lines on the map retain their device reachability colors. Link labels summarize the port evidence separately.
 
 | State | What the host observed |
 | --- | --- |
@@ -20,7 +20,7 @@ A baseline is the set of mapped connections you expect to protect a device. In *
 
 A device can have healthy redundancy, run without redundancy when a path is lost, be isolated, or have unknown redundancy. Devices without an accepted group display **No baseline set**. The evidence label under the device status shows whether spanning tree or bundle membership contributed to the baseline. **Based on link status only** indicates that the decision used physical port status.
 
-Hierarchy starts with designated roots and shows distance in saved links. Unassigned devices have their own row. Admins can review single points of failure in **Link attention**. These reflect the saved topology, including manual connections, and can identify a dependency before an outage.
+Hierarchy starts with designated roots and shows distance in saved links. Unassigned devices have their own row. Admins can review single points of failure on link rows in **Connections** and for devices in **Device redundancy alerts**. Open **Map tools** below the map for incidents, recent changes, and failure estimates. These reflect the saved topology, including manual connections, and can identify a dependency before an outage.
 
 ## Link quality and bundles
 

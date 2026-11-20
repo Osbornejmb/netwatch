@@ -1,30 +1,17 @@
 .dashboard-shell .main-area {
-  height: 100dvh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-}
-.dashboard-shell .topbar {
-  flex-shrink: 0;
-}
-.dashboard-shell .page-content {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
 }
 .health-dashboard {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  font-size: 14px;
+  font-size: theme('fontSize.ops-body');
   line-height: 1.5;
   color: var(--text);
   background: var(--canvas);
-}
-.health-dashboard.is-inventory {
-  overflow: auto;
 }
 .health-page-titlebar {
   display: flex;
@@ -37,13 +24,14 @@
   background: var(--surface);
 }
 .health-page-titlebar h1 {
-  font-size: 24px;
+  font-size: theme('fontSize.ops-title');
+  line-height: 1.25;
   font-weight: 600;
   letter-spacing: -0.7px;
   margin: 0;
 }
 .health-page-titlebar > div > p {
-  font-size: 12px;
+  font-size: theme('fontSize.ops-meta');
   color: var(--muted);
   margin: 0;
   max-width: 650px;
@@ -118,8 +106,7 @@
   width: 174px;
 }
 .health-map {
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 max(22rem, 70dvh);
   position: relative;
   background: var(--canvas);
 }
@@ -168,7 +155,7 @@
   gap: 5px;
   padding: 4px 8px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: theme('fontSize.ops-meta');
   font-weight: 600;
   white-space: nowrap;
 }
@@ -522,14 +509,17 @@
   outline-offset: 3px;
 }
 @media (max-width: 720px) {
+  .health-map {
+    flex-basis: max(20rem, 50dvh);
+  }
   .health-page-titlebar {
     padding: 8px 12px;
     align-items: stretch;
     flex-direction: column;
     gap: 6px;
   }
-  .health-page-titlebar h1 {
-    font-size: 22px;
+  .health-title > h1 {
+    flex-basis: 100%;
   }
   .health-map-tools {
     width: 100%;
@@ -603,6 +593,14 @@
   gap: 8px;
   padding: 8px;
 }
+.health-node:not(.router-node) .device-copy > strong:not(.device-ip-label) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+}
 .health-node-up .node-status {
   color: var(--health-up);
 }
@@ -628,8 +626,9 @@
 .health-summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  padding: 0 20px;
+  max-width: 100%;
+  gap: theme('spacing.ops-2');
+  padding: theme('spacing.ops-1') 20px;
   flex-shrink: 0;
 }
 .health-overview {
@@ -640,20 +639,30 @@
 }
 .health-summary button {
   min-height: 40px;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  padding: theme('spacing.ops-1') theme('spacing.ops-3');
   cursor: pointer;
-  font-size: 13px;
+  font-size: theme('fontSize.ops-meta');
 }
-.health-summary .summary-down {
-  color: var(--health-down);
-  font-weight: 700;
+:is(.summary-up strong, .connection-status.is-up) {
+  color: theme('colors.status.up');
+}
+:is(.summary-down strong, .connection-status.is-down) {
+  color: theme('colors.status.down');
+}
+:is(.summary-stale strong, .connection-status.is-warning) {
+  color: theme('colors.status.overdue');
+}
+:is(.summary-unknown strong, .connection-status.is-unknown) {
+  color: theme('colors.status.unknown');
 }
 .health-summary button[aria-pressed='true'] {
-  text-decoration: underline;
-  text-underline-offset: 4px;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 .health-attention {
   padding: 0 12px;
@@ -699,7 +708,6 @@
   flex-wrap: wrap;
   gap: 0 8px;
 }
-.health-title > h1,
 .health-title > .health-highlight-status {
   flex-basis: 100%;
 }
@@ -746,6 +754,34 @@
   max-width: 1040px;
   width: 100%;
   margin-inline: auto;
+}
+.discovery-page {
+  font-size: theme('fontSize.ops-body');
+}
+.discovery-page > .page-heading h1 {
+  margin: 0;
+  font-size: theme('fontSize.ops-title');
+}
+.discovery-page > .page-heading {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding-block: 12px;
+  margin-bottom: 12px;
+  background: var(--canvas);
+  border-bottom: 1px solid var(--border);
+}
+.discovery-page :is(button, input, select, summary) {
+  scroll-margin-block-start: 5rem;
+}
+.discovery-device-name {
+  display: grid;
+  flex-basis: 100%;
+  gap: theme('spacing.ops-1');
+}
+.discovery-device-name strong {
+  font-size: theme('fontSize.ops-section');
+  font-weight: 600;
 }
 .discovery-list {
   padding: 0;
@@ -848,6 +884,9 @@
   }
 }
 @media (max-width: 720px) {
+  .discovery-page :is(button, input, select, summary) {
+    scroll-margin-block-start: 9rem;
+  }
   .discovery-heading-actions {
     width: 100%;
   }
@@ -881,7 +920,10 @@
     max-width: 100%;
   }
   .health-summary {
-    padding: 0 16px;
+    padding-inline: theme('spacing.ops-3');
+  }
+  .health-summary button {
+    min-height: 44px;
   }
   .health-attention {
     padding: 0 16px;
@@ -910,15 +952,15 @@
 }
 
 .link-overview {
-  padding: 0 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
+  padding: 0 clamp(12px, 2vw, 28px);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
   min-width: 0;
 }
 .link-overview-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 1.25rem;
+  gap: theme('spacing.ops-1') theme('spacing.ops-4');
 }
 .link-overview details {
   min-width: 0;
@@ -929,12 +971,10 @@
   min-height: 44px;
   align-content: center;
 }
-.link-overview-actions > .map-tools[open] {
+.link-overview-actions > details[open] {
   flex-basis: 100%;
 }
 .map-tools-content {
-  max-height: min(15rem, 30dvh);
-  overflow: auto;
   padding-inline: 0.75rem 0.5rem;
 }
 .map-tools-content label {
@@ -950,12 +990,52 @@
   list-style: none;
   margin: 0 0 0.5rem;
   padding: 0;
-  max-height: 15rem;
-  overflow: auto;
 }
 .link-overview li {
   margin-bottom: 0.25rem;
   overflow-wrap: anywhere;
+}
+.connection-legend,
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.connection-legend svg,
+.connection-status svg {
+  flex: none;
+}
+.connection-legend,
+.map-tools-empty {
+  color: var(--muted);
+}
+.link-overview .connection-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  width: 100%;
+  padding-inline: theme('spacing.ops-2');
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.connection-list li + li {
+  border-top: 1px solid var(--border);
+}
+.link-overview .connection-row:hover {
+  background: var(--accent-soft);
+}
+.connection-status {
+  margin-inline-start: auto;
+  font-size: theme('fontSize.ops-meta');
+  font-weight: 600;
+}
+.connection-list {
+  max-width: 52rem;
+}
+.connection-risk {
+  color: var(--muted);
 }
 .link-overview button {
   max-width: 100%;
@@ -965,7 +1045,7 @@
 
 @media (max-width: 540px) {
   .health-dashboard .react-flow__edge-text {
-    font-size: 11px !important;
+    font-size: 12px !important;
   }
 }
 
@@ -980,6 +1060,46 @@
 
 .link-overview-panel[open] .link-overview-actions {
   padding-bottom: 0.4rem;
+}
+.discovery-schedule {
+  padding: theme('spacing.ops-3') theme('spacing.ops-4');
+  border-radius: 8px;
+  background: var(--surface);
+}
+.discovery-schedule h2 {
+  margin: 0 0 theme('spacing.ops-2');
+  font-size: theme('fontSize.ops-section');
+  font-weight: 600;
+}
+.discovery-schedule-fields,
+.discovery-manual {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: theme('spacing.ops-2') theme('spacing.ops-3');
+}
+:is(.discovery-schedule-fields, .discovery-manual) label {
+  display: grid;
+  gap: 4px;
+  max-width: 100%;
+}
+.discovery-schedule input[type='number'] {
+  width: 8rem;
+}
+:is(.discovery-schedule, .discovery-manual) :is(select, input[type='number']) {
+  min-height: 44px;
+  max-width: 100%;
+  padding-inline: theme('spacing.ops-2');
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+.discovery-schedule-fields .discovery-schedule-toggle {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
 }
 .topology-proposals > summary {
   cursor: pointer;

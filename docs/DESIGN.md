@@ -1,6 +1,6 @@
 # Dashboard design direction
 
-In Edit map, Backspace and Delete open the removal confirmation for the selected device. Text fields keep their normal editing behavior.
+In Edit map, Clear draft map sits next to Use this map and asks for confirmation before clearing the draft. Backspace and Delete open the removal confirmation for the selected device. Text fields keep their normal editing behavior.
 
 Circle gives each branch a sector based on the number of devices at its ends. Tidy places small branches in columns beneath their parents, wraps sets of direct clients, and routes connections through the gaps between rows. Wider hierarchies use the compact grid. Both layouts use measured card widths once they are available.
 
@@ -35,7 +35,7 @@ Remote viewers see the Dashboard and device details. Remote admins have the full
 Reference guidance: [UI/UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill), using its status/incident dashboard and minimal enterprise recommendations. Keep existing React Flow and Lucide rather than adding a design framework.
 
 - An off-white map-first landing screen with one small horizontal navigation bar: Dashboard, Edit map, Devices. No sidebar, avatar, breadcrumbs, promotional heading, summary-card row, or always-visible inventory.
-- The topology fills all remaining viewport space. A small title, connection status, summary strip, Status filter and conditional Needs attention strip precede it. Source, layout and reachability explanation are tucked into View options; the device table appears only on the Devices screen. Clicking a device opens a dismissible, keyboard-accessible detail popup; no permanent detail/attention sidebar competes with the map. A searchable device list offers an alternative to using the graph.
+- The topology has a stable height in the page scroll. Expanding the panels below the map leaves the canvas height intact. A small title, connection status, status chips, filters and conditional Needs attention controls precede it. Link evidence has one connection list below the map, with a shared explanation for unknown status icons. Map tools stays collapsed until requested. The Discovered page keeps its actions visible while scrolling and distinguishes the scheduled start device from the manual start device. Source, layout and reachability explanation are tucked into View options; the device table appears only on the Devices screen. Clicking a device opens a dismissible, keyboard-accessible detail popup; no permanent detail/attention sidebar competes with the map. A searchable device list offers an alternative to using the graph.
 - Summary counts: all devices, up, down, stale, not monitored. Counts refer to the full current inventory; the filter states how many devices are shown.
 - Green + check + Up, red + failure icon + Down, amber + clock + Stale, neutral + question mark + Not monitored. Node type uses a router/switch icon; type colors must not imply health.
 - Connections are undirected. Distinct mapped port pairs can appear as parallel links, and unresolved records use their device pair for display. Connection lines summarize endpoint reachability: solid green when both endpoints are up, dashed red when an endpoint is down, solid amber for stale, and dashed gray for unknown data. This does not establish interface, cable, traffic-forwarding, or BGP health. A responding switch keeps its own green state despite one failed upstream router. Filtered maps hide links whose endpoints are hidden.
@@ -55,4 +55,4 @@ Validate at desktop and narrow widths. Check search, each status filter, selecti
 
 - Device details include collapsible Incidents with open/recovered labels, local timestamps, empty/loading/error feedback, bounded older pages and View checks to open Recent history. Needs attention includes open incidents even when monitoring is paused or evidence is stale. An open incident is historical outage evidence, not a claim that the latest check is fresh. External notifications remain deferred.
 
-- Live snapshots refresh every second. Default device checks target ten-second cycles with two failures before Down and one reply for recovery; the host freshness threshold is at least 30 seconds and scales with inventory.
+- The dashboard receives coalesced live snapshots with conditional polling as a fallback. Default device checks target ten-second cycles with two failures before Down and one reply for recovery; the host freshness threshold is at least 30 seconds and scales with inventory.

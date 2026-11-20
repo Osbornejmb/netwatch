@@ -3,6 +3,8 @@
 - [ARCHITECTURE](ARCHITECTURE.md) — maintained reference
 - [DESIGN](DESIGN.md) — maintained reference
 - [DISCOVERY](DISCOVERY.md) — maintained reference
+- [LINK-HEALTH](LINK-HEALTH.md) — maintained reference for Connections, redundancy alerts and Map tools
+- [Repository audit](../AUDIT.md) — findings recorded against the audited working tree
 - [HOST-API](HOST-API.md) — maintained reference
 - [ICMP-COLLECTOR](ICMP-COLLECTOR.md) — maintained reference
 - [INCIDENTS-CHECKPOINT](INCIDENTS-CHECKPOINT.md) — historical log

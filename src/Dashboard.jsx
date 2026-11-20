@@ -568,37 +568,18 @@ export default function Dashboard({
           </details>
         </div>
       </header>
-      {!showInventory && (
-        <LinkOverview
-          summary={summary}
-          topology={!viewer && live ? live.inventory.topology : undefined}
-          dynamics={viewer ? undefined : live?.dynamics}
-          nodes={nodes}
-          tiers={tiers}
-          failurePoints={viewer ? undefined : live?.linkHealth?.failurePoints}
-          selectLink={(id) => {
-            setSelectedId(null)
-            setSelectedLinkId(id)
-          }}
-          selectDevice={selectDevice}
-        />
-      )}
       <div className="health-overview">
         <div className="health-summary" aria-label="Device health summary">
-          {Object.entries({ up: 'up', down: 'down', stale: 'overdue', unknown: 'not monitored' }).map(
-            ([key, label], index) => (
-              <span key={key}>
-                {index > 0 && ' · '}
-                <button
-                  className={`summary-${key}`}
-                  aria-pressed={statusFilter === key}
-                  onClick={() => setStatusFilter(statusFilter === key ? 'all' : key)}
-                >
-                  {counts[key]} {label}
-                </button>
-              </span>
-            ),
-          )}
+          {Object.entries(HEALTH).map(([key, { label }]) => (
+            <button
+              key={key}
+              className={`summary-${key}`}
+              aria-pressed={statusFilter === key}
+              onClick={() => setStatusFilter(statusFilter === key ? 'all' : key)}
+            >
+              <strong>{counts[key]}</strong> {label}
+            </button>
+          ))}
         </div>
         {attention.length > 0 && (
           <details className="health-attention">
@@ -710,6 +691,9 @@ export default function Dashboard({
               {visible.map((node) => (
                 <article key={node.id} className="health-device-card">
                   <strong>{node.data.label}</strong>
+                  {node.data.ip && node.data.ip !== node.data.label && (
+                    <span className="health-address">{node.data.ip}</span>
+                  )}
                   <Status status={node.health} />
                   <InfoTooltip label={`Information for ${node.data.label}`}>
                     <span>{node.data.ip || 'No address'}</span>
@@ -732,6 +716,7 @@ export default function Dashboard({
       ) : (
         <div className={`health-map${dense || nodes.length >= 120 ? ' health-map-large' : ''}`}>
           <ReactFlow
+            style={{ position: 'absolute', inset: 0 }}
             key={`${layoutKey}-${effectiveCenterId}`}
             onNodesChange={(changes) => {
               onDimensionsChange(changes)
@@ -823,6 +808,21 @@ export default function Dashboard({
             </div>
           )}
         </div>
+      )}
+      {!showInventory && (
+        <LinkOverview
+          summary={summary}
+          topology={!viewer && live ? live.inventory.topology : undefined}
+          dynamics={viewer ? undefined : live?.dynamics}
+          nodes={nodes}
+          tiers={tiers}
+          failurePoints={viewer ? undefined : live?.linkHealth?.failurePoints}
+          selectLink={(id) => {
+            setSelectedId(null)
+            setSelectedLinkId(id)
+          }}
+          selectDevice={selectDevice}
+        />
       )}
       {selectedLink && (
         <LinkDetails link={selectedLink} nodes={nodes} now={now} onClose={() => setSelectedLinkId(null)} />

@@ -8,7 +8,7 @@ Screenshots use a test inventory with documentation addresses.
 
 | Dashboard | Edit map | Devices on a narrow screen |
 | --- | --- | --- |
-| <img src="docs/screenshots/link-health-desktop.png" alt="Link dashboard with a tiered map and a running-without-redundancy alert" width="380"> | <img src="docs/screenshots/editor-after.png" alt="Draft topology editor with an editable network map and controls for adding device connections" width="380"> | <img src="docs/screenshots/devices-narrow-after.png" alt="Narrow Devices view with stacked status cards and the Backups menu open" width="180"> |
+| <img src="docs/screenshots/link-health-desktop.png" alt="Dashboard with a tiered map, device status filters, and link details below the canvas" width="380"> | <img src="docs/screenshots/editor-after.png" alt="Draft topology editor with an editable network map and controls for adding device connections" width="380"> | <img src="docs/screenshots/devices-narrow-after.png" alt="Narrow Devices view with stacked status cards and the Backups menu open" width="180"> |
 
 ## Set up NetWatch on Windows
 
@@ -17,6 +17,8 @@ Screenshots use a test inventory with documentation addresses.
 1. On the Windows 10 or 11 PC you want to use for monitoring, open [NetWatch releases](https://github.com/Osbornejmb/netwatch/releases). Choose v0.2.1 or later for the Windows VLAN context field and switch discovery fixes.
 2. Under **Assets**, download the file whose name ends in **Windows-x64-Setup.exe**. This is the installer for 64-bit Windows PCs with Intel or AMD processors. It includes everything NetWatch needs to run.
 3. Open the downloaded file and follow the prompts. For your first setup, leave **Set up access from another PC on my private network** unchecked. You can [set up sharing later](docs/REMOTE-ACCESS.md#windows-installer-setup).
+
+If upgrading an existing installation, quit NetWatch and create the matching offline database backup before starting the new version. Follow the [database upgrade steps](docs/HOST-API.md#sqlite-migrations-and-retention). A fresh installation creates its own database.
 
 ### 2. Open the dashboard
 
@@ -49,7 +51,7 @@ Keep the NetWatch PC awake, connected, and signed in while you want checks to ru
 
 1. In the Windows NetWatch app, click **Stop** and wait for it to finish. Turn on **Discover local network neighbors on next start**, then click **Start** and **Open dashboard**.
 2. In the dashboard, open **Discovered devices → Scan now** and wait for the scan to finish. NetWatch looks on the nearby private networks the PC is directly connected to.
-3. Choose **Add to draft** for a device you recognize. Review the draft in **Edit map** and choose **Use this map**, then **Confirm replacement**. Enable checks separately after saving the device. [Discovery guide](docs/DISCOVERY.md)
+3. Choose **Add to draft** for a device you recognize. Review the draft in **Edit map** and choose **Use this map**, then **Confirm replacement**. Enable checks separately after saving the device. The scan and bulk actions stay visible while you scroll. Use **Scheduled discovery** for recurring topology runs from an enrolled router or switch. [Discovery guide](docs/DISCOVERY.md)
 
 To discover switch-to-switch connections, enroll the devices for SNMPv3 port checks. Under **Discovered → Topology proposals**, choose a router or switch and select **Find connections**. Review the proposed ports and devices before adding them to the draft.
 
@@ -103,7 +105,7 @@ Line colors summarize endpoint reachability, not verified cable, interface or ro
 
 **Monitored network** shows the host's saved devices and real checks. **Draft map** shows your local edits without live health. Loading or saving host inventory is an explicit reviewed replacement, not automatic synchronization.
 
-Use **Backups → Download map** to keep a copy of your draft, or **Edit map → Load saved map** to review the monitored map before downloading it. **Restore map** checks a backup file and asks before replacing the draft; **Use this map** applies the draft to the dashboard separately. **Use this map** and loading or restoring a map never turn checks on for a new or changed device. Updates preserve saved maps and history; remove unwanted devices in the editor and review **Use this map** to apply the change.
+Use **Backups → Download map** to keep a copy of your draft, or **Edit map → Load saved map** to review the monitored map before downloading it. **Restore map** checks a backup file and asks before replacing the draft; **Use this map** applies the draft to the dashboard separately. **Use this map** and loading or restoring a map never turn checks on for a new or changed device. To empty the draft, choose **Clear draft map** next to **Use this map** and confirm. Review **Use this map → Confirm replacement** separately if you intend to replace the monitored map.
 
 Both maps open in the compact Circle layout; Tidy layout remains available. Connected devices stay grouped. Dragging a card against another pushes it out of the way. Moved devices stay in place until you leave the map, switch browser tabs, or reload. A move snaps back to its last valid position only if a connection stretches too far. Limits are 1.5× the arranged connection length, with a minimum reach of 320 layout pixels; unconnected devices can move freely. Drag adjustments only affect the open map. Connections are undirected: opposite or repeated entries draw one line, and adding the reverse link is blocked. Search stays beside the map; counts, Status and Needs attention are visible, while layout settings are in **View options**; the **Devices** page offers a keyboard-operable list. Device details open with a click or Enter/Space.
 
@@ -167,6 +169,6 @@ See [ROADMAP.md](docs/ROADMAP.md), [Windows launcher](docs/WINDOWS-LAUNCHER.md),
 
 In device details, expand **Incidents** to see outages and recovery times; **View checks** opens the recent check history. Two failed checks open an outage, and the next reply confirms recovery. Repeated failures keep one outage open. **View options → Needs attention** includes open outages. Paused or disconnected monitoring leaves incidents open until a reply confirms recovery; check freshness and monitoring state before acting.
 
-Incidents survive host restart. Resolved incidents are kept for up to 30 days, with a 10,000-record network-wide limit. Removing a device or replacing its address/type removes its old incident evidence. Existing databases upgrade automatically; back up before upgrading. Only new confirmed results create incidents after upgrade. Optional chat notifications remain planned.
+Incidents survive host restart. Resolved incidents are kept for up to 30 days, with a 10,000-record network-wide limit. Removing a device or replacing its address/type removes its old incident evidence. Before upgrading an existing database, create the [matching offline backup](docs/HOST-API.md#sqlite-migrations-and-retention). Only new confirmed results create incidents after upgrade. Optional chat notifications remain planned.
 
-The dashboard summary counts and Status filter narrow the displayed devices; Needs attention includes down/overdue devices and open outages. Edit map adds new devices to the next free grid cell. Removing a device asks for confirmation. Routers fit their content in an oblong shape; long names use a tooltip. Devices uses cards on narrow screens, and Backups opens below navigation. Dashboard/Edit map/Devices links support reload and browser Back/Forward.
+The device status chips and Status filter narrow the map. Open the link health summary below the map to review connections and access Map tools. Needs attention includes down/overdue devices and open outages. Edit map adds new devices to the next free grid cell. Removing a device asks for confirmation. Routers fit their content in an oblong shape; long names use a tooltip. Devices uses cards on narrow screens, and Backups opens below navigation. Dashboard/Edit map/Devices links support reload and browser Back/Forward.
