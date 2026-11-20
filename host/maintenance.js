@@ -4,6 +4,7 @@ import { copyFileSync, renameSync, rmSync, existsSync } from 'node:fs'
 import { lock, mustNotExist } from './files.js'
 import { HISTORY_MAX_ROWS, inventory } from './store.js'
 import { validateInterfaces } from './interfaces.js'
+import { normalizeLinkEvidence } from './link-evidence.js'
 
 export function validateDatabase(path) {
   const db = new DatabaseSync(path, { readOnly: true })
@@ -11,7 +12,7 @@ export function validateDatabase(path) {
     const version = db.prepare('PRAGMA user_version').get().user_version
     if (
       db.prepare('PRAGMA integrity_check').get().integrity_check !== 'ok' ||
-      ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].includes(version)
+      ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].includes(version)
     )
       throw new Error('Invalid or unsupported backup database.')
     const rows = db.prepare('SELECT * FROM inventory').all()
@@ -133,6 +134,28 @@ export function validateDatabase(path) {
             if (item[key] !== null && (!Number.isFinite(item[key]) || item[key] < 0 || item[key] > 1e15))
               throw new Error('Invalid interface rates in backup.')
         }
+      }
+    }
+    if (version >= 13) {
+      const samples = db.prepare('SELECT checked_at,payload FROM interface_samples WHERE device_id=?')
+      for (const row of db.prepare('SELECT * FROM interface_link_evidence').iterate()) {
+        const sample = samples.get(row.device_id)
+        if (!sample || sample.checked_at !== row.checked_at || Buffer.byteLength(row.payload) > 512 * 1024)
+          throw new Error('Invalid link evidence in backup.')
+        const value = JSON.parse(row.payload)
+        normalizeLinkEvidence(value.rows, JSON.parse(sample.payload).interfaces)
+        if (
+          ![value.thresholds?.errors, value.thresholds?.discards].every(
+            (v) => Number.isFinite(v) && v > 0 && v <= 1e9,
+          ) ||
+          value.rows.some(
+            (port) =>
+              [port.errorsPerSec, port.discardsPerSec].some(
+                (v) => v !== null && (!Number.isFinite(v) || v < 0 || v > 1e10),
+              ) || [port.errorStreak, port.discardStreak].some((v) => !Number.isInteger(v) || v < 0 || v > 3),
+          )
+        )
+          throw new Error('Invalid link evidence rates in backup.')
       }
     }
     if (version >= 5) {

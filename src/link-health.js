@@ -1,3 +1,4 @@
+import { inferredRoles, linkBundles } from './rich-link.js'
 import { physicalConnectionKey } from './connections.js'
 
 const failed = (port) => port.admin === 2 || [2, 6, 7].includes(port.oper)
@@ -18,7 +19,11 @@ function portState(samples, now, staleAfterMs) {
     checkedAt: latest.checkedAt,
     fresh: true,
     reportedDown: failed(latest),
-    forwarding: latest.forwarding,
+    stp: latest.stp,
+    aggregateId: latest.aggregateId,
+    errorsPerSec: latest.errorsPerSec,
+    discardsPerSec: latest.discardsPerSec,
+    forwarding: latest.stp === 'blocking' ? 'standby' : latest.stp === 'forwarding' ? 'forwarding' : latest.forwarding,
     speed: latest.speed,
     degraded: latest.degraded,
     flapping:
@@ -32,9 +37,10 @@ function portState(samples, now, staleAfterMs) {
   }
 }
 
-function linkEvidence(edge, readings, now, staleAfterMs, conflictingPorts) {
+function linkEvidence(edge, readings, now, staleAfterMs, conflictingPorts, metadata) {
   const source = portState(readings?.source, now, staleAfterMs)
   const target = portState(readings?.target, now, staleAfterMs)
+  metadata.set(edge.id, { source, target })
   const count = Number(!!source.fresh) + Number(!!target.fresh)
   const scope =
     readings?.neighborVerified && count === 2
@@ -54,16 +60,23 @@ function linkEvidence(edge, readings, now, staleAfterMs, conflictingPorts) {
     state = 'down'
   } else if (source.state === 'up' && target.state === 'up') {
     if (source.speed > 0 && target.speed > 0 && source.speed !== target.speed) state = 'mismatch'
-    else if (source.degraded || target.degraded) state = 'degraded'
     else if (source.forwarding === 'standby' || target.forwarding === 'standby') state = 'standby'
+    else if ([source.stp, target.stp].some((status) => status && status !== 'forwarding')) state = 'unknown'
+    else if (source.degraded || target.degraded) state = 'degraded'
     else if (source.forwarding === 'forwarding' && target.forwarding === 'forwarding') state = 'forwarding'
     else state = 'portsUp'
   } else if (count === 1) {
     state = 'oneSided'
   }
+  const details = (port) => ({
+    ...(port.fresh && port.stp && { stp: port.stp }),
+    ...(port.fresh && Number.isFinite(port.errorsPerSec) && { errorsPerSec: port.errorsPerSec }),
+    ...(port.fresh && Number.isFinite(port.discardsPerSec) && { discardsPerSec: port.discardsPerSec }),
+  })
   return {
     id: edge.id,
     source: {
+      ...details(source),
       deviceId: edge.source,
       portLabel: edge.uplink?.source.label ?? '',
       checkedAt: source.checkedAt ?? null,
@@ -71,6 +84,7 @@ function linkEvidence(edge, readings, now, staleAfterMs, conflictingPorts) {
       ...(source.fresh && source.speed > 0 && { speedBps: source.speed }),
     },
     target: {
+      ...details(target),
       deviceId: edge.target,
       portLabel: edge.uplink?.target.label ?? '',
       checkedAt: target.checkedAt ?? null,
@@ -83,7 +97,7 @@ function linkEvidence(edge, readings, now, staleAfterMs, conflictingPorts) {
   }
 }
 
-function graph(topology, links) {
+function graph(topology, links, bundles) {
   const adjacency = new Map(topology.nodes.map(({ id }) => [id, []]))
   const root = Symbol('root')
   adjacency.set(root, [])
@@ -93,10 +107,11 @@ function graph(topology, links) {
   }
   const keys = new Set()
   for (const edge of links) {
-    const key = physicalConnectionKey(edge)
+    const bundle = bundles.get(edge.id)
+    const key = bundle ?? physicalConnectionKey(edge)
     if (keys.has(key)) continue
     keys.add(key)
-    add(edge.id, edge.source, edge.target)
+    add(bundle?.id ?? edge.id, edge.source, edge.target)
   }
   for (const id of topology.roots ?? []) add(Symbol('root link'), root, id)
   return { adjacency, root }
@@ -160,7 +175,13 @@ function conflictingPortKeys(edges) {
 export function evaluateLinks(topology, evidence, now, staleAfterMs) {
   const samples = new Map(evidence.map((row) => [row.id, row]))
   const conflicts = conflictingPortKeys(topology.edges)
-  const links = topology.edges.map((edge) => linkEvidence(edge, samples.get(edge.id), now, staleAfterMs, conflicts))
+  const metadata = new Map()
+  const roles = inferredRoles(topology)
+  const links = topology.edges.map((edge) => ({
+    ...linkEvidence(edge, samples.get(edge.id), now, staleAfterMs, conflicts, metadata),
+    role: roles.get(edge.id),
+  }))
+  const { bundles, byLink } = linkBundles(topology, links, metadata)
   const states = new Map(links.map((link) => [link.id, link.state]))
   const usable = new Set(['portsUp', 'forwarding', 'standby', 'degraded'])
   const unknown = new Set(['unknown', 'oneSided'])
@@ -168,9 +189,9 @@ export function evaluateLinks(topology, evidence, now, staleAfterMs) {
     (edge) => usable.has(states.get(edge.id)) && states.get(edge.id) !== 'standby',
   )
   const possible = topology.edges.filter((edge) => usable.has(states.get(edge.id)) || unknown.has(states.get(edge.id)))
-  const connected = graph(topology, confirmed)
+  const connected = graph(topology, confirmed, byLink)
   const reached = reachable(connected)
-  const potential = graph(topology, possible)
+  const potential = graph(topology, possible, byLink)
   const potentiallyReached = reachable(potential)
   const byId = new Map(topology.edges.map((edge) => [edge.id, edge]))
   const redundancy = (topology.groups ?? [])
@@ -178,6 +199,14 @@ export function evaluateLinks(topology, evidence, now, staleAfterMs) {
     .map((group) => {
       const { protectedDevice } = group
       let state = 'unknown'
+      const uniquePaths = new Set(group.links.map((id) => byLink.get(id) ?? id))
+      const stp = group.links.every((id) =>
+        ['source', 'target'].every((side) => {
+          const status = metadata.get(id)?.[side]?.stp
+          return ['forwarding', 'blocking'].includes(status)
+        }),
+      )
+      const lacp = group.links.some((id) => byLink.has(id))
       if (topology.roots?.length && reached.has(protectedDevice)) {
         const upstream = reachable(connected, protectedDevice)
         const possibleUpstream = reachable(potential, protectedDevice)
@@ -192,7 +221,7 @@ export function evaluateLinks(topology, evidence, now, staleAfterMs) {
               reachesRoot && (state === 'portsUp' || state === 'forwarding' || state === 'standby'),
           )
         ) {
-          state = 'healthy'
+          state = uniquePaths.size < group.links.length ? 'degraded' : 'healthy'
         } else if (
           members.some(
             ({ state, canReachRoot }) =>
@@ -204,7 +233,17 @@ export function evaluateLinks(topology, evidence, now, staleAfterMs) {
       } else if (topology.roots?.length && !potentiallyReached.has(protectedDevice)) {
         state = 'isolated'
       }
-      return { id: group.id, deviceId: protectedDevice, state, basis: 'linkStatusOnly' }
+      return {
+        id: group.id,
+        deviceId: protectedDevice,
+        state,
+        basis: stp && lacp ? 'stpAndLacp' : stp ? 'stp' : lacp ? 'lacp' : 'linkStatusOnly',
+      }
     })
-  return { links, redundancy, failurePoints: failurePoints(graph(topology, topology.edges)) }
+  return {
+    links,
+    redundancy,
+    ...(bundles.length && { bundles }),
+    failurePoints: failurePoints(graph(topology, topology.edges, byLink)),
+  }
 }

@@ -89,6 +89,7 @@ export function createInterfaceCollector(
             return runner(target.address, user, {
               signal: targetController.signal,
               collectSwitchPorts: target.type === 'switch',
+              collectLinkEvidence: true,
             })
           })()
           const value = await Promise.race([operation, interrupted])

@@ -1,4 +1,4 @@
-import { linkLabels, scopeLabels } from './refocus.js'
+import { basisLabels, linkLabels, roleLabels, scopeLabels } from './refocus.js'
 import { csrf, hostFetch } from './auth.js'
 import { validateTopology } from './topology.js'
 
@@ -38,6 +38,19 @@ export async function hostRequest(path, { signal, body } = {}) {
           : 'Unable to reach the monitoring service. Try again.',
     )
   return value
+}
+
+function validBundle(row) {
+  return (
+    !!row &&
+    Number.isInteger(row.total) &&
+    row.total >= 2 &&
+    row.total <= 10000 &&
+    Number.isInteger(row.up) &&
+    row.up >= 0 &&
+    row.up <= row.total &&
+    ['up', 'down', 'degraded', 'standby', 'unknown'].includes(row.state)
+  )
 }
 
 export function validateSnapshot(value, previousInventory) {
@@ -132,6 +145,8 @@ export function validateSnapshot(value, previousInventory) {
       const edge = links.get(row?.id)
       if (!edge || !Object.hasOwn(linkLabels, row.state) || !Object.hasOwn(scopeLabels, row.scope))
         throw Error('Invalid link state.')
+      if (row.role !== undefined && !Object.hasOwn(roleLabels, row.role)) throw Error('Invalid link role.')
+      if (row.bundle !== undefined && !validBundle(row.bundle)) throw Error('Invalid link bundle.')
       for (const side of ['source', 'target']) {
         const end = row[side]
         if (
@@ -145,6 +160,14 @@ export function validateSnapshot(value, previousInventory) {
             (!Number.isSafeInteger(end.speedBps) || end.speedBps < 1 || end.speedBps > 1e15))
         )
           throw Error('Invalid link port evidence.')
+        if (
+          (end.stp !== undefined &&
+            !['blocking', 'forwarding', 'listening', 'learning', 'disabled', 'broken'].includes(end.stp)) ||
+          ['errorsPerSec', 'discardsPerSec'].some(
+            (key) => end[key] !== undefined && (!Number.isFinite(end[key]) || end[key] < 0 || end[key] > 1e10),
+          )
+        )
+          throw Error('Invalid rich port evidence.')
       }
     }
     if (
@@ -152,10 +175,25 @@ export function validateSnapshot(value, previousInventory) {
         (row) =>
           !ids.has(row?.deviceId) ||
           !['healthy', 'degraded', 'isolated', 'unknown'].includes(row.state) ||
-          row.basis !== 'linkStatusOnly',
+          !Object.hasOwn(basisLabels, row.basis),
       )
     )
       throw Error('Invalid redundancy evidence.')
+    if (
+      linkHealth.bundles !== undefined &&
+      (!Array.isArray(linkHealth.bundles) ||
+        linkHealth.bundles.length > links.size ||
+        linkHealth.bundles.some(
+          (bundle) =>
+            !validBundle(bundle) ||
+            !links.has(bundle.id) ||
+            !Array.isArray(bundle.members) ||
+            bundle.members.length !== bundle.total ||
+            new Set(bundle.members).size !== bundle.members.length ||
+            bundle.members.some((id) => !links.has(id)),
+        ))
+    )
+      throw Error('Invalid bundles.')
     if (linkHealth.failurePoints !== undefined) {
       const points = linkHealth.failurePoints
       if (

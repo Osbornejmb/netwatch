@@ -1,3 +1,4 @@
+import { readLinkEvidence } from './link-evidence.js'
 import { readDiscoveryLldp } from './discovery-lldp.js'
 import snmp from 'net-snmp'
 import { normalizeAddress } from '../src/inventory.js'
@@ -72,7 +73,11 @@ export function createSnmpProbe({
   now = () => Date.now(),
   policy = POLICY,
 } = {}) {
-  return async (address, credentials, { signal, collectSwitchPorts = false, discovery = false } = {}) => {
+  return async (
+    address,
+    credentials,
+    { signal, collectSwitchPorts = false, discovery = false, collectLinkEvidence = false } = {},
+  ) => {
     let session, timer, onAbort, rejectActive
     try {
       const target = normalizeAddress(address)
@@ -207,14 +212,18 @@ export function createSnmpProbe({
         }),
       })
       const lldp = await readLldp(request, interfaces.checkedAt).catch(() => ({ state: 'unavailable' }))
-      if (!collectSwitchPorts) return { ...interfaces, lldp }
-      try {
-        const ports = await readSwitchPorts(request, interfaces.interfaces, policy, lldp.neighbors)
-        if ((await uptime()) < endUptime) throw new Error('Switch restarted')
-        return { ...interfaces, lldp, switchPorts: ports }
-      } catch {
-        return { ...interfaces, lldp }
+      let switchPorts
+      if (collectSwitchPorts) {
+        try {
+          const ports = await readSwitchPorts(request, interfaces.interfaces, policy, lldp.neighbors)
+          if ((await uptime()) >= endUptime) switchPorts = ports
+        } catch {}
       }
+      if (collectLinkEvidence && !signal?.aborted && requests < policy.maxRequests) {
+        const linkEvidence = await readLinkEvidence(request, interfaces.interfaces)
+        if (linkEvidence.length && (await uptime().catch(() => -1)) >= endUptime) interfaces.linkEvidence = linkEvidence
+      }
+      return { ...interfaces, lldp, ...(switchPorts && { switchPorts }) }
     } catch (error) {
       return {
         error: ['cancelled', 'snmp_limit', 'snmp_timeout', 'snmp_changed', 'credentials_rejected'].includes(

@@ -59,7 +59,7 @@ export function createSnapshotRoute(instance) {
         ...(groups && { groups: groups.filter((group) => !group.protectedDevice) }),
       }
       const linkHealth = result.linkHealth && {
-        links: result.linkHealth.links.map(({ flapping, ...link }) => link),
+        links: result.linkHealth.links.map(({ flapping, role, ...link }) => link),
         redundancy: result.linkHealth.redundancy,
       }
       return {

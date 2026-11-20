@@ -1,5 +1,9 @@
 # Working checkpoint
 
+## Current status (2026-11-20) — richer link evidence
+
+- Link details show fresh spanning tree evidence, derived rates, and bundle availability. Discovery review includes matching CDP observations. SQLite v13 requires an offline backup of a v12 database. See the [Phase 4 report](refocus/REPORT-PHASE-4.md).
+
 ## Current status (2026-11-20) — link health dashboard
 
 - The dashboard leads with verified coverage, link details, and reviewed redundancy. Layout tiers and fresh speeds are viewer-safe. The failure-point list requires admin access. See the [Phase 3 report](refocus/REPORT-PHASE-3.md).

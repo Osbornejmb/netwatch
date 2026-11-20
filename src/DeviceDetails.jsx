@@ -18,6 +18,7 @@ export default function DeviceDetails({
   remote,
   stageDiscovery,
   redundancy,
+  redundancyBasis,
 }) {
   const modal = useModal(onClose)
   const [saving, setSaving] = useState(false)
@@ -66,7 +67,7 @@ export default function DeviceDetails({
             {redundancy && (
               <p>
                 <strong>{redundancy}</strong>
-                {redundancy !== 'No baseline set' && ' · Based on link status only'}
+                {redundancyBasis && ' · ' + redundancyBasis}
               </p>
             )}
           </div>

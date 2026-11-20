@@ -5,10 +5,10 @@ Open a connection on the map or in **Connections** to see what each port reporte
 | State | What the host observed |
 | --- | --- |
 | Ports up · Forwarding unverified | Both ports report up and the host lacks current forwarding evidence. |
-| Forwarding or Standby | Current evidence supports the forwarding or standby state. These labels require additional monitoring evidence. |
+| Forwarding or Standby | Fresh spanning tree reports support forwarding or show an operational port held in standby. |
 | Link down | A port repeatedly reported a down state. |
 | Mismatch | The ends disagree, their reported speeds differ, or a port is assigned to conflicting peers. |
-| Degraded link | Available evidence shows reduced link health. |
+| Degraded link | Three consecutive compatible readings show sustained errors or discards, or a known bundle has lost a member. |
 | One-sided evidence | A current reading is available for one end. |
 | Link state unknown | Current port evidence is missing or insufficient. |
 
@@ -18,6 +18,14 @@ The link detail shows evidence scope, the last reading time, and each current re
 
 A baseline is the set of mapped connections you expect to protect a device. In **Edit map → Uplinks & redundancy**, choose root routers, then save a group with its protected device and mapped links. Review the draft via **Use this map → Confirm replacement**.
 
-A device can have healthy redundancy, run without redundancy when a path is lost, be isolated, or have unknown redundancy. Devices without an accepted group display **No baseline set**. The **Based on link status only** label describes the scope of the current checks.
+A device can have healthy redundancy, run without redundancy when a path is lost, be isolated, or have unknown redundancy. Devices without an accepted group display **No baseline set**. The evidence label under the device status shows whether spanning tree or bundle membership contributed to the baseline. **Based on link status only** indicates that the decision used physical port status.
 
 Hierarchy starts with designated roots and shows distance in saved links. Unassigned devices have their own row. Admins can review single points of failure in **Link attention**. These reflect the saved topology, including manual connections, and can identify a dependency before an outage.
+
+## Link quality and bundles
+
+A port is flagged after three consecutive compatible intervals at or above one error per second or ten discarded packets per second by default. Device reboots, counter resets, ambiguity, or missing readings interrupt the streak. Link details can show the latest derived rates even before a link is flagged.
+
+NetWatch uses consistent LACP membership from both ends to group physical members. A bundle provides one logical path for redundancy. The admin connection list lets you expand a bundle to inspect its members. An attached aggregate ID establishes membership. Forwarding state requires separate current evidence.
+
+Spanning tree states use the reported bridge context. A VLAN or MST instance outside that context can behave differently. [BRIDGE-MIB specification](https://datatracker.ietf.org/doc/html/rfc4188)

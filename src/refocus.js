@@ -22,6 +22,13 @@ export const baselineLabels = {
   none: 'No baseline set',
 }
 
+export const basisLabels = {
+  linkStatusOnly: 'Based on link status only',
+  stp: 'Includes spanning tree evidence',
+  lacp: 'Includes bundle membership',
+  stpAndLacp: 'Includes spanning tree and bundle membership',
+}
+export const roleLabels = { uplink: 'Uplink', downlink: 'Downlink', peer: 'Peer link', unknown: 'Role unknown' }
 export function layoutTiers(topology) {
   const neighbors = new Map(topology.nodes.map(({ id }) => [id, []]))
   for (const { source, target } of topology.edges) {
@@ -84,6 +91,8 @@ export function refocusSummary(nodes, edges, evidence, now, freshness, connected
         (report.target.fresh !== false && report.target.checkedAt && !target.fresh))
     return {
       edge,
+      role: report?.role,
+      bundle: connected && !outdated ? report?.bundle : undefined,
       source,
       target,
       count,
@@ -101,11 +110,12 @@ export function refocusSummary(nodes, edges, evidence, now, freshness, connected
   const rank = { isolated: 0, degraded: 1, unknown: 2, healthy: 3 }
   for (const group of evidence?.redundancy ?? []) {
     const state = connected && !partial ? group.state : 'unknown'
-    if (!groups.has(group.deviceId) || rank[state] < rank[groups.get(group.deviceId)]) groups.set(group.deviceId, state)
+    if (!groups.has(group.deviceId) || rank[state] < rank[groups.get(group.deviceId).state])
+      groups.set(group.deviceId, { state, basis: connected && !partial ? group.basis : undefined })
   }
   const devices = nodes
     .filter((node) => node.type === 'switch' || groups.has(node.id))
-    .map((node) => ({ node, state: groups.get(node.id) ?? 'none' }))
+    .map((node) => ({ node, ...(groups.get(node.id) ?? { state: 'none' }) }))
   const monitored = links.filter(({ count }) => count === 2).length
   const affected = (state) => devices.filter((device) => device.state === state).length
   const isolated = affected('isolated'),
@@ -127,8 +137,10 @@ export function refocusSummary(nodes, edges, evidence, now, freshness, connected
     devices.every(({ state }) => state === 'healthy') &&
     links.every(({ state }) => ['portsUp', 'forwarding', 'standby'].includes(state))
   )
-    headline = 'Reviewed redundancy is available · Based on link status only'
-  return { links, devices, headline, monitored }
+    headline =
+      'Reviewed redundancy is available' +
+      (devices.some(({ basis }) => basis === 'linkStatusOnly') ? ' · Based on link status only' : '')
+  return { links, devices, headline, monitored, bundles: connected && !partial ? (evidence?.bundles ?? []) : [] }
 }
 
 export function formatSpeed(speedBps) {

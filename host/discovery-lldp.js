@@ -91,12 +91,64 @@ function resolvePort(interfaces, subtype, value) {
   return { label, subtype, index, admin, oper, speedBps }
 }
 
+const cdpRoot = '1.3.6.1.4.1.9.9.23.1.2.1.1'
+async function readCdp(request) {
+  const columns = await Promise.all(
+    [3, 4, 6, 7, 8, 9].map(async (column) => (await table(request, cdpRoot + '.' + column, 128)).rows),
+  )
+  const [families, addresses, ids, ports, platforms, capabilities] = columns
+  return [...ids].flatMap(([suffix, id]) => {
+    if (!/^\d{1,10}\.\d{1,10}$/.test(suffix)) return []
+    const [index, entry] = suffix.split('.').map(Number)
+    if (index < 1 || index > 2147483647 || entry < 1 || entry > 2147483647) return []
+    const device = text(id),
+      peerPort = text(ports.get(suffix))
+    if (!device || !peerPort) return []
+    const raw = addresses.get(suffix)
+    const scheme = families.get(suffix)
+    let address
+    if (Buffer.isBuffer(raw) && scheme === 1 && raw.length === 4) address = [...raw].join('.')
+    const capability = capabilities.get(suffix)
+    return [
+      {
+        index,
+        device,
+        peerPort,
+        ...(address && { address }),
+        platform: text(platforms.get(suffix)),
+        capabilities: Buffer.isBuffer(capability) && capability.length <= 4 ? capability.toString('hex') : '',
+      },
+    ]
+  })
+}
+
+export function correlateCdp(neighbors, cdp) {
+  return neighbors.map((row) => {
+    const candidate = cdp.filter(
+      (report) => report.index === row.localPort.index && report.address && row.addresses.includes(report.address),
+    )
+    if (!candidate.length) return row
+    const claims = candidate.flatMap((report) => {
+      const mac = report.device.toLowerCase().replace(/[:.\-]/g, '')
+      const key = /^[0-9a-f]{12}$/.test(mac) ? 'mac:' + mac.match(/../g).join(':') : null
+      if (key) return [key === row.chassisKey && report.peerPort === row.peerPort.label]
+      if (row.name && report.device.toLowerCase() === row.name.toLowerCase())
+        return [report.peerPort === row.peerPort.label]
+      return []
+    })
+    return !claims.length
+      ? row
+      : { ...row, ...(claims.every(Boolean) ? { source: 'both' } : { protocolConflict: true }) }
+  })
+}
+
 export async function readDiscoveryLldp(request, checkedAt) {
   const scalar = await request('get', identityOids)
   if (!Array.isArray(scalar) || scalar.length > identityOids.length) throw Error('snmp_invalid')
   const values = new Map(scalar.filter((row) => !snmp.isVarbindError(row)).map(({ oid, value }) => [oid, value]))
   const key = chassisKey(values.get(identityOids[0]), values.get(identityOids[1]))
-  if (!key) return { checkedAt, state: 'identity_unavailable', neighbors: [] }
+  if (!key)
+    return { checkedAt, state: 'identity_unavailable', neighbors: [], cdp: await readCdp(request).catch(() => []) }
   let partial = false
   const read = async (oid, cap = 512) => {
     const result = await table(request, oid, cap)
@@ -167,11 +219,13 @@ export async function readDiscoveryLldp(request, checkedAt) {
       },
     })
   }
+  const cdp = await readCdp(request).catch(() => [])
   return {
     checkedAt,
     chassisKey: key,
     name: text(values.get(identityOids[5])) || text(values.get(identityOids[2])),
     state: partial ? 'partial' : sightings.length ? 'current' : 'empty',
-    neighbors: sightings,
+    neighbors: correlateCdp(sightings, cdp),
+    ...(cdp.length && { cdp }),
   }
 }
