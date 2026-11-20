@@ -8,7 +8,17 @@ import DeviceIncidents from './DeviceIncidents'
 import DeviceInterfaces from './DeviceInterfaces'
 import DeviceNeighbors from './DeviceNeighbors'
 
-export default function DeviceDetails({ device, check, connections, host, onClose, viewer, remote, stageDiscovery }) {
+export default function DeviceDetails({
+  device,
+  check,
+  connections,
+  host,
+  onClose,
+  viewer,
+  remote,
+  stageDiscovery,
+  redundancy,
+}) {
   const modal = useModal(onClose)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -53,6 +63,12 @@ export default function DeviceDetails({ device, check, connections, host, onClos
           <div>
             <span className="health-eyebrow">NETWORK DEVICE</span>
             <h2 id="device-popup-title">{device.data.label}</h2>
+            {redundancy && (
+              <p>
+                <strong>{redundancy}</strong>
+                {redundancy !== 'No baseline set' && ' · Based on link status only'}
+              </p>
+            )}
           </div>
           <button data-initial-focus className="health-close" aria-label="Close device details" onClick={onClose}>
             <X size={18} />

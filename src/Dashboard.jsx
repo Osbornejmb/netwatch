@@ -1,3 +1,5 @@
+import { hierarchyLayout, refocusSummary, linkLabels, baselineLabels, formatSpeed } from './refocus.js'
+import { LinkOverview, LinkDetails } from './LinkOverview.jsx'
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { ReactFlow } from '@xyflow/react'
 import MapControls from './MapControls'
@@ -6,7 +8,7 @@ import { HEALTH, deviceHealth, summarizeHealth, connectionHealth, nextEvidenceCh
 import DeviceDetails from './DeviceDetails'
 import useMonitoring from './useMonitoring'
 import useLayoutDrag from './useLayoutDrag'
-import { uniqueConnections } from './connections'
+import { connectionKey, uniqueConnections } from './connections'
 import { formatCheckTime, collectorLabel } from './monitoring'
 import { tidyLayout, radialLayout, connectedDevices } from './radial'
 import { redundancyState, uplinkLabels, uplinkState } from './uplinks'
@@ -94,6 +96,7 @@ export default function Dashboard({
   const [statusFilter, setStatusFilter] = useState('all')
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState(null)
+  const [selectedLinkId, setSelectedLinkId] = useState(null)
   const [highlightedId, setHighlightedId] = useState(null)
   const [showPortLabels, setShowPortLabels] = useState(true)
   const [showAllLinks, setShowAllLinks] = useState(false)
@@ -136,6 +139,29 @@ export default function Dashboard({
   }, [deadline, clockOffset, localNow])
   const edges = useMemo(() => uniqueConnections(sourceEdges), [sourceEdges])
   const dense = edges.length >= 30
+  const parallelOffsets = useMemo(() => {
+    const pairs = new Map()
+    for (const edge of edges) {
+      const key = connectionKey(edge)
+      if (!pairs.has(key)) pairs.set(key, [])
+      pairs.get(key).push(edge)
+    }
+    return new Map(
+      [...pairs.values()].flatMap((links) =>
+        links.map(({ id, source, target }, index) => [
+          id,
+          (source < target ? 1 : -1) * (index - (links.length - 1) / 2) * Math.min(24, 120 / links.length),
+        ]),
+      ),
+    )
+  }, [edges])
+  const tiers = live?.tiers ?? NO_OBSTACLES
+  const summary = useMemo(
+    () => refocusSummary(nodes, edges, live?.linkHealth, now, portFreshness, host.state === 'connected'),
+    [nodes, edges, live, now, portFreshness, host.state],
+  )
+  const linksById = useMemo(() => new Map(summary.links.map((link) => [link.edge.id, link])), [summary])
+  const selectedLink = linksById.get(selectedLinkId)
   const groups = (live ? (live.inventory.topology.groups ?? []) : draftGroups).filter((group) => !group.protectedDevice)
   const paths = useMemo(
     () =>
@@ -153,13 +179,15 @@ export default function Dashboard({
   const effectiveCenterId = nodes.some((node) => node.id === centerId) ? centerId : ''
   const layoutNodes = useMemo(() => {
     const layout =
-      mapLayout === 'radial'
+      mapLayout === 'radial' || (mapLayout === 'hierarchy' && !tiers.length)
         ? radialLayout(nodes, edges, effectiveCenterId, nodeSizes)
-        : tidyLayout(nodes, edges, nodeSizes)
+        : mapLayout === 'hierarchy' && tiers.length
+          ? hierarchyLayout(nodes, tiers, nodeSizes)
+          : tidyLayout(nodes, edges, nodeSizes)
     return dense
       ? layout.map((node) => ({ ...node, position: { x: node.position.x * 1.25, y: node.position.y * 1.25 } }))
       : layout
-  }, [nodes, edges, mapLayout, effectiveCenterId, nodeSizes, dense])
+  }, [nodes, edges, mapLayout, effectiveCenterId, nodeSizes, dense, tiers])
   const layoutKey = `${live ? 'host' : 'draft'}-${mapLayout}`
   const {
     positions: positionOverrides,
@@ -247,9 +275,24 @@ export default function Dashboard({
         stale: 'Stale endpoint data',
         unknown: 'Endpoint reachability unknown',
       }[status]
-      const portLabel = /^(?:Last seen on |LLDP · )/.test(edge.label)
-        ? edge.label.replace(/^(?:Last seen on |LLDP · )/, '')
-        : undefined
+      const link = linksById.get(edge.id)
+      const hasPorts = !!(edge.uplink?.source.label || edge.uplink?.target.label)
+      const sharedSpeed =
+        link?.source.fresh && link?.target.fresh && link.source.speedBps === link.target.speedBps
+          ? formatSpeed(link.source.speedBps)
+          : ''
+      const endpoint = (side) => {
+        const name = link?.[side].portLabel || edge.uplink?.[side].label || 'Port unknown'
+        const speed = link?.[side].fresh && formatSpeed(link[side].speedBps)
+        return speed && !sharedSpeed ? name + ' · ' + speed : name
+      }
+      const portLabel = hasPorts
+        ? [endpoint('source') + ' ↔ ' + endpoint('target'), sharedSpeed, linkLabels[link?.state ?? 'unknown']]
+            .filter(Boolean)
+            .join(' · ')
+        : /^(?:Last seen on |LLDP · )/.test(edge.label)
+          ? edge.label.replace(/^(?:Last seen on |LLDP · )/, '')
+          : undefined
       return {
         id: edge.id,
         source: edge.source,
@@ -261,7 +304,8 @@ export default function Dashboard({
           target: cardsById.get(edge.target),
           cards: routeCards,
           maxBlockers: dense ? 8 : undefined,
-          layered: mapLayout === 'tidy',
+          layered: mapLayout === 'tidy' || (mapLayout === 'hierarchy' && tiers.length > 0),
+          parallelOffset: parallelOffsets.get(edge.id),
         },
         type: 'mapLink',
         label: showPortLabels && !(dense && (showAllLinks || dragging)) ? portLabel : undefined,
@@ -297,6 +341,7 @@ export default function Dashboard({
     : []
 
   const selectDevice = useCallback((node) => {
+    setSelectedLinkId(null)
     setHighlightedId(node.id)
     setSelectedId(node.id)
   }, [])
@@ -374,7 +419,7 @@ export default function Dashboard({
     >
       <header className="health-page-titlebar">
         <div className="health-title">
-          <h1>{showInventory ? 'Devices' : 'Your network'}</h1>
+          <h1>{showInventory ? 'Devices' : 'Link health and redundancy'}</h1>
           <p
             className={source === 'host' && host.state !== 'connected' && host.hasConnected ? 'connection-lost' : ''}
             role="status"
@@ -488,6 +533,7 @@ export default function Dashboard({
                   }}
                 >
                   <option value="radial">Circle</option>
+                  <option value="hierarchy">Hierarchy layout</option>
                   <option value="tidy">Tidy layout</option>
                 </select>
               </label>
@@ -519,13 +565,26 @@ export default function Dashboard({
                 </span>
                 <InfoTooltip label="About this map">
                   <span>Moves reset when you leave the map, switch browser tabs, or reload.</span>
-                  <span>Line colors show device reachability. Open a device for its port status.</span>
+                  <span>Line colors show device reachability. Open a connection for its port evidence.</span>
                 </InfoTooltip>
               </div>
             </div>
           </details>
         </div>
       </header>
+      {!showInventory && (
+        <LinkOverview
+          summary={summary}
+          nodes={nodes}
+          tiers={tiers}
+          failurePoints={viewer ? undefined : live?.linkHealth?.failurePoints}
+          selectLink={(id) => {
+            setSelectedId(null)
+            setSelectedLinkId(id)
+          }}
+          selectDevice={selectDevice}
+        />
+      )}
       <div className="health-overview">
         <div className="health-summary" aria-label="Device health summary">
           {Object.entries({ up: 'up', down: 'down', stale: 'overdue', unknown: 'not monitored' }).map(
@@ -685,6 +744,10 @@ export default function Dashboard({
             edges={mapEdges}
             nodeTypes={nodeTypes}
             edgeTypes={mapEdgeTypes}
+            onEdgeClick={(_, edge) => {
+              setSelectedId(null)
+              setSelectedLinkId(edge.id)
+            }}
             onMoveStart={() => document.dispatchEvent(new Event('mapviewportchange'))}
             onNodeClick={(_, node) => selectDevice(node)}
             onPaneClick={() => {
@@ -769,8 +832,12 @@ export default function Dashboard({
           )}
         </div>
       )}
+      {selectedLink && (
+        <LinkDetails link={selectedLink} nodes={nodes} now={now} onClose={() => setSelectedLinkId(null)} />
+      )}
       {selected && (
         <DeviceDetails
+          redundancy={baselineLabels[summary.devices.find(({ node }) => node.id === selected.id)?.state]}
           stageDiscovery={stageDiscovery}
           key={`${source}-${selected.id}`}
           host={live ? host : null}

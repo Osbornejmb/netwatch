@@ -1,5 +1,9 @@
 # Working checkpoint
 
+## Current status (2026-11-20) — link health dashboard
+
+- The dashboard leads with verified coverage, link details, and reviewed redundancy. Layout tiers and fresh speeds are viewer-safe. The failure-point list requires admin access. See the [Phase 3 report](refocus/REPORT-PHASE-3.md).
+
 ## Current status (2026-11-20) — topology discovery
 
 - Admins can start an enrolled-device LLDP run and stage reviewed links in the draft. Nearby discovery records hints for review. The v12 upgrade requires a verified offline backup. See the [Phase 2 report](refocus/REPORT-PHASE-2.md).

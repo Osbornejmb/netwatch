@@ -152,6 +152,8 @@ test('snapshot roles allowlist link evidence and invalidate cached state as port
     }
     const live = invoke('viewer')
     assert.equal(live.value.linkHealth.links[0].state, 'portsUp')
+    assert.equal(live.value.linkHealth.links[0].source.speedBps, 1000)
+    assert.deepEqual(live.value.tiers, [{ deviceId: 'r', tier: 0 }, { deviceId: 's', tier: 1 }])
     assert.equal(live.value.linkHealth.redundancy[0].state, 'healthy')
     assert.equal(live.value.uplinkPorts[0].source.oper, 1)
     assert.equal(invoke('viewer', live.tag).response.status, 304)
@@ -159,6 +161,7 @@ test('snapshot roles allowlist link evidence and invalidate cached state as port
     const stale = invoke('viewer', live.tag)
     assert.notEqual(stale.tag, live.tag)
     assert.equal(stale.value.linkHealth.links[0].state, 'unknown')
+    assert.equal(stale.value.linkHealth.links[0].source.speedBps, undefined)
     assert.equal(stale.value.linkHealth.redundancy[0].state, 'unknown')
   } finally {
     store.close()

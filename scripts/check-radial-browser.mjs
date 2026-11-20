@@ -27,7 +27,7 @@ const positions=()=>page.locator('.react-flow__node').evaluateAll(nodes=>Object.
 const original=await stored()
 const view=page.locator('.health-view-options > summary')
 await view.click()
-assert.equal(await page.getByLabel('Map layout',{exact:true}).inputValue(),'radial')
+assert.equal(await page.getByLabel('Map layout',{exact:true}).inputValue(),'hierarchy')
 await page.getByLabel('Map layout',{exact:true}).selectOption('tidy')
 const tidy=await positions()
 await page.getByLabel('Map layout',{exact:true}).selectOption('radial')

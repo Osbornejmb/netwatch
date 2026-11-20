@@ -1,6 +1,6 @@
 # NetWatch
 
-NetWatch helps you see which switches, routers, and other devices on your network are responding. You start with an empty map and add the devices you want to check.
+NetWatch shows how your routers and switches connect, which ports have evidence, and where a switch has lost a backup path. Start with an empty map, then review discovered links or map the ports yourself. Choose root routers and save a redundancy baseline so the dashboard can compare the links you expect with what the host observes. [How NetWatch decides a link is healthy](docs/LINK-HEALTH.md)
 
 ## Screenshots
 
@@ -8,7 +8,7 @@ Screenshots use a test inventory with documentation addresses.
 
 | Dashboard | Edit map | Devices on a narrow screen |
 | --- | --- | --- |
-| <img src="docs/screenshots/desktop-after.png" alt="Network dashboard with connected routers and switches, device status counts, and a Needs attention row" width="380"> | <img src="docs/screenshots/editor-after.png" alt="Draft topology editor with an editable network map and controls for adding device connections" width="380"> | <img src="docs/screenshots/devices-narrow-after.png" alt="Narrow Devices view with stacked status cards and the Backups menu open" width="180"> |
+| <img src="docs/screenshots/link-health-desktop.png" alt="Link dashboard with a tiered map and a running-without-redundancy alert" width="380"> | <img src="docs/screenshots/editor-after.png" alt="Draft topology editor with an editable network map and controls for adding device connections" width="380"> | <img src="docs/screenshots/devices-narrow-after.png" alt="Narrow Devices view with stacked status cards and the Backups menu open" width="180"> |
 
 ## Set up NetWatch on Windows
 
