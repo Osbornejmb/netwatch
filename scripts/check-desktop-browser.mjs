@@ -18,7 +18,10 @@ try {
   const base = process.env.NETWATCH_URL || 'http://127.0.0.1:5173'
   await page.goto(base)
   await page.locator('.health-node-up').first().waitFor()
-  assert.match(await page.locator('.health-summary').innerText(), /11 up.*1 down.*1 overdue.*1 not monitored/s)
+  const summary = page.locator('.health-summary')
+  for (const name of ['11 Up', '1 Down', '1 Overdue', '1 Not monitored']) {
+    await summary.getByRole('button', { name, exact: true }).waitFor()
+  }
   assert.ok(await page.locator('.health-attention').isVisible())
   for (const [key, count] of [['up', 11], ['down', 1], ['stale', 1], ['unknown', 1]]) {
     await page.locator(`.summary-${key}`).click()
