@@ -88,10 +88,14 @@ try {
   await page.getByText('View options', { exact: true }).click()
   assert.equal(await page.getByLabel('Map layout', { exact: true }).inputValue(), 'hierarchy')
   await page.getByText('View options', { exact: true }).click()
+  const initialMapHeight = (await page.locator('.health-map').boundingBox()).height
   await overview.getByText('Connections (3)', { exact: true }).click()
+  assert.equal((await page.locator('.health-map').boundingBox()).height, initialMapHeight)
   assert.equal(await overview.locator('.connection-row').count(), edges.length)
   const mismatch = overview.getByRole('button', { name: /Core router.*Mismatch/ })
   await mismatch.focus()
+  await page.keyboard.press('Tab')
+  await page.keyboard.press('Shift+Tab')
   assert.ok(
     await mismatch.evaluate(
       (button) => button.matches(':focus-visible') && getComputedStyle(button).outlineStyle !== 'none',

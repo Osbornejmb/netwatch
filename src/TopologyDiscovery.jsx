@@ -198,7 +198,7 @@ export default function TopologyDiscovery({ stageDiscovery }) {
               Run automatically
             </label>
             <label>
-              Every (minutes)
+              Interval (minutes)
               <input
                 name="interval"
                 type="number"
@@ -207,7 +207,8 @@ export default function TopologyDiscovery({ stageDiscovery }) {
                 step="1"
                 required={scheduled}
                 disabled={!scheduled}
-                value={interval ?? (data.schedule.intervalMinutes || 60)}
+                placeholder="15–1440"
+                value={interval ?? (data.schedule.intervalMinutes || '')}
                 onChange={(event) => setInterval(event.target.value)}
               />
             </label>

@@ -1,5 +1,9 @@
 # Working checkpoint
 
+## Current status (2026-11-21)
+
+- The dashboard opens on the map with compact status filters. Connection and redundancy details scroll below the map. Discovered devices keeps scan actions visible and separates manual runs from scheduled discovery.
+
 ## Current status (2026-11-20) — richer link evidence
 
 - Link details show fresh spanning tree evidence, derived rates, and bundle availability. Discovery review includes matching CDP observations. SQLite v13 requires an offline backup of a v12 database. See the [Phase 4 report](refocus/REPORT-PHASE-4.md).

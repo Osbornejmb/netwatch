@@ -691,6 +691,9 @@ export default function Dashboard({
               {visible.map((node) => (
                 <article key={node.id} className="health-device-card">
                   <strong>{node.data.label}</strong>
+                  {node.data.ip && node.data.ip !== node.data.label && (
+                    <span className="health-address">{node.data.ip}</span>
+                  )}
                   <Status status={node.health} />
                   <InfoTooltip label={`Information for ${node.data.label}`}>
                     <span>{node.data.ip || 'No address'}</span>
