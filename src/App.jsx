@@ -14,7 +14,7 @@ import ConfirmDialog from './ConfirmDialog'
 import MapControls from './MapControls'
 import InventoryControls from './InventoryControls'
 import { createId } from './id'
-import { connectionKey, uniqueConnections } from './connections'
+import { connectionKey, physicalConnectionKey, uniqueConnections } from './connections'
 import useLayoutDrag from './useLayoutDrag'
 import { tidyLayout, radialLayout } from './radial'
 import { mapCard, mapEdgeTypes } from './nodes/MapEdge'
@@ -47,15 +47,29 @@ export default function App({ viewer = false, remote = false, accessControls }) 
   const [editorSizes, setEditorSizes] = useState({})
   const [edges, setEdges, onEdgesChange] = useEdgesState(saved.topology.edges)
   const [draftGroups, setDraftGroups] = useState(saved.topology.groups ?? [])
+  const [draftRoots, setDraftRoots] = useState(saved.topology.roots ?? [])
+  const roots = useMemo(
+    () => draftRoots.filter((id) => nodes.some((node) => node.id === id && node.type === 'router')),
+    [draftRoots, nodes],
+  )
   const groups = useMemo(() => {
     const links = new Map(edges.map((edge) => [edge.id, edge]))
     const routers = new Set(nodes.filter((node) => node.type === 'router').map((node) => node.id))
     return draftGroups
       .map((group) => ({
         ...group,
-        links: group.links.filter((id) => routers.has(links.get(id)?.source) || routers.has(links.get(id)?.target)),
+        links: group.protectedDevice
+          ? group.links
+          : group.links.filter((id) => routers.has(links.get(id)?.source) || routers.has(links.get(id)?.target)),
       }))
       .filter((group) => {
+        if (group.protectedDevice) {
+          const members = group.links.map((id) => links.get(id))
+          return (
+            members.every((edge) => edge?.uplink?.source.index && edge?.uplink?.target.index) &&
+            new Set(members.map(physicalConnectionKey)).size === members.length
+          )
+        }
         const members = group.links.flatMap((id) => [links.get(id).source, links.get(id).target])
         return group.links.length >= 2 && new Set(members.filter((id) => routers.has(id))).size >= 2
       })
@@ -97,7 +111,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
   useEffect(() => {
     if (viewer || autosavePaused) return
     try {
-      writeTopology(localStorage, { nodes, edges, groups })
+      writeTopology(localStorage, { nodes, edges, groups, roots })
       setStorageError('')
     } catch {
       setBackupNotice('')
@@ -106,7 +120,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
       )
       setAutosavePaused(true)
     }
-  }, [nodes, edges, groups, autosavePaused, viewer])
+  }, [nodes, edges, groups, roots, autosavePaused, viewer])
 
   const importTopology = async (event) => {
     const file = event.target.files?.[0]
@@ -146,7 +160,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
   const removeConnection = (id) =>
     setEdges((current) => {
       const edge = current.find((edge) => edge.id === id)
-      return edge ? current.filter((other) => connectionKey(other) !== connectionKey(edge)) : current
+      return edge ? current.filter((other) => physicalConnectionKey(other) !== physicalConnectionKey(edge)) : current
     })
   const changeEditorEdges = (changes) => {
     const updates = changes.filter((change) => change.type !== 'remove')
@@ -185,7 +199,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
   const confirmRemoval = useCallback(
     (removed, removedEdges = []) => {
       const ids = new Set(removed.map((node) => node.id))
-      const links = new Set(removedEdges.map(connectionKey))
+      const links = new Set(removedEdges.map(physicalConnectionKey))
       setConfirm({
         title: removed.length === 1 ? 'Remove device?' : 'Remove devices?',
         message:
@@ -196,7 +210,9 @@ export default function App({ viewer = false, remote = false, accessControls }) 
         onConfirm: () => {
           setNodes((current) => current.filter((node) => !ids.has(node.id)))
           setEdges((current) =>
-            current.filter((edge) => !ids.has(edge.source) && !ids.has(edge.target) && !links.has(connectionKey(edge))),
+            current.filter(
+              (edge) => !ids.has(edge.source) && !ids.has(edge.target) && !links.has(physicalConnectionKey(edge)),
+            ),
           )
           setSelectedId((current) => (ids.has(current) ? null : current))
         },
@@ -274,7 +290,11 @@ export default function App({ viewer = false, remote = false, accessControls }) 
 
   const exportTopology = () => {
     download(
-      JSON.stringify({ exportedAt: new Date().toISOString(), ...validateTopology({ nodes, edges, groups }) }, null, 2),
+      JSON.stringify(
+        { exportedAt: new Date().toISOString(), ...validateTopology({ nodes, edges, groups, roots }) },
+        null,
+        2,
+      ),
       'netwatch-topology.json',
       'application/json',
     )
@@ -286,7 +306,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
 
   const persistCurrent = () => {
     try {
-      writeTopology(localStorage, { nodes, edges, groups })
+      writeTopology(localStorage, { nodes, edges, groups, roots })
       setStorageError('')
       setAutosavePaused(false)
       setRecovery(null)
@@ -307,6 +327,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
       setNodes(pendingAction.topology.nodes)
       setEdges(pendingAction.topology.edges)
       setDraftGroups(pendingAction.topology.groups ?? [])
+      setDraftRoots(pendingAction.topology.roots ?? [])
       setSelectedNode(null)
       setQuery('')
       setBackupNotice(
@@ -645,9 +666,15 @@ export default function App({ viewer = false, remote = false, accessControls }) 
                 nodes={nodes}
                 edges={edges}
                 groups={groups}
+                roots={roots}
+                onRoots={setDraftRoots}
                 onGroups={setDraftGroups}
-                onUplink={(id, uplink) =>
-                  setEdges((current) => current.map((edge) => (edge.id === id ? { ...edge, uplink } : edge)))
+                onUplink={(connection, parallel) =>
+                  setEdges((current) =>
+                    parallel
+                      ? [...current, connection]
+                      : current.map((edge) => (edge.id === connection.id ? connection : edge)),
+                  )
                 }
               />
             </details>
@@ -660,11 +687,13 @@ export default function App({ viewer = false, remote = false, accessControls }) 
             nodes={nodes}
             edges={edges}
             groups={groups}
+            roots={roots}
             paused={autosavePaused}
             onLoad={(topology) => {
               setNodes(topology.nodes)
               setEdges(topology.edges)
               setDraftGroups(topology.groups ?? [])
+              setDraftRoots(topology.roots ?? [])
               setSelectedNode(null)
             }}
           />

@@ -1,5 +1,9 @@
 # Working checkpoint
 
+## Current status (2026-11-20) — refocus foundations
+
+- Phase 1 adds versioned port-level links, reviewed baselines, and role-filtered link evidence. The v11 upgrade requires a verified offline backup. Physical switch behavior remains unverified. See the [Phase 1 report](refocus/REPORT-PHASE-1.md).
+
 ## Current status (2026-11-20) — live dashboard updates
 
 - The dashboard receives coalesced server-sent snapshots with the existing read policy and an eight-second HTTP fallback. Freshness continues locally using host time. Second-PC HTTPS verification remains pending.

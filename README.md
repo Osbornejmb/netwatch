@@ -83,7 +83,7 @@ For help with launcher setup, see the [Windows launcher guide](docs/WINDOWS-LAUN
 
 An optional Windows-host SNMPv3 feature adds interface status and traffic rates under device details → **Ports**. In the Windows launcher, stop the host and choose **Port monitoring** to test and enroll a saved device for port checks; it does not change ping-based device health. See [SNMP interface setup](docs/SNMP-INTERFACES.md). Cisco 3750/2811 physical verification is pending.
 
-Use **Edit map → Uplinks & redundancy** to map ports to connections and group alternate router links. The dashboard reports group status from port readings while map line colors continue to show device reachability.
+Use **Edit map → Uplinks & redundancy** to map both ends of a connection, add a parallel link with different ports, or set a link role. To save a redundancy baseline, choose the protected device and its mapped connections, then select the root routers. **Use this map** previews and applies the draft. Existing router groups still show their port-based status on the dashboard. Map line colors continue to show device reachability.
 
 - **Up:** recent checks confirm a response.
 - **Down:** two consecutive failed checks confirm no response; the first successful reply restores Up.
@@ -104,7 +104,7 @@ Use **Backups → Download map** to keep a copy of your draft, or **Edit map →
 
 Both maps open in the compact Circle layout; Tidy layout remains available. Connected devices stay grouped. Dragging a card against another pushes it out of the way. Moved devices stay in place until you leave the map, switch browser tabs, or reload. A move snaps back to its last valid position only if a connection stretches too far. Limits are 1.5× the arranged connection length, with a minimum reach of 320 layout pixels; unconnected devices can move freely. Drag adjustments only affect the open map. Connections are undirected: opposite or repeated entries draw one line, and adding the reverse link is blocked. Search stays beside the map; counts, Status and Needs attention are visible, while layout settings are in **View options**; the **Devices** page offers a keyboard-operable list. Device details open with a click or Enter/Space.
 
-The launcher stores data under `%LOCALAPPDATA%\NetWatch\data\netwatch.sqlite`; its control window shows the location. Browser JSON exports contain topology only, not history. For full database backup/restore, stop the host and follow [HOST-API.md](docs/HOST-API.md). A lock held by a running process blocks startup. NetWatch logs and replaces locks from dead local processes and ownerless or unreadable locks older than 60 seconds. Stop the owning process before maintenance. Never delete a database to resolve a startup error.
+The launcher stores data under `%LOCALAPPDATA%\NetWatch\data\netwatch.sqlite`; its control window shows the location. Browser JSON exports contain topology only, not history. This upgrade requires a verified offline backup of an existing database. For the backup command and full database recovery steps, stop the host and follow [HOST-API.md](docs/HOST-API.md). A lock held by a running process blocks startup. NetWatch logs and replaces locks from dead local processes and ownerless or unreadable locks older than 60 seconds. Stop the owning process before maintenance. Never delete a database to resolve a startup error.
 
 ## Start and stop
 

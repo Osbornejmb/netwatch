@@ -121,6 +121,7 @@ test('SNMP samples/authorization persist separately; identity edits revoke them;
 })
 test('v3→v4 migration preserves old data and rolls back on interruption',t=>{
  const f=fixture(t);f.store.close();const db=new DatabaseSync(f.path);db.exec('DROP TABLE audit_log;DROP TABLE sessions;DROP TABLE auth_config;DROP TABLE latest_check;DROP TABLE discovered_devices;DROP TABLE interface_samples;DROP TABLE snmp_targets;PRAGMA user_version=3');db.close()
+ backupDatabase(f.path,f.path+'.pre-v11.bak')
  assert.throws(()=>openStore(f.path,{migrateV4:()=>{throw Error('interrupted')}}),/interrupted/)
  const check=new DatabaseSync(f.path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,3);check.close()
  const migrated=openStore(f.path);assert.equal(migrated.read().topology.nodes.length,1);assert.equal(migrated.interfaces('a').configured,false);migrated.close()

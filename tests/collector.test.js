@@ -106,12 +106,13 @@ test('v1 schema migration preserves inventory/history; interrupted v2 migration 
  old.exec(`DROP TABLE audit_log;DROP TABLE sessions;DROP TABLE auth_config;DROP TABLE latest_check;DROP TABLE discovered_devices;DROP TABLE interface_samples;DROP TABLE snmp_targets;DROP TABLE incidents;DROP TABLE checks;CREATE TABLE checks(seq INTEGER PRIMARY KEY AUTOINCREMENT,device_id TEXT NOT NULL,status TEXT NOT NULL,checked_at INTEGER NOT NULL);CREATE INDEX checks_device_time ON checks(device_id,seq);CREATE INDEX checks_time ON checks(checked_at);PRAGMA user_version=1;`)
  old.prepare('INSERT INTO checks VALUES(1,?,?,?)').run('d0','up',Date.now());old.close()
  const legacy=join(dir,'legacy-backup');backupDatabase(path,legacy)
+ backupDatabase(path,path+'.pre-v11.bak')
  assert.throws(()=>openStore(path,{migrateV2:()=>{throw new Error('interrupted')}}),/interrupted/)
  const check=new DatabaseSync(path);assert.equal(check.prepare('PRAGMA user_version').get().user_version,1);assert.equal(check.prepare('SELECT status FROM checks').get().status,'up');check.close()
  const migrated=openStore(path);assert.equal(migrated.read().revision,1);assert.equal(migrated.history('d0').checks[0].reason,'legacy')
  migrated.append([{deviceId:'d0',status:'up',...up,checkedAt:new Date().toISOString()}],{revision:1});assert.throws(()=>migrated.append([],{revision:0}),e=>e.status===409);migrated.close()
  const backup=join(dir,'backup');backupDatabase(path,backup);restoreDatabase(path,backup);const restored=openStore(path);assert.equal(restored.history('d0').checks[0].latencyMs,2);restored.close()
- restoreDatabase(path,legacy);const legacyRestored=openStore(path);assert.equal(legacyRestored.history('d0').checks[0].reason,'legacy');assert.equal(legacyRestored.history('d0').checks[0].id,1);legacyRestored.close()
+ rmSync(path+'.pre-v11.bak');restoreDatabase(path,legacy);backupDatabase(path,path+'.pre-v11.bak');const legacyRestored=openStore(path);assert.equal(legacyRestored.history('d0').checks[0].reason,'legacy');assert.equal(legacyRestored.history('d0').checks[0].id,1);legacyRestored.close()
 })
 test('v1 migration never reuses history IDs after the newest rows were deleted',t=>{
  const {store,path}=setup(t);store.close()
@@ -119,6 +120,7 @@ test('v1 migration never reuses history IDs after the newest rows were deleted',
  old.exec(`DROP TABLE audit_log;DROP TABLE sessions;DROP TABLE auth_config;DROP TABLE latest_check;DROP TABLE discovered_devices;DROP TABLE interface_samples;DROP TABLE snmp_targets;DROP TABLE incidents;DROP TABLE checks;CREATE TABLE checks(seq INTEGER PRIMARY KEY AUTOINCREMENT,device_id TEXT NOT NULL,status TEXT NOT NULL,checked_at INTEGER NOT NULL);PRAGMA user_version=1;`)
  old.prepare('INSERT INTO checks VALUES(500,?,?,?)').run('d0','up',Date.now())
  old.exec('DELETE FROM checks');old.close()
+ backupDatabase(path,path+'.pre-v11.bak')
  const migrated=openStore(path)
  try {
   migrated.append([{deviceId:'d0',status:'up',...up,checkedAt:new Date().toISOString()}])
