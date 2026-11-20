@@ -14,7 +14,7 @@ Screenshots use a test inventory with documentation addresses.
 
 ### 1. Install NetWatch
 
-1. On the Windows 10 or 11 PC you want to use for monitoring, open the [latest NetWatch release](https://github.com/Osbornejmb/netwatch/releases/latest).
+1. On the Windows 10 or 11 PC you want to use for monitoring, open [NetWatch releases](https://github.com/Osbornejmb/netwatch/releases). Choose v0.2.1 or later for the Windows VLAN context field and switch discovery fixes.
 2. Under **Assets**, download the file whose name ends in **Windows-x64-Setup.exe**. This is the installer for 64-bit Windows PCs with Intel or AMD processors. It includes everything NetWatch needs to run.
 3. Open the downloaded file and follow the prompts. For your first setup, leave **Set up access from another PC on my private network** unchecked. You can [set up sharing later](docs/REMOTE-ACCESS.md#windows-installer-setup).
 
@@ -58,7 +58,7 @@ To discover switch-to-switch connections, enroll the devices for SNMPv3 port che
 Use these steps if you want to run NetWatch from its project files. The Windows installer above is the simplest option for regular use.
 
 1. Install [Node.js LTS](https://nodejs.org/en/download), version 22.13 or newer, using its Windows installer and the default options. Node.js runs NetWatch, and its included tool, npm, gets the extra files the app needs.
-2. From the [latest release](https://github.com/Osbornejmb/netwatch/releases/latest), download **Source code (zip)**. In File Explorer, right-click the download, choose **Extract All**, and extract it to a folder you’ll keep, such as **Documents**.
+2. From your chosen [NetWatch release](https://github.com/Osbornejmb/netwatch/releases), download **Source code (zip)**. In File Explorer, right-click the download, choose **Extract All**, and extract it to a folder you’ll keep, such as **Documents**.
 3. Open the extracted folder that contains `package.json`. PowerShell is where you enter the setup commands, and opening it from this folder lets the commands find the project files. Click the File Explorer address bar, type `powershell`, and press **Enter**.
 4. Download the packages, which are extra pieces of software NetWatch needs.
 
