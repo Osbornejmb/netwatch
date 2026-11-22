@@ -22,7 +22,7 @@
   "dependencies": {
     "@xyflow/react": "^12.8.5",
     "lucide-react": "^1.72.0",
-    "net-snmp": "3.29.2",
+    "net-snmp": "3.29.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
