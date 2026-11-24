@@ -2,6 +2,8 @@
 
 ## Current status (2026-11-24)
 
+- Discovered refreshes to show runs started outside the page and reports when results cannot be refreshed. Switching between Dashboard and Devices dismisses open details.
+
 - Source launcher setup preserves saved SNMP port contexts. The dashboard wheel scrolls to link details, and editor toolbar labels stay readable at tablet widths. See the [UI audit](UI-AUDIT.md) for fixture screenshots, findings, and verification limits.
 
 ## Current status (2026-11-21)
