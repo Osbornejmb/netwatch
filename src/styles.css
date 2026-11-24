@@ -381,6 +381,7 @@ label {
 }
 .canvas-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .search-box {
@@ -863,13 +864,14 @@ label {
     width: calc(100vw - 24px);
     max-height: calc(100dvh - 160px);
   }
-  .canvas-actions {
-    flex-wrap: wrap;
-  }
 }
 
 .topbar {
   position: relative;
+}
+
+.canvas-actions .heading-actions button {
+  white-space: nowrap;
 }
 
 .canvas-actions > .health-filter {
