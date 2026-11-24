@@ -39,6 +39,7 @@ async function request(path, body, signal) {
       ? { signal, cache: 'no-store' }
       : {
           method: 'POST',
+          signal,
           headers: { ...writeHeaders(), ...(body !== null && { 'Content-Type': 'application/json' }) },
           ...(body !== null && { body: JSON.stringify(body) }),
         },
@@ -149,15 +150,25 @@ export default function TopologyDiscovery({ stageDiscovery }) {
       const body = { ids, baseRevision: await revision(), matches }
       const { draft } = await request(runPath + '/accept', { ...body, preview: true })
       await stageDiscovery(draft, true)
-      setPreview({ draft, body, path: runPath + '/accept' })
+      setPreview({ draft, body, path: runPath + '/accept', acknowledge: true })
     })
   const apply = () =>
     act(async () => {
-      const { draft } = await request(preview.path, preview.body)
+      const { draft } = preview.acknowledge
+        ? preview
+        : await request(preview.path, preview.body, AbortSignal.timeout(8000))
       await stageDiscovery(draft)
       setPreview(null)
+      if (preview.acknowledge) {
+        try {
+          await request(preview.path, preview.body, AbortSignal.timeout(8000))
+        } catch {
+          setMessage('The draft map was saved. Could not confirm the proposal with the host.')
+          return
+        }
+      }
       setMessage('Added to the draft map. Review it in Edit map.')
-      await refresh()
+      await refresh().catch(() => {})
     })
   const devices = new Map((run?.devices ?? []).map((device) => [device.chassisKey, device]))
   const linkDevices = (link) => [devices.get(link.source), devices.get(link.target)]
@@ -247,7 +258,7 @@ export default function TopologyDiscovery({ stageDiscovery }) {
             : 'Could not load topology discovery.'}
         </p>
       )}
-      {message && (
+      {message && !preview && (
         <p className="discovery-message" role="status">
           {message}
         </p>
@@ -509,6 +520,7 @@ export default function TopologyDiscovery({ stageDiscovery }) {
                 onClose={() => setPreview(null)}
                 onConfirm={apply}
               >
+                {message && <p role="alert">{message}</p>}
                 <p>These connections will be available in Edit map. Use this map to review and apply your draft.</p>
                 {!!preview.draft.nodes.length && (
                   <ul>

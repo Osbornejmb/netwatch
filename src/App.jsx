@@ -125,6 +125,11 @@ export default function App({ viewer = false, remote = false, accessControls }) 
     }
     const next = mergeDiscoveryDraft(base, patch)
     if (preview) return next
+    try {
+      writeTopology(localStorage, next)
+    } catch {
+      throw Error('Could not save the draft map. Check browser storage and try again.')
+    }
     setNodes(next.nodes)
     setEdges(next.edges)
     setDraftGroups(next.groups ?? [])
