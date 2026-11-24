@@ -117,6 +117,15 @@ try {
       return box.left >= 0 && box.right <= innerWidth && box.top >= 0 && box.bottom <= innerHeight
     }),
   )
+  const pane = await page.locator('.health-map .react-flow__pane').boundingBox()
+  const viewport = page.locator('.react-flow__viewport')
+  const scale = () => viewport.evaluate(el => new DOMMatrixReadOnly(getComputedStyle(el).transform).a)
+  const beforeWheel = await scale()
+  await page.mouse.move(pane.x + pane.width / 2, pane.y + 30)
+  await page.mouse.wheel(0, 320)
+  await page.waitForFunction(() => scrollY > 0, null, { timeout: 2000 })
+  assert.equal(await scale(), beforeWheel)
+  await page.evaluate(() => scrollTo(0, 0))
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1))
   await page.screenshot({ path: '.tools/evidence/screenshots/links-narrow.png' })
   await page.getByRole('link', { name: 'Devices', exact: true }).click()

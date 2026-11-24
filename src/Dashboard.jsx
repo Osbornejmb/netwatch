@@ -736,6 +736,7 @@ export default function Dashboard({
               setSelectedId(null)
               setHighlightedId(null)
             }}
+            preventScrolling={false}
             nodesDraggable={!viewer}
             onlyRenderVisibleElements={nodes.length >= 120 || edges.length >= 200}
             nodesConnectable={false}
