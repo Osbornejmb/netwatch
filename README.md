@@ -16,9 +16,8 @@ Screenshots use a test inventory with documentation addresses.
 
 1. On the Windows 10 or 11 PC you want to use for monitoring, open [NetWatch releases](https://github.com/Osbornejmb/netwatch/releases). Choose v0.2.1 or later for the Windows VLAN context field and switch discovery fixes.
 2. Under **Assets**, download the file whose name ends in **Windows-x64-Setup.exe**. This is the installer for 64-bit Windows PCs with Intel or AMD processors. It includes everything NetWatch needs to run.
-3. Open the downloaded file and follow the prompts. For your first setup, leave **Set up access from another PC on my private network** unchecked. You can [set up sharing later](docs/REMOTE-ACCESS.md#windows-installer-setup).
-
-If upgrading an existing installation, quit NetWatch and create the matching offline database backup before starting the new version. Follow the [database upgrade steps](docs/HOST-API.md#sqlite-migrations-and-retention). A fresh installation creates its own database.
+3. If you already use NetWatch, quit it and create the matching offline backup before installing the update. Follow the [database upgrade steps](docs/HOST-API.md#sqlite-migrations-and-retention) to find the backup name for your database version. A fresh installation creates its own database.
+4. Open the downloaded file and follow the prompts. For your first setup, leave **Set up access from another PC on my private network** unchecked. You can [set up sharing later](docs/REMOTE-ACCESS.md#windows-installer-setup).
 
 ### 2. Open the dashboard
 

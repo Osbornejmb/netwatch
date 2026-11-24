@@ -2,6 +2,8 @@
 
 ## Current status (2026-11-24)
 
+- Offline restore preserves the current remote access policy and audit log. Fresh restores start with remote access disabled. Outage attribution uses one graph traversal, and dashboard device names expose a Details button to assistive technology.
+
 - A draft replacement retries once when the host rejects an expired local write token. Dashboard polling and live updates now preserve the newest displayed map revision from the same host.
 
 - NetWatch saves reviewed topology proposals in the browser draft before the host marks them accepted. Recovery is covered for storage errors and lost confirmation responses.

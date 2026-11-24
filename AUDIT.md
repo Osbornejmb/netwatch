@@ -163,3 +163,12 @@ Browser JSON import checks size before parse, validates topology and asks before
 - Should ordinary wheel input scroll the Dashboard everywhere, with a modifier reserved for graph zoom?
 
 **Verification limits.** No real-device discovery, live LAN sign-in, full screen-reader walkthrough, installer upgrade or 500+ device browser benchmark was performed. The scope was reachable Git history and the local code, with deeper reads in the command, storage, auth and discovery paths. Only this report was added to the checkout.
+
+## November 24 follow-up
+
+- D-01 fixed. Restoring over an existing database preserves its access policy and audit log and clears its sessions. A fresh destination clears access credentials.
+- E-01 fixed. Outage attribution uses one rooted graph traversal. The 2,000-device fixture took 9 ms after the change versus 2,121 ms before in the same run. Incident results matched the original implementation on 600 generated graphs.
+- B-02 and C-01 fixed. The editor inspector uses 13 px for the device type, and map device names act as named Details buttons. The map retains its separate information button and keyboard movement.
+- B-01 and F-01 fixed. A browser check exercises ordinary wheel scrolling over the dashboard canvas with expanded link details.
+- A-01 and A-02 fixed. The browser saves a reviewed proposal before acknowledging it, and an open Discovered page refreshes scheduled results.
+- G-01 fixed. The installer walkthrough places the offline backup before the update and links to the version-specific backup name.
