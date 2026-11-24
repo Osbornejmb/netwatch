@@ -2,6 +2,8 @@
 
 ## Current status (2026-11-24)
 
+- A draft replacement retries once when the host rejects an expired local write token. Dashboard polling and live updates now preserve the newest displayed map revision from the same host.
+
 - NetWatch saves reviewed topology proposals in the browser draft before the host marks them accepted. Recovery is covered for storage errors and lost confirmation responses.
 
 - Discovered refreshes to show runs started outside the page and reports when results cannot be refreshed. Switching between Dashboard and Devices dismisses open details.

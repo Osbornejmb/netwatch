@@ -277,6 +277,8 @@ async function requestSnapshot(path, { signal, etag }) {
   return { value: await response.json(), etag: response.headers.get('ETag') }
 }
 
+const snapshotInstance = (tag) => tag?.replace('W/"', '').replaceAll('"', '').split('.')[0]
+
 // Serial, deadline-bounded polling. Cleanup also rejects late responses from transports that ignore abort.
 export function pollSnapshot(
   onState,
@@ -298,10 +300,9 @@ export function pollSnapshot(
         onState(connection)
       } else {
         // A different host instance can start at the same revision with a different database.
-        const instance = (value) => value?.split('.')[0]
         const snapshot = validateSnapshot(
           reply.value,
-          instance(cache.etag) === instance(reply.etag) ? cache.inventory : undefined,
+          snapshotInstance(cache.etag) === snapshotInstance(reply.etag) ? cache.inventory : undefined,
         )
         cache.etag = reply.etag
         cache.inventory = snapshot.inventory
@@ -355,13 +356,21 @@ export function subscribeSnapshots(
   // Request the saved revision even when an established event stream is still serving an older map.
   let expected = minimumRevision
   const syncUntil = now() + 30000
-  const awaitingSave = (snapshot) =>
-    Number.isSafeInteger(expected) && now() < syncUntil && snapshot.inventory.revision < expected
+  let accepted
+  const acceptSnapshot = (snapshot, instance) => {
+    const revision = snapshot.inventory.revision
+    if (Number.isSafeInteger(expected) && now() < syncUntil && revision < expected) return false
+    // A different host process may have opened a different database.
+    if (accepted && instance === accepted.instance && revision < accepted.revision) return false
+    accepted = { instance, revision }
+    return true
+  }
   const startPolling = () => {
     if (stopPolling) return
     stopPolling = poll(
       (state) => {
-        if (!state.snapshot || !awaitingSave(state.snapshot)) onState({ ...state, transport: 'poll' })
+        if (!state.snapshot || acceptSnapshot(state.snapshot, snapshotInstance(cache.etag)))
+          onState({ ...state, transport: 'poll' })
       },
       { intervalMs: Number.isSafeInteger(expected) ? 1000 : 8000, cache },
     )
@@ -384,6 +393,7 @@ export function subscribeSnapshots(
   function connect() {
     if (stopped || document?.hidden) return
     if (!EventSource) return fail()
+    if (Number.isSafeInteger(expected)) startPolling()
     let active
     try {
       active = source = new EventSource('/api/v1/events')
@@ -403,12 +413,12 @@ export function subscribeSnapshots(
     active.addEventListener('snapshot', (event) => {
       if (source !== active) return
       try {
-        const instance = (id) => id?.split('.')[0]
+        const instance = snapshotInstance(event.lastEventId)
         const snapshot = validateSnapshot(
           JSON.parse(event.data),
-          instance(previousId) === instance(event.lastEventId) ? inventory : undefined,
+          snapshotInstance(previousId) === instance ? inventory : undefined,
         )
-        if (awaitingSave(snapshot)) {
+        if (!acceptSnapshot(snapshot, instance)) {
           startPolling()
           return
         }
@@ -444,7 +454,6 @@ export function subscribeSnapshots(
     else if (!source && !stopPolling) connect()
   }
   document?.addEventListener('visibilitychange', visibility)
-  if (Number.isSafeInteger(expected) && !document?.hidden && EventSource) startPolling()
   connect()
   return () => {
     stopped = true

@@ -749,6 +749,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
         <div hidden={view !== 'editor'} className="editor-network-settings">
           <HostStorage
             ref={hostStorage}
+            remote={remote}
             importGeneration={importGeneration}
             nodes={nodes}
             edges={edges}
