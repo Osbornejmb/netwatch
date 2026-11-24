@@ -51,3 +51,5 @@ The known open issues cover topology discovery and LLDP review, redundancy, auth
 | Chromium regression | New wheel and tablet assertions reproduced failures | Both passed. All 20 CI-style fixture scripts also passed in the local Windows run. |
 
 The first restricted test run failed only on Windows DPAPI and self-signed certificate generation. Both tests passed in the baseline and updated runs with access to the Windows credential and certificate stores. The dedicated remote browser script requires a separate HTTPS configuration and disposable accounts. The fixture admin discovery and redacted audit-export browser check passed, and the Node suite exercised authentication and recovery.
+
+On the discovery and navigation follow-up, both new browser regressions passed and all 204 Windows Node tests passed. The CI-style browser run passed 19 scripts and exposed a timing failure in the scale check. The scale check now waits for keyboard focus and verifies the existing edge counts and node opacity in the same settled render. The updated scale check passed in standalone Chromium runs.
