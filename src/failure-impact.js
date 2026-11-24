@@ -74,23 +74,53 @@ export function incidentAnchors(topology, redundancy) {
     if (!current.has(deviceId) || priority[state] > priority[current.get(deviceId)]) current.set(deviceId, state)
   }
   const isolated = new Set([...current].filter(([, state]) => state === 'isolated').map(([id]) => id))
-  const baseline = reachable(topology, topology.edges)
-  const reachableWithout = new Map([...isolated].map((id) => [id, reachable(topology, topology.edges, id)]))
-  const impact = new Map(
-    [...isolated].map((id) => [
-      id,
-      new Set([...baseline].filter((peer) => peer !== id && !reachableWithout.get(id).has(peer))),
-    ]),
-  )
+  const root = Symbol('root')
+  const graph = new Map(topology.nodes.map(({ id }) => [id, []]))
+  graph.set(root, topology.roots ?? [])
+  for (const id of graph.get(root)) graph.get(id).push(root)
+  for (const { source, target } of topology.edges) {
+    graph.get(source).push(target)
+    graph.get(target).push(source)
+  }
+
+  const entered = new Map()
+  const affected = new Map()
+  const coverage = []
+  let index = 0
+  // A DFS child with no edge above its parent is cut off when that parent is removed.
+  function visit(id, parent) {
+    const first = index++
+    entered.set(id, first)
+    let lowest = first
+    let count = Number(isolated.has(id))
+    for (const next of graph.get(id)) {
+      if (next === parent) continue
+      if (entered.has(next)) {
+        lowest = Math.min(lowest, entered.get(next))
+        continue
+      }
+      const child = visit(next, id)
+      lowest = Math.min(lowest, child.lowest)
+      count += child.count
+      if (!isolated.has(id) || child.lowest < first) continue
+      affected.set(id, (affected.get(id) ?? 0) + child.count)
+      coverage[child.first] = (coverage[child.first] ?? 0) + 1
+      coverage[index] = (coverage[index] ?? 0) - 1
+    }
+    return { first, lowest, count }
+  }
+  visit(root)
+  const covered = new Set()
+  let depth = 0
+  for (const [id, first] of entered) {
+    depth += coverage[first] ?? 0
+    if (depth) covered.add(id)
+  }
   return [...current]
-    .filter(
-      ([id, state]) =>
-        state === 'degraded' ||
-        (state === 'isolated' && ![...impact].some(([parent, children]) => parent !== id && children.has(id))),
-    )
+    .filter(([id, state]) => state === 'degraded' || (state === 'isolated' && !covered.has(id)))
     .map(([deviceId, state]) => ({
       deviceId,
       state,
-      affected: state === 'isolated' ? [...impact.get(deviceId)].filter((id) => isolated.has(id)).length : 0,
+      affected: state === 'isolated' ? (affected.get(deviceId) ?? 0) : 0,
     }))
 }

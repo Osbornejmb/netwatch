@@ -43,6 +43,19 @@ test('failure estimates identify downstream devices and incidents use the upstre
   assert.deepEqual(incidentAnchors(topology, redundancy), [{ deviceId: 'b', state: 'isolated', affected: 1 }])
 })
 
+test('incident anchors respect alternate roots and handle a 2,000-device outage', () => {
+  const nodes = Array.from({ length: 2000 }, (_, i) => ({ id: String(i) }))
+  const edges = nodes.slice(1).map(({ id }, i) => ({ id: 'edge-' + i, source: String(i), target: id }))
+  const redundancy = nodes.slice(1).map(({ id }) => ({ deviceId: id, state: 'isolated' }))
+  assert.deepEqual(incidentAnchors({ nodes, edges, roots: ['0'] }, redundancy), [
+    { deviceId: '1', state: 'isolated', affected: 1998 },
+  ])
+  const ring = { nodes: nodes.slice(0, 4), edges: edges.slice(0, 3), roots: ['0', '3'] }
+  assert.deepEqual(incidentAnchors(ring, redundancy.slice(0, 2)), [
+    { deviceId: '1', state: 'isolated', affected: 0 },
+    { deviceId: '2', state: 'isolated', affected: 0 },
+  ])
+})
 test('incidents persist through uncertain evidence and resolve on confirmed recovery', (t) => {
   let now = Date.UTC(2026, 0, 1)
   const store = openStore(':memory:', { now: () => now })

@@ -14,6 +14,19 @@ const errors=[]
 page.on('pageerror',e=>errors.push(e.message))
 await page.goto(process.env.NETWATCH_URL || 'http://127.0.0.1:4173')
 await page.getByRole('link',{name:'Edit map',exact:true}).click()
+const initialViewport = page.viewportSize()
+await page.setViewportSize({ width: 768, height: 900 })
+const actionLabels = page.locator('.canvas-actions .heading-actions button')
+assert.equal(await actionLabels.count(), 2)
+assert.ok(await actionLabels.evaluateAll(buttons => buttons.every(button => {
+  const label = [...button.childNodes].find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim())
+  const range = document.createRange()
+  range.selectNodeContents(label)
+  const toolbar = button.closest('.canvas-toolbar').getBoundingClientRect()
+  const bounds = button.getBoundingClientRect()
+  return range.getClientRects().length === 1 && bounds.left >= toolbar.left && bounds.right <= toolbar.right
+})), 'Draft action labels should fit on one line at tablet width')
+await page.setViewportSize(initialViewport)
 const snapshot=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('netwatch-topology-v1')))
 const original=await snapshot()
 for(const selector of ['.router-node','.switch-node']){const shapes=await page.locator(selector).evaluateAll(nodes=>nodes.map(node=>{const s=getComputedStyle(node);return {radius:s.borderRadius,width:node.offsetWidth,height:node.offsetHeight}}));assert.ok(shapes.length);for(const shape of shapes){assert.equal(shape.radius,selector==='.router-node'?'999px':'12px');assert.ok(shape.width<=280);assert.ok(shape.height<=56)}}

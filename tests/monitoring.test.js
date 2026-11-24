@@ -168,3 +168,43 @@ test('a restarted poll can reuse its cache, but a new host at the same revision 
  await setImmediate();refreshed()
  assert.equal(states[1].snapshot.inventory.topology.nodes[0].data.label,'New database')
 })
+
+test('live snapshots cannot replace a newer saved revision received over HTTP', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const received = [], cache = {}
+  let currentTime = now, source, emitPoll, stops = 0
+  class Source extends EventTarget {
+    constructor() { super(); source = this }
+    close() {}
+  }
+  const atRevision = (revision) => {
+    const value = snapshot()
+    value.inventory.revision = revision
+    return value
+  }
+  const publish = (revision, instance = 'host') => source.dispatchEvent(new MessageEvent('snapshot', {
+    data: JSON.stringify(atRevision(revision)), lastEventId: instance + '.' + revision,
+  }))
+  const stop = subscribeSnapshots(({ snapshot, transport }) => {
+    if (snapshot) received.push([snapshot.inventory.revision, transport])
+  }, {
+    EventSource: Source, minimumRevision: 2, cache, now: () => currentTime,
+    poll(emit) { emitPoll = emit; return () => { stops++ } },
+  })
+  t.after(stop)
+  cache.etag = 'W/"host.2"'
+  emitPoll({ snapshot: atRevision(2) })
+  publish(1)
+  currentTime += 31000
+  publish(1)
+  cache.etag = 'W/"host.1"'
+  emitPoll({ snapshot: atRevision(1) })
+  assert.deepEqual(received, [[2, 'poll']])
+  assert.equal(stops, 0)
+  publish(2)
+  publish(1)
+  assert.deepEqual(received, [[2, 'poll'], [2, 'sse']])
+  assert.equal(stops, 1)
+  publish(1, 'restarted')
+  assert.deepEqual(received.at(-1), [1, 'sse'])
+})

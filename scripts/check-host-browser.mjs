@@ -18,7 +18,15 @@ const save=async()=>{await host.getByRole('button',{name:'Use this map',exact:tr
 try {
  await page.goto(base);await open();const initial=await read();const writeToken=await page.locator('meta[name="netwatch-write-token"]').getAttribute('content')
  await host.getByRole('button',{name:'Use this map',exact:true}).click();await page.keyboard.press('Shift+Tab');assert.equal(await preview.locator('summary').nth(1).evaluate(el=>el===document.activeElement),true);await page.keyboard.press('Shift+Tab');assert.equal(await preview.locator('summary').nth(0).evaluate(el=>el===document.activeElement),true);await page.keyboard.press('Enter');await preview.getByText('CORE-ROUTER-01 ·',{exact:false}).waitFor();await preview.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal((await read()).revision,initial.revision)
- await save();const migrated=await read();assert.equal(migrated.topology.nodes.length,5);assert.equal(migrated.topology.edges.length,4);assert.ok(Object.values(migrated.monitoring).every(v=>v===false))
+ const tokenMeta=page.locator('meta[name="netwatch-write-token"]')
+ await tokenMeta.evaluate(meta=>{meta.content='0'.repeat(64)})
+ const rejected=page.waitForResponse(response=>response.url().endsWith('/api/v1/topology')&&response.request().method()==='PUT'&&response.status()===403)
+ await save();await rejected
+ assert.equal(await tokenMeta.getAttribute('content'),writeToken)
+ await page.getByRole('link',{name:'Network dashboard',exact:true}).click()
+ await page.waitForFunction(()=>document.querySelectorAll('.health-node').length===5)
+ await page.getByRole('link',{name:'Edit map',exact:true}).click()
+ const migrated=await read();assert.equal(migrated.topology.nodes.length,5);assert.equal(migrated.topology.edges.length,4);assert.ok(Object.values(migrated.monitoring).every(v=>v===false))
  await host.getByText('Device checks',{exact:true}).click();await host.getByLabel('Host device monitoring').selectOption('r1');await host.getByRole('checkbox').check();await save();assert.equal((await read()).monitoring.r1,true)
  // Reimporting the same v1 map must still revoke implicit authorization.
  await page.locator('input[type=file]').setInputFiles({name:'backup.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(migrated.topology))});await preview.getByRole('button',{name:'Import map',exact:true}).click();await save();assert.equal((await read()).monitoring.r1,false)
