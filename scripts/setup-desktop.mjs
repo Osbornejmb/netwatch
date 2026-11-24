@@ -17,7 +17,7 @@ let settings={node:process.execPath,root,database:join(directory,'data','netwatc
 if(existsSync(configuration)) {
   const previous=JSON.parse(readFileSync(configuration,'utf8'))
   if(typeof previous.database!=='string'||!previous.database||typeof previous.icmp!=='boolean')throw Error('Invalid existing desktop.json; preserve it and repair before setup.')
-  settings={...settings,database:resolve(previous.database),icmp:previous.icmp,discovery:previous.discovery===true,discoveryIcmp:previous.discovery===true&&previous.discoveryIcmp===true,lan:previous.lan===true,managedSharing:previous.managedSharing===true,snmp:typeof previous.snmp==='boolean'?previous.snmp:undefined}
+  settings={...settings,database:resolve(previous.database),icmp:previous.icmp,discovery:previous.discovery===true,discoveryIcmp:previous.discovery===true&&previous.discoveryIcmp===true,lan:previous.lan===true,managedSharing:previous.managedSharing===true,snmp:typeof previous.snmp==='boolean'?previous.snmp:undefined,snmpPortContexts:previous.snmpPortContexts}
 }
 const executable=join(directory,'NetWatch.exe'),temporary=join(directory,`NetWatch-${process.pid}.exe`)
 try {

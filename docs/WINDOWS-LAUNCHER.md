@@ -57,7 +57,7 @@ The launcher binds the host to 127.0.0.1 on port 4317 by default. Set NETWATCH_P
 
 The launcher runs without administrator rights and never changes the firewall. If Windows displays a firewall prompt for Node, select **Private networks** only. If granting access requires an administrator in your Windows setup, ask the administrator to allow Node on the Private profile, or leave LAN sharing off. Use a unique password. A DHCP reservation can keep the URL stable. LAN sharing requires direct HTTPS. The launcher enables it when it inherits both TLS file settings.
 
-Open the launcher and click **Start** after signing in to Windows. Sleep, sign-out, shutdown or loss of network interrupts monitoring. For a source update or rollback, quit NetWatch, back up the database, build the intended revision, and rerun source setup. To remove the source launcher, quit it and remove its NetWatch.exe and optional desktop shortcut. Keep `desktop.json` and the data directory for recovery.
+Open the launcher and click **Start** after signing in to Windows. Sleep, sign-out, shutdown or loss of network interrupts monitoring. For a source update or rollback, quit NetWatch, back up the database, build the intended revision, and rerun source setup. Rerunning source setup preserves saved per-device SNMP port contexts. To remove the source launcher, quit it and remove its NetWatch.exe and optional desktop shortcut. Keep `desktop.json` and the data directory for recovery.
 
 ## Verification
 
