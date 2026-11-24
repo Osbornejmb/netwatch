@@ -103,6 +103,12 @@ export default function Dashboard({
   const [selectedId, setSelectedId] = useState(null)
   const [selectedLinkId, setSelectedLinkId] = useState(null)
   const [highlightedId, setHighlightedId] = useState(null)
+  const [previousShowInventory, setPreviousShowInventory] = useState(showInventory)
+  if (previousShowInventory !== showInventory) {
+    setPreviousShowInventory(showInventory)
+    setSelectedId(null)
+    setSelectedLinkId(null)
+  }
   const [dragging, setDragging] = useState(false)
   useEffect(() => {
     if (!dragging) return
