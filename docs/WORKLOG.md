@@ -1,5 +1,9 @@
 # Working checkpoint
 
+## Current status (2026-11-24)
+
+- Source launcher setup preserves saved SNMP port contexts. The dashboard wheel scrolls to link details, and editor toolbar labels stay readable at tablet widths. See the [UI audit](UI-AUDIT.md) for fixture screenshots, findings, and verification limits.
+
 ## Current status (2026-11-21)
 
 - The dashboard opens on the map with compact status filters. Connection and redundancy details scroll below the map. Discovered devices keeps scan actions visible and separates manual runs from scheduled discovery. Clear draft map sits next to Use this map. See the [repository audit](../AUDIT.md) for remaining issues and verification limits.
