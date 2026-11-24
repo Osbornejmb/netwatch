@@ -73,7 +73,7 @@ After restarting the host, query the local access log from another terminal on t
 curl.exe https://127.0.0.1:4317/api/v1/audit
 ~~~
 
-Reopen the browser after a host restart to refresh the admin write token. Database restore clears sessions and may restore older password hashes and viewer policy from the backup. Check the configuration before turning LAN sharing back on. Protect the database and its backups because they contain hashes, inventory and the access log.
+An open local editor can refresh its write token when saving after a host restart. An offline restore clears sessions. Replacing a database keeps its current passwords, viewer policy, and access log. Restoring to a new path starts with remote access disabled and retains the backup access log. Protect the database and its backups because they contain hashes, inventory and the access log.
 
 ## Direct HTTPS
 

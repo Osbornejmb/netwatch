@@ -200,6 +200,45 @@ export function backupDatabase(path, destination) {
     release()
   }
 }
+function preserveAccessState(db, version, path) {
+  const existing = existsSync(path) ? new DatabaseSync(path, { readOnly: true }) : null
+  try {
+    const currentVersion = existing?.prepare('PRAGMA user_version').get().user_version ?? 0
+    const access =
+      currentVersion >= 7
+        ? existing
+            .prepare('SELECT viewer_mode, viewer_hash, admin_hash, updated_at FROM auth_config WHERE singleton=1')
+            .get()
+        : null
+    const audit =
+      currentVersion >= 8
+        ? existing.prepare('SELECT id, at, source, ip, role, action, detail FROM audit_log ORDER BY id').all()
+        : null
+    if (
+      (version < 7 && (access?.admin_hash || access?.viewer_hash || access?.viewer_mode === 'open')) ||
+      (version < 8 && audit?.length)
+    )
+      throw new Error('This backup predates the current access or audit data. Restore it to a separate database first.')
+    if (version >= 7) {
+      db.prepare('UPDATE auth_config SET viewer_mode=?,viewer_hash=?,admin_hash=?,updated_at=? WHERE singleton=1').run(
+        access?.viewer_mode ?? 'disabled',
+        access?.viewer_hash ?? null,
+        access?.admin_hash ?? null,
+        access?.updated_at ?? new Date().toISOString(),
+      )
+      if (version === 9) db.exec('UPDATE auth_config SET operator_hash=NULL')
+      db.exec('DELETE FROM sessions')
+    }
+    if (version >= 8 && audit) {
+      db.exec('DELETE FROM audit_log')
+      const append = db.prepare('INSERT INTO audit_log(id,at,source,ip,role,action,detail) VALUES(?,?,?,?,?,?,?)')
+      for (const row of audit) append.run(row.id, row.at, row.source, row.ip, row.role, row.action, row.detail)
+    }
+  } finally {
+    existing?.close()
+  }
+}
+
 export function restoreDatabase(path, source) {
   const release = lock(path)
   const temporary = `${path}.restoring`
@@ -218,7 +257,7 @@ export function restoreDatabase(path, source) {
       )
       const version = db.prepare('PRAGMA user_version').get().user_version
       if (version >= 4) db.exec('DELETE FROM snmp_targets')
-      if (version >= 7) db.exec('DELETE FROM sessions')
+      preserveAccessState(db, version, path)
       db.exec('PRAGMA wal_checkpoint(TRUNCATE)')
     } finally {
       db.close()

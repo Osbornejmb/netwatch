@@ -97,6 +97,26 @@ test('offline backup/restore validates data, advances revision and rejects corru
  const bad=join(dir,'bad');writeFileSync(bad,'not sqlite');assert.throws(()=>restoreDatabase(path,bad));assert.equal(validateDatabase(path),3)
  const release=lock(path);assert.throws(()=>backupDatabase(path,join(dir,'other')),/in use/);release();assert.throws(()=>backupDatabase(path,backup),/already exists/)
 })
+test('restore keeps current access policy and audit history and disables remote access on a fresh target', t => {
+ const {path,dir,store}=fixture(t)
+ store.db.exec("UPDATE auth_config SET viewer_mode='open',admin_hash='old'; INSERT INTO audit_log(at,source,action) VALUES(1,'local','before_backup')")
+ store.close()
+ const backup=join(dir,'old.sqlite');backupDatabase(path,backup)
+ const live=openStore(path)
+ live.db.exec("UPDATE auth_config SET viewer_mode='password',admin_hash='new',viewer_hash='viewer'; INSERT INTO audit_log(at,source,action) VALUES(2,'local','password_changed'); INSERT INTO sessions VALUES('session','admin','csrf',1,1,2,'192.0.2.1')")
+ live.close()
+ restoreDatabase(path,backup)
+ const restored=openStore(path)
+ assert.deepEqual({...restored.db.prepare('SELECT viewer_mode,admin_hash,viewer_hash FROM auth_config').get()},{viewer_mode:'password',admin_hash:'new',viewer_hash:'viewer'})
+ assert.deepEqual(restored.db.prepare('SELECT action FROM audit_log ORDER BY id').all().map(row=>row.action),['before_backup','password_changed'])
+ assert.equal(restored.db.prepare('SELECT COUNT(*) n FROM sessions').get().n,0)
+ restored.close()
+ const freshPath=join(dir,'fresh.sqlite');restoreDatabase(freshPath,backup)
+ const fresh=openStore(freshPath)
+ assert.deepEqual({...fresh.db.prepare('SELECT viewer_mode,admin_hash,viewer_hash FROM auth_config').get()},{viewer_mode:'disabled',admin_hash:null,viewer_hash:null})
+ assert.equal(fresh.db.prepare('SELECT action FROM audit_log').get().action,'before_backup')
+ fresh.close()
+})
 test('loopback API enforces origin, host, write intent, payload bounds, error shapes and pagination',async t=>{
  const {store,dir}=fixture(t);const dist=writeTokenFixture(dir);const server=createHost(store,{port:0});await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port
  // Production authority is fixed; use a configurable test port once allocated.
