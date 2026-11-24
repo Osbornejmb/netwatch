@@ -44,9 +44,13 @@ function HealthNode({ data, selected }) {
       <NodeHandles />
       <StatusIcon size={16} role="img" aria-label={HEALTH[data.status].label} className="node-status" />
       <KindIcon size={14} aria-hidden="true" className="map-device-kind" />
-      <div className="device-copy">
+      <button
+        type="button"
+        className="device-copy map-device-details"
+        aria-label={`Open details for ${data.label}, ${deviceTypes[data.kind]}, ${HEALTH[data.status].label}`}
+      >
         <strong className={data.ip && data.label === data.ip ? 'device-ip-label' : undefined}>{data.label}</strong>
-      </div>
+      </button>
       <InfoTooltip label={`Information for ${data.label}`}>
         <strong>{data.label}</strong>
         <span>

@@ -593,6 +593,15 @@
   gap: 8px;
   padding: 8px;
 }
+.map-device-details {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
 .health-node:not(.router-node) .device-copy > strong:not(.device-ip-label) {
   display: -webkit-box;
   -webkit-box-orient: vertical;
