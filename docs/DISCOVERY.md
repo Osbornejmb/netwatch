@@ -36,7 +36,7 @@ Enable SNMP port checks on the Windows host and enroll the router or switch you 
 
 Compare the proposed ports and the reporting devices. Use **Review all verified** or review one proposal at a time. Confirm a suggested match by address when the saved device has no chassis identity. Use **Edit map → Use this map → Confirm replacement** to put the reviewed draft into service. New devices start with checks off.
 
-For recurring topology discovery, use **Scheduled discovery** on the Discovered page. Select **Run automatically**, set **Interval (minutes)** to 15–1440, choose a **Scheduled start device**, and select **Save schedule**. The scheduled device is independent of the manual start device. Turn off **Run automatically** and save to stop recurring topology runs. The schedule starts off.
+For recurring topology discovery, use **Scheduled discovery** on the Discovered page. Select **Run automatically**, set **Interval (minutes)** to 15–1440, choose a **Scheduled start device**, and select **Save schedule**. The scheduled device is independent of the manual start device. Turn off **Run automatically** and save to stop recurring topology runs. The schedule starts off. The open Discovered page refreshes automatically when the host starts a scheduled run. If the refresh fails, the page shows the last available results and tries again.
 
 See the [host API](HOST-API.md#topology-discovery-runs) for enrollment scope and bounds. See [database upgrades](HOST-API.md#sqlite-migrations-and-retention) for the backup required before migrating an older database.
 

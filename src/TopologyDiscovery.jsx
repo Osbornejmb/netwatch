@@ -32,11 +32,11 @@ const labels = {
 }
 const explain = (code) => labels[code] ?? 'Device details unavailable'
 
-async function request(path, body) {
+async function request(path, body, signal) {
   const response = await hostFetch(
     root + path,
     body === undefined
-      ? {}
+      ? { signal, cache: 'no-store' }
       : {
           method: 'POST',
           headers: { ...writeHeaders(), ...(body !== null && { 'Content-Type': 'application/json' }) },
@@ -78,43 +78,54 @@ export default function TopologyDiscovery({ stageDiscovery }) {
   const [matches, setMatches] = useState({})
   const [preview, setPreview] = useState(null)
   const [message, setMessage] = useState('')
+  const [refreshError, setRefreshError] = useState(false)
   const run = data?.run
   const runId = run?.id
   const running = run?.status === 'running'
   const refresh = async () => setData(await request('runs'))
 
   useEffect(() => {
-    let stop = false
-    request('runs')
-      .then((value) => {
-        if (!stop) setData(value)
-      })
-      .catch(() => {
-        if (!stop) setMessage('Could not load topology discovery.')
-      })
-    return () => {
-      stop = true
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!running) return
-    let stop = false,
-      timer
+    if (busy) return
+    const controller = new AbortController()
+    const { signal } = controller
+    let timer
+    let inFlight = false
+    let retryLatest = false
     async function poll() {
+      if (document.hidden || inFlight) return
+      inFlight = true
       try {
-        const current = await request('runs/' + encodeURIComponent(runId))
-        if (!stop) setData((previous) => ({ ...previous, run: current }))
-        if (current.status !== 'running') return
-      } catch {}
-      if (!stop) timer = setTimeout(poll, 1000)
+        const fetchRunOnly = running && !retryLatest
+        const current = await request(
+          fetchRunOnly ? 'runs/' + encodeURIComponent(runId) : 'runs',
+          undefined,
+          AbortSignal.any([signal, AbortSignal.timeout(8000)]),
+        )
+        if (!signal.aborted) {
+          setData((previous) => (fetchRunOnly ? { ...previous, run: current } : current))
+          retryLatest = false
+          setRefreshError(false)
+        }
+      } catch {
+        retryLatest = true
+        if (!signal.aborted) setRefreshError(true)
+      } finally {
+        inFlight = false
+        if (!signal.aborted && !document.hidden) timer = setTimeout(poll, running && !retryLatest ? 1000 : 5000)
+      }
     }
-    timer = setTimeout(poll, 1000)
-    return () => {
-      stop = true
+    function visibilityChanged() {
       clearTimeout(timer)
+      if (!document.hidden) void poll()
     }
-  }, [running, runId])
+    void poll()
+    document.addEventListener('visibilitychange', visibilityChanged)
+    return () => {
+      controller.abort()
+      clearTimeout(timer)
+      document.removeEventListener('visibilitychange', visibilityChanged)
+    }
+  }, [busy, running, runId])
 
   const act = async (fn) => {
     setBusy(true)
@@ -228,6 +239,13 @@ export default function TopologyDiscovery({ stageDiscovery }) {
             </button>
           </div>
         </form>
+      )}
+      {refreshError && (
+        <p className="discovery-message" role="status">
+          {data
+            ? 'Could not refresh topology discovery. Showing the last results.'
+            : 'Could not load topology discovery.'}
+        </p>
       )}
       {message && (
         <p className="discovery-message" role="status">
