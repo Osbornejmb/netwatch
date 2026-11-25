@@ -1,5 +1,7 @@
 # NetWatch documentation
 
+- [Linux package](LINUX.md) — run the dashboard and saved-map host without active collection.
+
 ## Tutorial for monitoring devices across routed subnets
 
 Start with the [Windows setup instructions](../README.md#set-up-netwatch-on-windows). This walkthrough uses a known inventory of switch, router and server IPs. Leave **Find nearby devices** off.

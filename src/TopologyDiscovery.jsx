@@ -182,81 +182,17 @@ export default function TopologyDiscovery({ stageDiscovery, infrastructureOnly =
     (link) => link.status === 'proposed' && (!infrastructureOnly || linkDevices(link).every(Boolean)),
   )
   const verified = proposed.filter((link) => link.confidence === 'verified' && canAccept(link))
-  const displayed =
-    proposed.length <= 1
-      ? proposed
-      : proposed.filter(
-          (link) =>
-            filter === 'all' ||
-            (filter === 'verified' && link.confidence === 'verified') ||
-            (filter === 'attention' && link.confidence !== 'verified') ||
-            (filter === 'unmanaged' && linkDevices(link).some((device) => device?.state === 'unmanaged')),
-        )
+  const displayed = proposed.filter(
+    (link) =>
+      filter === 'all' ||
+      (filter === 'verified' && link.confidence === 'verified') ||
+      (filter === 'attention' && link.confidence !== 'verified') ||
+      (filter === 'unmanaged' && linkDevices(link).some((device) => device?.state === 'unmanaged')),
+  )
   const proposalCount = proposed.length + hints.length
   const scheduled = scheduleEnabled ?? Boolean(data?.schedule?.intervalMinutes)
   return (
     <section className="discovery-topology" aria-label="Topology proposals">
-      {data?.schedule && (
-        <form
-          className="discovery-schedule"
-          aria-labelledby="discovery-schedule-title"
-          onSubmit={(event) => {
-            event.preventDefault()
-            const fields = new FormData(event.currentTarget)
-            void act(async () => {
-              const schedule = await request('schedule', {
-                seedId: fields.get('discoverySeed'),
-                intervalMinutes: scheduled ? Number(fields.get('interval')) : 0,
-              })
-              setData((previous) => ({ ...previous, schedule }))
-              setScheduleEnabled(null)
-              setInterval(null)
-              setMessage('Discovery schedule saved.')
-            })
-          }}
-        >
-          <h2 id="discovery-schedule-title">Scheduled discovery</h2>
-          <div className="discovery-schedule-fields">
-            <label className="discovery-schedule-toggle">
-              <input
-                type="checkbox"
-                checked={scheduled}
-                onChange={(event) => setScheduleEnabled(event.target.checked)}
-              />
-              Run automatically
-            </label>
-            <label>
-              Interval (minutes)
-              <input
-                name="interval"
-                type="number"
-                min="15"
-                max="1440"
-                step="1"
-                required={scheduled}
-                disabled={!scheduled}
-                placeholder="15–1440"
-                value={interval ?? (data.schedule.intervalMinutes || '')}
-                onChange={(event) => setInterval(event.target.value)}
-              />
-            </label>
-            <label>
-              Scheduled start device
-              <select name="discoverySeed" key={data.schedule.seedId} defaultValue={data.schedule.seedId || seed}>
-                <option value="">Choose an enrolled device</option>
-                {data.seeds.map(({ id, label }) => (
-                  <option key={id} value={id}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="submit" className="button secondary" disabled={busy}>
-              Save schedule
-            </button>
-          </div>
-        </form>
-      )}
       {refreshError && (
         <p className="discovery-message" role="status">
           {data
@@ -290,7 +226,7 @@ export default function TopologyDiscovery({ stageDiscovery, infrastructureOnly =
                 <select
                   id="discovery-seed"
                   value={seed}
-                  disabled={running || busy}
+                  disabled={running || busy || !data?.seeds?.length}
                   onChange={(event) => setSeed(event.target.value)}
                 >
                   <option value="">Choose an enrolled device</option>
@@ -315,6 +251,11 @@ export default function TopologyDiscovery({ stageDiscovery, infrastructureOnly =
                 Find connections
               </button>
             </div>
+            {data?.seeds?.length === 0 && (
+              <p className="discovery-notice">
+                Set up port monitoring for a reachable router or switch to find connections.
+              </p>
+            )}
             {running && (
               <>
                 <p role="status">Checking connections · {run.progress?.queried ?? 0} devices checked</p>
@@ -421,7 +362,7 @@ export default function TopologyDiscovery({ stageDiscovery, infrastructureOnly =
                     </ul>
                   </details>
                 )}
-                {proposed.length > 1 && (
+                {proposed.length > 1 || filter !== 'all' ? (
                   <div className="topology-proposal-filter">
                     <label htmlFor="topology-proposal-filter">Show connections</label>
                     <select
@@ -435,7 +376,7 @@ export default function TopologyDiscovery({ stageDiscovery, infrastructureOnly =
                       <option value="unmanaged">Unmanaged devices</option>
                     </select>
                   </div>
-                )}
+                ) : null}
                 {!!verified.length && (
                   <button
                     className="button secondary"
@@ -490,6 +431,9 @@ export default function TopologyDiscovery({ stageDiscovery, infrastructureOnly =
                     </li>
                   ))}
                 </ul>
+                {proposed.length > 0 && displayed.length === 0 && (
+                  <p className="discovery-empty">No connections match this filter.</p>
+                )}
               </>
             )}
             {!!hints.length && (
@@ -555,6 +499,78 @@ export default function TopologyDiscovery({ stageDiscovery, infrastructureOnly =
           </div>
         )}
       </details>
+      {data?.schedule && (
+        <form
+          className="discovery-schedule"
+          aria-labelledby="discovery-schedule-title"
+          onSubmit={(event) => {
+            event.preventDefault()
+            const fields = new FormData(event.currentTarget)
+            void act(async () => {
+              const schedule = await request('schedule', {
+                seedId: fields.get('discoverySeed'),
+                intervalMinutes: scheduled ? Number(fields.get('interval')) : 0,
+              })
+              setData((previous) => ({ ...previous, schedule }))
+              setScheduleEnabled(null)
+              setInterval(null)
+              setMessage('Discovery schedule saved.')
+            })
+          }}
+        >
+          <h2 id="discovery-schedule-title">Scheduled discovery</h2>
+          <p className="discovery-filter-scope">Run recurring topology checks from an enrolled device.</p>
+          <div className="discovery-schedule-fields">
+            <label className="discovery-schedule-toggle">
+              <input
+                type="checkbox"
+                checked={scheduled}
+                disabled={busy || (!scheduled && !data.seeds.length)}
+                onChange={(event) => setScheduleEnabled(event.target.checked)}
+              />
+              Run automatically
+            </label>
+            <label>
+              Interval (minutes)
+              <input
+                name="interval"
+                type="number"
+                min="15"
+                max="1440"
+                step="1"
+                required={scheduled}
+                disabled={busy || !scheduled}
+                placeholder="15–1440"
+                value={interval ?? (data.schedule.intervalMinutes || '')}
+                onChange={(event) => setInterval(event.target.value)}
+              />
+            </label>
+            <label>
+              Scheduled start device
+              <select
+                name="discoverySeed"
+                key={data.schedule.seedId}
+                defaultValue={data.schedule.seedId || seed}
+                disabled={busy || !scheduled || !data.seeds.length}
+              >
+                <option value="">Choose an enrolled device</option>
+                {data.seeds.map(({ id, label }) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="submit"
+              className="button secondary"
+              disabled={busy || (!data.seeds.length && (scheduled || !data.schedule.intervalMinutes))}
+            >
+              Save schedule
+            </button>
+          </div>
+        </form>
+      )}
     </section>
   )
 }

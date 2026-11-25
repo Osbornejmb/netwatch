@@ -1,5 +1,9 @@
 # Working checkpoint
 
+## Current status (2026-11-25) — scan-first discovery
+
+Discovered leads with local results and puts scheduled discovery below manual topology proposals. Page filter scope and bulk draft behavior are explicit. Captures and review findings are in [UI audit](UI-AUDIT.md).
+
 ## Current status (2026-11-25) — CDP topology fallback
 
 Topology proposals follow CDP across enrolled devices when LLDP data is missing and display directly reported unenrolled uplinks as one-sided observations. Cisco hardware verification remains pending.

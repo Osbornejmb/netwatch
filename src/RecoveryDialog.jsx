@@ -12,11 +12,11 @@ export default function RecoveryDialog({
   const modal = useModal(onClose)
   const importing = action.kind === 'import'
   return (
-    <dialog {...modal} className="modal device-dialog" aria-labelledby="recovery-dialog-title">
+    <dialog {...modal} className="modal device-dialog recovery-dialog" aria-labelledby="recovery-dialog-title">
       <h2 id="recovery-dialog-title">{importing ? 'Import this map?' : 'Replace saved map?'}</h2>
       <p>
         {importing
-          ? `Replace the visible map with ${action.topology.nodes.length} devices and ${action.topology.edges.length} links? Export your current map first if you need a backup.`
+          ? `Replace the visible map with ${action.topology.nodes.length} ${action.topology.nodes.length === 1 ? 'device' : 'devices'} and ${action.topology.edges.length} ${action.topology.edges.length === 1 ? 'link' : 'links'}? Export your current map first if you need a backup.`
           : 'Replace the saved draft with the map you see now and resume automatic saving?'}
       </p>
       {paused && (

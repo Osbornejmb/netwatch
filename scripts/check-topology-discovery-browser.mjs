@@ -96,6 +96,18 @@ try {
   assert.equal(await page.getByLabel('Manual start device').count(), 0)
   assert.equal(await page.locator('.topology-proposals').evaluate((panel) => panel.open), false)
   const scheduleToggle = page.getByRole('checkbox', { name: 'Run automatically' })
+  await scheduleToggle.waitFor()
+  assert.equal(
+    await page
+      .locator('.topology-proposals')
+      .evaluate((panel) =>
+        Boolean(
+          panel.compareDocumentPosition(document.querySelector('.discovery-schedule')) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+        ),
+      ),
+    true,
+  )
   await scheduleToggle.check()
   await page.locator('select[name="discoverySeed"]').selectOption('Router')
   await page.locator('input[name="interval"]').fill('60')

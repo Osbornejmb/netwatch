@@ -18,6 +18,8 @@ The admin-only Network neighbors panel opens on demand in saved-device details. 
 
 Discovery shows route-check progress and reports newly saved router links at scan completion.
 
+Discovered puts **Scan now** and **Local scan results** first. Search and status filters apply to the loaded page. The bulk confirmation explains that all pending results are included. **Jump to topology** moves focus to the topology heading, where manual proposals appear before scheduled discovery. Router and switch mode keeps the topology section and shows why local scans are paused.
+
 The dashboard map labels discovered links with the access port or both LLDP port identifiers. Port labels can be toggled in View options. The Connections section retains the full observation label.
 
 At 30 distinct connections, the dashboard increases card spacing and shows only the selected device's links by default. **Show all links** draws a simplified overview without port labels. Node health, filters, and device details stay available in either view.

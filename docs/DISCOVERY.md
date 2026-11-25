@@ -2,6 +2,8 @@
 
 Discovery is optional. If you already know the device IPs and uplink ports, start with [manual monitoring across routed subnets](README.md#tutorial-for-monitoring-devices-across-routed-subnets). Its uptime and SNMP port checks use saved device IPs.
 
+Use **Scan now** above **Local scan results**. Search and status apply only to the page you are viewing. **Add all to draft** includes pending results across pages, regardless of search and status. **Jump to topology** takes you to manual topology proposals, with scheduled discovery below them.
+
 **Show and check only routers and switches** pauses scheduled local neighbor discovery and **Scan now**, including optional subnet pings. Use **Topology proposals** to find links by querying enrolled routers and switches. Turning the mode off restores the previous discovery preferences and results.
 
 For live setup, first collect the actual addresses and verify the selected Windows adapter using [Network setup and troubleshooting](NETWORK-TROUBLESHOOTING.md). A management IP or DHCP server is not inherently a router. A directly attached Ethernet subnet can work with no default gateway; Wi-Fi may supply the only default route. Nearby discovery without a recognized infrastructure hint can stage an endpoint; manually correct the type to Switch or Router in Edit map and apply the draft before SNMP enrollment. An Added discovery status is not proof of an enrolled infrastructure device.

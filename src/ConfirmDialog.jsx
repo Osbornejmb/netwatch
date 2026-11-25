@@ -15,7 +15,12 @@ export default function ConfirmDialog({
     messageId = useId()
   const modal = useModal(onClose)
   return (
-    <dialog {...modal} className="modal device-dialog" aria-labelledby={titleId} aria-describedby={messageId}>
+    <dialog
+      {...modal}
+      className="modal device-dialog confirm-dialog"
+      aria-labelledby={titleId}
+      aria-describedby={messageId}
+    >
       <h2 id={titleId}>{title}</h2>
       <p id={messageId}>{message}</p>
       {children}

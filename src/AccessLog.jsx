@@ -37,7 +37,7 @@ export default function AccessLog({ onClose }) {
     return () => controller.abort()
   }, [])
   return (
-    <dialog {...modal} className="modal device-dialog" aria-labelledby="access-log-title">
+    <dialog {...modal} className="modal device-dialog access-log-dialog" aria-labelledby="access-log-title">
       <h2 id="access-log-title">Access log</h2>
       {error ? (
         <p role="alert">Unable to load the access log.</p>
@@ -49,7 +49,7 @@ export default function AccessLog({ onClose }) {
         <ol className="access-log">
           {entries.map((entry) => (
             <li key={entry.id}>
-              <strong>{actions[entry.action] || entry.action}</strong>
+              <strong>{actions[entry.action] || 'Access event'}</strong>
               <span>
                 {new Date(entry.at).toLocaleString()} · {entry.source === 'local' ? 'NetWatch PC' : entry.ip}
               </span>
