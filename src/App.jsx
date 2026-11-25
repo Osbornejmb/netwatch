@@ -125,6 +125,11 @@ export default function App({ viewer = false, remote = false, accessControls }) 
     }
     const next = mergeDiscoveryDraft(base, patch)
     if (preview) return next
+    try {
+      writeTopology(localStorage, next)
+    } catch {
+      throw Error('Could not save the draft map. Check browser storage and try again.')
+    }
     setNodes(next.nodes)
     setEdges(next.edges)
     setDraftGroups(next.groups ?? [])
@@ -579,14 +584,19 @@ export default function App({ viewer = false, remote = false, accessControls }) 
                     placeholder="Find a device"
                   />
                 </div>
-                <button
-                  className="button primary"
-                  disabled={autosavePaused || importBusy}
-                  onClick={() => void hostStorage.current.reviewSave()}
-                >
-                  <Check size={15} />
-                  Use this map
-                </button>
+                <div className="heading-actions">
+                  <button type="button" className="button secondary" disabled={!nodes.length} onClick={clearDraftMap}>
+                    Clear draft map
+                  </button>
+                  <button
+                    className="button primary"
+                    disabled={autosavePaused || importBusy}
+                    onClick={() => void hostStorage.current.reviewSave()}
+                  >
+                    <Check size={15} />
+                    Use this map
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -712,7 +722,6 @@ export default function App({ viewer = false, remote = false, accessControls }) 
                 onSelect={setSelectedId}
                 onEdit={() => setShowModal('edit')}
                 onRemove={removeSelected}
-                onClearDraft={nodes.length ? clearDraftMap : undefined}
                 onConnect={onConnect}
                 onRemoveLink={removeConnection}
               />
@@ -740,6 +749,7 @@ export default function App({ viewer = false, remote = false, accessControls }) 
         <div hidden={view !== 'editor'} className="editor-network-settings">
           <HostStorage
             ref={hostStorage}
+            remote={remote}
             importGeneration={importGeneration}
             nodes={nodes}
             edges={edges}

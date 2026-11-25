@@ -12,7 +12,7 @@ The Windows helper cache uses source-hash filenames and a SHA-256 sidecar for ea
 Requires Windows 10/11, Node 22.13+, the Windows .NET Framework v4 runtime/compiler, and OS permission to send ICMP. No administrator elevation or PowerShell execution-policy change is requested. The framework compiler must be present and permitted by application control. On a non-Windows host the enabled collector reports `unsupported`; it never substitutes another platform's ping command.
 
 1. Stop the host and back up the database with `npm.cmd run db -- backup "<BACKUP_FILE_PATH>"`. Replace `<BACKUP_FILE_PATH>` with the full path for a new backup file in an existing writable folder. Remove the brackets and keep the quotes. Schema v1 upgrades transactionally to v2, preserving inventory, sequence IDs, revisions and existing checks. V1 and v2 backups remain accepted. A compatible host migrates a restored v1 backup on its next start. Older hosts reject v2 rather than guessing its shape.
-2. Start the host normally and prepare **only your approved device inventory**. In Backup → Local host storage, save the inventory, choose each authorized host device, check Authorize ICMP checks, and preview/confirm Save to host. New/imported entries default disabled. Do not opt in the starter placeholders or sample devices.
+2. Start the host normally and prepare **only your approved device inventory**. In Edit map, choose Use this map and confirm the replacement. Open each approved saved device in Devices, then enable its checks in the device details. New and imported entries start with checks disabled.
 3. Stop the host, then explicitly enable the collector in the PowerShell session:
 
 ```powershell
@@ -78,6 +78,8 @@ Fake-runner tests cover success, initial unknown, transient loss, down threshold
 Issue #5's approved Windows device test is still required: record Windows/Node versions, exact authorized inventory, which devices are expected to answer/block ICMP, actual raw outcomes/latencies and cycle duration, three-failure detection time and recovery time. Use an approved existing unreachable/block-ICMP device; do not scan or alter production routing/firewalls to manufacture a failure. Start with one or two approved devices, export the API history/collector snapshots, and compare observed timing to the policy above. A permission/process error is an environment failure, not a passed unreachable-device test. Stop the collector after the test and disable the test inventory as appropriate. Do not close #5 based solely on fake runners or loopback.
 
 ## Single-computer test
+
+For a real network target, obtain the approved device's actual management IPv4 from its console or administrator and verify the Windows source adapter with `ipconfig /all` and `route print -4`. See [network troubleshooting](NETWORK-TROUBLESHOOTING.md). A failed switch-to-PC ping may reflect inbound Windows ICMP filtering; test PC-to-switch separately. Fixed loopback examples below are intentionally local.
 
 When no other devices are available, run this from the checked-out branch on your Windows computer:
 

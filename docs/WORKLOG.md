@@ -12,6 +12,31 @@ The launcher leads with host status and dashboard access. Settings now paints ch
 
 The launcher mode limits uptime checks and monitoring views to routers and switches and pauses local neighbor scans. Enrolled topology discovery remains available. Live hardware verification is pending.
 
+
+## Documentation follow-up (2026-11-25)
+
+- Streamlined the first-time guide into an ordered install → addresses → save device → SNMP → discovery → verification path. Preserved advanced settings and verification evidence in SETUP-REFERENCE.md; split blank-switch access setup from optional trunk configuration and added an existing-ACL correction path.
+
+- Added [first-time setup guide](SETUP.md) covering installation, configuration, first run, verification, troubleshooting and maintenance; linked from README and documentation index. Recorded the v0.2.4 automated release evidence and explicitly separated file review from unperformed clean Windows and hardware acceptance.
+
+- Documented session troubleshooting for generic startup errors, draft versus saved infrastructure enrollment, missing Ethernet gateway hints, Windows source IP versus management IP, SNMP ACL/user mismatches, VLAN context spelling, and ordered reachability and topology checks. See [Network setup and troubleshooting](NETWORK-TROUBLESHOOTING.md). Configuration guidance now obtains real addresses from the host/device instead of copying sample IPs. This is documentation only; no new hardware acceptance or software fix is claimed.
+
+## Current status (2026-11-24)
+
+- Offline restore preserves the current remote access policy and audit log. Fresh restores start with remote access disabled. Outage attribution uses one graph traversal, and dashboard device names expose a Details button to assistive technology.
+
+- A draft replacement retries once when the host rejects an expired local write token. Dashboard polling and live updates now preserve the newest displayed map revision from the same host.
+
+- NetWatch saves reviewed topology proposals in the browser draft before the host marks them accepted. Recovery is covered for storage errors and lost confirmation responses.
+
+- Discovered refreshes to show runs started outside the page and reports when results cannot be refreshed. Switching between Dashboard and Devices dismisses open details.
+
+- Source launcher setup preserves saved SNMP port contexts. The dashboard wheel scrolls to link details, and editor toolbar labels stay readable at tablet widths. See the [UI audit](UI-AUDIT.md) for fixture screenshots, findings, and verification limits.
+
+## Current status (2026-11-21)
+
+- The dashboard opens on the map with compact status filters. Connection and redundancy details scroll below the map. Discovered devices keeps scan actions visible and separates manual runs from scheduled discovery. Clear draft map sits next to Use this map. See the [repository audit](../AUDIT.md) for remaining issues and verification limits.
+
 ## Current status (2026-11-20) — richer link evidence
 
 - Link details show fresh spanning tree evidence, derived rates, and bundle availability. Discovery review includes matching CDP observations. SQLite v13 requires an offline backup of a v12 database. See the [Phase 4 report](refocus/REPORT-PHASE-4.md).

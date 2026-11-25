@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { CircleCheck, CircleHelp, CircleX, TriangleAlert } from 'lucide-react'
 import DynamicsPanel from './DynamicsPanel.jsx'
 import { baselineLabels, formatSpeed, linkLabels, roleLabels, scopeLabels } from './refocus.js'
 import { formatCheckTime } from './monitoring.js'
@@ -6,6 +7,39 @@ import useModal from './useModal'
 
 const title = (link, names) =>
   [link.edge.source, link.edge.target].map((id) => names.get(id)?.data.label ?? id).join(' ↔ ')
+
+function connectionStatus(link) {
+  const speedMismatch =
+    link.source.fresh &&
+    link.target.fresh &&
+    link.source.speedBps &&
+    link.target.speedBps &&
+    link.source.speedBps !== link.target.speedBps
+  if (link.state === 'down') return { rank: 0, Icon: CircleX, tone: 'down', label: linkLabels.down }
+  if (['oneSided', 'mismatch', 'degraded'].includes(link.state) || speedMismatch) {
+    return {
+      rank: 1,
+      Icon: TriangleAlert,
+      tone: 'warning',
+      label: speedMismatch && link.state === 'portsUp' ? 'Speed mismatch' : linkLabels[link.state],
+      speedMismatch: speedMismatch && link.state !== 'portsUp',
+    }
+  }
+  if (link.count === 0 && link.stale) {
+    return { rank: 2, Icon: TriangleAlert, tone: 'warning', label: 'Port readings overdue' }
+  }
+  if (link.count === 0 || link.state === 'unknown') {
+    return {
+      rank: 2,
+      Icon: CircleHelp,
+      tone: 'unknown',
+      unverified: true,
+      label: link.count === 0 ? 'Ports not monitored' : linkLabels.unknown,
+    }
+  }
+  if (link.state === 'forwarding') return { rank: 4, Icon: CircleCheck, tone: 'up', label: linkLabels.forwarding }
+  return { rank: 3, Icon: CircleHelp, tone: 'unknown', label: linkLabels[link.state] }
+}
 
 export function LinkOverview(props) {
   const [expanded, setExpanded] = useState(false)
@@ -45,101 +79,42 @@ function LinkOverviewDetails({ summary, nodes, tiers, failurePoints, selectDevic
   const attention = openIncidents?.length
     ? openIncidents.map(({ deviceId, state, affected }) => ({ node: names.get(deviceId), state, affected }))
     : summary.devices.filter(({ state }) => ['isolated', 'degraded'].includes(state))
-  const entries = attention.map(({ node, state, affected }) => ({
-    rank: state === 'isolated' ? 0 : 1,
-    id: node.id,
-    label: node.data.label + ' · ' + baselineLabels[state] + (affected ? ' · ' + affected + ' downstream' : ''),
-    action: () => selectDevice(node),
-  }))
-  for (const link of summary.links) {
-    const speedMismatch =
-      link.source.fresh &&
-      link.target.fresh &&
-      link.source.speedBps &&
-      link.target.speedBps &&
-      link.source.speedBps !== link.target.speedBps
-    const rank =
-      link.state === 'down'
-        ? 2
-        : speedMismatch
-          ? 4
-          : ['oneSided', 'mismatch', 'degraded'].includes(link.state)
-            ? 3
-            : link.count < 2
-              ? 5
-              : link.state === 'portsUp'
-                ? 7
-                : null
-    if (rank === null) continue
-    const detail = speedMismatch
-      ? 'Speed mismatch'
-      : link.count === 0 && link.stale
-        ? 'Port readings overdue'
-        : link.count === 0
-          ? 'Ports not monitored'
-          : link.state === 'degraded'
-            ? 'Degraded link · Sustained errors or discards'
-            : linkLabels[link.state]
-    entries.push({
-      rank,
-      id: link.edge.id,
-      label: title(link, names) + ' · ' + detail,
-      action: () => selectLink(link.edge.id),
-    })
-  }
-  if (failurePoints) {
-    for (const id of failurePoints.devices) {
-      const node = names.get(id)
-      if (node)
-        entries.push({
-          rank: 6,
-          id,
-          label: node.data.label + ' · Single point of failure',
-          action: () => selectDevice(node),
-        })
-    }
-    const byId = new Map(summary.links.map((link) => [link.edge.id, link]))
-    for (const id of failurePoints.links) {
-      const link = byId.get(id)
-      if (link)
-        entries.push({
-          rank: 6,
-          id,
-          label: title(link, names) + ' · Single point of failure',
-          action: () => selectLink(id),
-        })
-    }
-  }
-  entries.sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label))
+  const failureDevices = new Set(failurePoints?.devices)
+  const failureLinks = new Set(failurePoints?.links)
   const byId = new Map(summary.links.map((link) => [link.edge.id, link]))
   const grouped = new Set(summary.bundles.flatMap((bundle) => bundle.members))
   const connectionCount = summary.links.length - grouped.size + summary.bundles.length
-  const connectionButton = (link) => (
-    <button className="health-button" onClick={() => selectLink(link.edge.id)}>
-      {title(link, names)} · {linkLabels[link.state]}
-    </button>
-  )
+  const statusById = new Map(summary.links.map((link) => [link.edge.id, connectionStatus(link)]))
+  const ordered = (links) => links.toSorted((a, b) => statusById.get(a.edge.id).rank - statusById.get(b.edge.id).rank)
+  const connectionButton = (link) => {
+    const { Icon, tone, label, unverified, speedMismatch } = statusById.get(link.edge.id)
+    return (
+      <button className="health-button connection-row" onClick={() => selectLink(link.edge.id)}>
+        <span>{title(link, names)}</span>
+        <span className={`connection-status is-${tone}`}>
+          <Icon size={16} aria-hidden="true" />
+          <span className={unverified ? 'sr-only' : undefined}>
+            {label}
+            {speedMismatch ? ' · Speed mismatch' : ''}
+          </span>
+        </span>
+        {failureLinks.has(link.edge.id) && <span className="connection-risk">Single point of failure</span>}
+      </button>
+    )
+  }
   return (
     <div className="link-overview-actions">
       {!!summary.links.length && (
         <>
-          {!!entries.length && (
-            <details>
-              <summary>Link attention ({entries.length})</summary>
-              <ul>
-                {entries.map(({ id, rank, label, action }) => (
-                  <li key={rank + ':' + id}>
-                    <button className="health-button" onClick={action}>
-                      {label}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
           <details>
             <summary>Connections ({connectionCount})</summary>
-            <ul>
+            {[...statusById.values()].some(({ unverified }) => unverified) && (
+              <p className="connection-legend">
+                <CircleHelp size={16} aria-hidden="true" />A question mark means port readings are unavailable or the
+                link state is unknown.
+              </p>
+            )}
+            <ul className="connection-list">
               {summary.bundles.map((bundle) => {
                 const members = bundle.members.map((id) => byId.get(id)).filter(Boolean)
                 return (
@@ -150,7 +125,7 @@ function LinkOverviewDetails({ summary, nodes, tiers, failurePoints, selectDevic
                           Bundle · {title(members[0], names)} · {bundle.up} of {bundle.total} members up
                         </summary>
                         <ul>
-                          {members.map((link) => (
+                          {ordered(members).map((link) => (
                             <li key={link.edge.id}>{connectionButton(link)}</li>
                           ))}
                         </ul>
@@ -159,13 +134,36 @@ function LinkOverviewDetails({ summary, nodes, tiers, failurePoints, selectDevic
                   )
                 )
               })}
-              {summary.links
-                .filter((link) => !grouped.has(link.edge.id))
-                .map((link) => (
-                  <li key={link.edge.id}>{connectionButton(link)}</li>
-                ))}
+              {ordered(summary.links.filter((link) => !grouped.has(link.edge.id))).map((link) => (
+                <li key={link.edge.id}>{connectionButton(link)}</li>
+              ))}
             </ul>
           </details>
+          {(attention.length > 0 || failureDevices.size > 0) && (
+            <details>
+              <summary>Device redundancy alerts</summary>
+              <ul>
+                {attention.map(({ node, state, affected }) => (
+                  <li key={node.id}>
+                    <button className="health-button" onClick={() => selectDevice(node)}>
+                      {node.data.label} · {baselineLabels[state]}
+                      {affected ? ' · ' + affected + ' downstream' : ''}
+                      {failureDevices.has(node.id) && ' · Single point of failure'}
+                    </button>
+                  </li>
+                ))}
+                {[...failureDevices]
+                  .filter((id) => names.has(id) && !attention.some(({ node }) => node.id === id))
+                  .map((id) => (
+                    <li key={id}>
+                      <button className="health-button" onClick={() => selectDevice(names.get(id))}>
+                        {names.get(id).data.label} · Single point of failure
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+            </details>
+          )}
           {!!summary.devices.length && (
             <details>
               <summary>Redundancy by tier</summary>

@@ -2,15 +2,27 @@ import { hostFetch } from './auth.js'
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
 import useModal from './useModal'
 import { validateTopology } from './topology'
-import { writeHeaders } from './monitoring.js'
+import { refreshLocalWriteToken, writeHeaders } from './monitoring.js'
 
-async function request(method = 'GET', body) {
-  const response = await hostFetch('/api/v1/topology', {
-    method,
-    headers: body ? { 'Content-Type': 'application/json', ...writeHeaders() } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  })
-  const result = await response.json()
+async function request(method = 'GET', body, remote) {
+  const send = () =>
+    hostFetch('/api/v1/topology', {
+      method,
+      headers: body ? { 'Content-Type': 'application/json', ...writeHeaders() } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    })
+  let response = await send()
+  let result = await response.json()
+  if (
+    method === 'PUT' &&
+    !remote &&
+    response.status === 403 &&
+    result.error?.message === 'Valid write token required. Reload NetWatch and try again.' &&
+    (await refreshLocalWriteToken().catch(() => false))
+  ) {
+    response = await send()
+    result = await response.json()
+  }
   if (!response.ok) throw new Error(result.error?.message || 'Host request failed.')
   return result
 }
@@ -81,7 +93,7 @@ function Preview({ action, onClose, onConfirm, busy }) {
   )
 }
 export default forwardRef(function HostStorage(
-  { nodes, edges, groups, roots, onLoad, onSaved, paused, importGeneration },
+  { nodes, edges, groups, roots, onLoad, onSaved, paused, importGeneration, remote },
   ref,
 ) {
   const [host, setHost] = useState(null)
@@ -155,12 +167,16 @@ export default forwardRef(function HostStorage(
         onLoad(action.topology)
         setMessage('Saved network copied to your draft; edits apply only after you choose Use this map.')
       } else {
-        const value = await request('PUT', {
-          source: 'inventory',
-          baseRevision: action.revision,
-          topology: action.topology,
-          monitoring: action.monitoring,
-        })
+        const value = await request(
+          'PUT',
+          {
+            source: 'inventory',
+            baseRevision: action.revision,
+            topology: action.topology,
+            monitoring: action.monitoring,
+          },
+          remote,
+        )
         imported.current = false
         setHost(value)
         setMonitoring(value.monitoring)

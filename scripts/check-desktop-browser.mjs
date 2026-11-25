@@ -18,7 +18,10 @@ try {
   const base = process.env.NETWATCH_URL || 'http://127.0.0.1:5173'
   await page.goto(base)
   await page.locator('.health-node-up').first().waitFor()
-  assert.match(await page.locator('.health-summary').innerText(), /11 up.*1 down.*1 overdue.*1 not monitored/s)
+  const summary = page.locator('.health-summary')
+  for (const name of ['11 Up', '1 Down', '1 Overdue', '1 Not monitored']) {
+    await summary.getByRole('button', { name, exact: true }).waitFor()
+  }
   assert.ok(await page.locator('.health-attention').isVisible())
   for (const [key, count] of [['up', 11], ['down', 1], ['stale', 1], ['unknown', 1]]) {
     await page.locator(`.summary-${key}`).click()
@@ -49,6 +52,10 @@ try {
   assert.equal(await page.locator('.health-node .node-status[aria-label]').count(), 14)
   assert.equal(await page.locator('.health-path-stale path').first().evaluate(node => node.style.strokeDasharray), '')
   await page.screenshot({ path: '.tools/evidence/screenshots/desktop-after.png', fullPage: true })
+  const detailsButton = page.getByRole('button', { name: /^Open details for / }).first()
+  await detailsButton.press('Enter')
+  await page.getByRole('dialog').waitFor()
+  await page.keyboard.press('Escape')
   await page.locator('.health-node').first().evaluate(node => node.closest('.react-flow__node').focus())
   await page.keyboard.press('Enter')
   await page.getByRole('dialog').waitFor()
@@ -63,7 +70,13 @@ try {
   await page.getByRole('link', { name: 'Devices', exact: true }).click()
   for (const width of [1280, 1920, 390, 320]) {
     await page.setViewportSize({ width, height: 900 })
-    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+    const { scrollWidth, offenders } = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      offenders: [...document.querySelectorAll('body *')]
+        .filter(element => element.getBoundingClientRect().right > innerWidth + 0.5)
+        .slice(0, 10).map(element => [element.tagName, element.getAttribute('class')]),
+    }))
+    assert.ok(scrollWidth <= width, `Horizontal overflow at ${width}px: ${scrollWidth}px (${JSON.stringify(offenders)})`)
     assert.equal(await page.locator('.health-inventory table').isVisible(), width >= 720)
     if (width < 720) assert.equal(await page.locator('.health-device-card:visible').count(), 14)
     await page.locator('.backup-recovery summary').click()

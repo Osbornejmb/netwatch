@@ -44,15 +44,21 @@ for (const viewport of [{width:1440,height:900},{width:390,height:844}]) {
   assert.equal(initialBounds.outside,0,'Default full map must fit all 100 devices')
   await page.waitForFunction(count=>document.querySelectorAll('.react-flow__edge').length===count,initial.edges.length)
   const focusedId=initial.nodes[0].id
-  await page.locator('.react-flow__node[data-id='+JSON.stringify(focusedId)+']').press('Enter')
+  const focusedNode=page.locator('.react-flow__node[data-id='+JSON.stringify(focusedId)+']')
+  await focusedNode.focus()
+  await page.waitForFunction(id=>document.activeElement?.dataset.id===id,focusedId)
+  await page.keyboard.press('Enter')
   await page.getByRole('dialog').waitFor()
   await page.keyboard.press('Escape')
   const incidentEdges=initial.edges.filter(edge=>edge.source===focusedId||edge.target===focusedId)
-  await page.waitForFunction(count=>document.querySelectorAll('.react-flow__edge.health-path-highlighted').length===count,incidentEdges.length)
-  assert.ok(await page.locator('.health-node-muted').evaluateAll(nodes=>nodes.length>0&&nodes.every(node=>getComputedStyle(node).opacity==='1')))
-  assert.equal(await page.locator('.react-flow__edge').count(),initial.edges.length)
+  await page.waitForFunction(({highlighted,total})=>{
+    const muted=[...document.querySelectorAll('.health-node-muted')]
+    return document.querySelectorAll('.react-flow__edge').length===total
+      && document.querySelectorAll('.react-flow__edge.health-path-highlighted').length===highlighted
+      && muted.length>0&&muted.every(node=>getComputedStyle(node).opacity==='1')
+  },{highlighted:incidentEdges.length,total:initial.edges.length})
   await page.getByRole('button',{name:'Clear connection highlight'}).click()
-  assert.equal(await page.locator('.react-flow__edge').count(),initial.edges.length)
+  await page.waitForFunction(count=>document.querySelectorAll('.react-flow__edge').length===count,initial.edges.length)
   const stored=()=>page.evaluate(()=>localStorage.getItem('netwatch-topology-v1'))
   assert.equal(await stored(),serialized)
   const view=page.locator('.health-view-options > summary')

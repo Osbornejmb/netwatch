@@ -2,6 +2,8 @@
 
 Use this guide to set up read-only SNMPv3 port monitoring for switches you have added by management IP. Standard interface MIBs supply port status and counters for manually mapped uplinks. VLAN forwarding tables, LLDP, and CDP support optional discovery. The Cisco IOS example below includes the additional configuration verified on a Catalyst 3750.
 
+**Start here:** If you already have a working management IP, skip the blank-switch VLAN/trunk commands. Check Windows reachability and the existing SNMP configuration first. For a new switch, follow sections A–F in order. Only an authorized administrator should change device configuration.
+
 ## 1. Prepare the switch and network
 
 1. Use the switch's local console or management interface to assign it a unique management IP. Use the management VLAN, subnet mask, and gateway or return route appropriate for your network.
@@ -62,9 +64,11 @@ Run these commands at the Cisco IOS console. Before pasting a block, replace eac
 | `<AUTH_PASSPHRASE>`, `<PRIVACY_PASSPHRASE>` | The distinct authentication and privacy passphrases for that SNMPv3 account. Enter them only in your switch console and NetWatch launcher. |
 | `<VLAN_CONTEXT>` | The exact context name for the endpoint VLAN reported by `show snmp context`. This is only needed for optional forwarding-table discovery. |
 
+For help finding these values, see [Network setup and troubleshooting](docs/NETWORK-TROUBLESHOOTING.md).
+
 ### A. Create the VLAN, management interface, and ports
 
-Use the access and trunk port names for the switch you are configuring. Give the switch at the other end its own management IP.
+Supply the actual access and trunk ports from cable tracing and `show interfaces status`. Supply the management VLAN ID from the network plan and existing VLAN database.
 
 ```text
 configure terminal
@@ -80,19 +84,26 @@ interface <ACCESS_PORT>
  switchport access vlan <ACCESS_VLAN_ID>
  no shutdown
 exit
+end
+show ip interface brief
+show interfaces <ACCESS_PORT> switchport
+show mac address-table interface <ACCESS_PORT>
+```
+
+If connecting a second switch, configure the actual inter-switch port on both ends. On an existing trunk do not replace allowed VLANs or change encapsulation unnecessarily. Only for a new trunk, run the following after confirming the required VLANs and native VLAN on both ends. If the switch only supports 802.1Q, omit the encapsulation command.
+
+```text
+configure terminal
 interface <TRUNK_PORT>
  switchport trunk encapsulation dot1q
  switchport mode trunk
  switchport trunk allowed vlan add <TRUNK_VLAN_LIST>
  no shutdown
 end
-show ip interface brief
-show interfaces <ACCESS_PORT> switchport
 show interfaces trunk
-show mac address-table interface <ACCESS_PORT>
 ```
 
-If the switch only supports 802.1Q, it may omit the encapsulation command. Verify the allowed and native VLANs on both ends. If the monitoring PC is on another subnet, configure the switch's management return path for that network. An SVI may remain down until the VLAN has an active member port.
+For the remote switch, substitute its own trunk port. The block adds the management VLAN; obtain any additional required VLANs from the network plan. Verify the allowed and native VLANs on both ends. If the monitoring PC is on another subnet, configure the switch's management return path for that network. An SVI may remain down until the VLAN has an active member port.
 
 ### B. Enable and verify neighbor discovery
 
@@ -124,7 +135,7 @@ Verify the neighbor's management address, local interface, and remote port. Enab
 
 ### C. Create the read-only SNMPv3 account and views
 
-Use the approved SNMP names, ACL and passphrases from the table above. The default view grants uptime, interface counters, LLDP, and CDP. Omit the discovery subtree for a protocol you do not use.
+Obtain the source PC IPv4 from `ipconfig /all` on the NetWatch host and verify the route to the switch with `route print -4`. Do not use the switch management IP or DHCP server address in the source ACL. Choose the username (or read the existing one with `show snmp user`) and enter both passphrases locally. Identify an appropriate unused ACL number or reuse the existing restricted ACL after checking its rules and other uses. The default view grants uptime, interface counters, LLDP, and CDP. Omit the discovery subtree for a protocol you do not use.
 
 ```text
 configure terminal
@@ -145,9 +156,24 @@ show snmp context
 
 With IOS `auth sha`, select **SHA-1** in the NetWatch launcher. The privacy setting is **AES-128**. [Cisco SNMP configuration guide](https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst3750/software/release/15-0_2_se/configuration/guide/scg3750/swsnmp.html) · [Cisco CDP MIB reference](https://www.cisco.com/c/en/us/td/docs/security/ise/1-4-1/admin_guide/b_ise_admin_guide_141/b_ise_admin_guide_141_chapter_0100001.pdf)
 
+#### Correct an existing source ACL
+
+On the switch console, run `show snmp group` and `show access-lists` to identify the ACL already used by SNMP. On Windows, use `ipconfig /all` and `route print -4` to obtain the actual host source IPv4. Review ACL usage and rule order before editing. If the address is missing and you are authorized to add it, preserve existing rules and ensure the new permit precedes any explicit deny.
+
+```text
+configure terminal
+ip access-list standard <SNMP_ACL_NUMBER>
+permit host <NETWATCH_PC_IP>
+exit
+end
+show access-lists <SNMP_ACL_NUMBER>
+```
+
+Test the existing username and credentials in NetWatch before saving the configuration. Do not create a second group or user just to fix an ACL mismatch.
+
 ### D. Expose the MAC forwarding table
 
-If `show snmp context` lists a context for the endpoint VLAN, add a dedicated read view and a group entry for that exact context. Keep the default group entry for interface polling and neighbor discovery.
+If `show snmp context` lists a context for the endpoint VLAN, supply its exact name as `<VLAN_CONTEXT>` (Cisco names often contain a hyphen). Add a dedicated read view and group entry for that context. Keep the default group entry for interface polling and neighbor discovery.
 
 ```text
 configure terminal
@@ -195,6 +221,10 @@ copy running-config startup-config
 ```
 
 ## Troubleshooting
+
+Start with the [ordered Windows, VLAN, ACL and SNMP diagnostics](docs/NETWORK-TROUBLESHOOTING.md). A failed interface test is not evidence of a VLAN-context problem; test the default-context interface view first.
+
+To replace an existing SNMPv3 username, create the new user in the same group with the command in section C, test and enroll it, then remove the old user with `no snmp-server user <OLD_SNMP_USERNAME> NETWATCH v3` only after verifying no other poller needs it. Save the configuration after verification.
 
 | Symptom | Check |
 | --- | --- |

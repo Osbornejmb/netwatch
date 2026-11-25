@@ -44,9 +44,13 @@ function HealthNode({ data, selected }) {
       <NodeHandles />
       <StatusIcon size={16} role="img" aria-label={HEALTH[data.status].label} className="node-status" />
       <KindIcon size={14} aria-hidden="true" className="map-device-kind" />
-      <div className="device-copy">
+      <button
+        type="button"
+        className="device-copy map-device-details"
+        aria-label={`Open details for ${data.label}, ${deviceTypes[data.kind]}, ${HEALTH[data.status].label}`}
+      >
         <strong className={data.ip && data.label === data.ip ? 'device-ip-label' : undefined}>{data.label}</strong>
-      </div>
+      </button>
       <InfoTooltip label={`Information for ${data.label}`}>
         <strong>{data.label}</strong>
         <span>
@@ -103,6 +107,12 @@ export default function Dashboard({
   const [selectedId, setSelectedId] = useState(null)
   const [selectedLinkId, setSelectedLinkId] = useState(null)
   const [highlightedId, setHighlightedId] = useState(null)
+  const [previousShowInventory, setPreviousShowInventory] = useState(showInventory)
+  if (previousShowInventory !== showInventory) {
+    setPreviousShowInventory(showInventory)
+    setSelectedId(null)
+    setSelectedLinkId(null)
+  }
   const [dragging, setDragging] = useState(false)
   useEffect(() => {
     if (!dragging) return
@@ -574,37 +584,18 @@ export default function Dashboard({
           </details>
         </div>
       </header>
-      {!showInventory && (
-        <LinkOverview
-          summary={summary}
-          topology={!viewer && live ? live.inventory.topology : undefined}
-          dynamics={viewer ? undefined : live?.dynamics}
-          nodes={nodes}
-          tiers={tiers}
-          failurePoints={viewer ? undefined : live?.linkHealth?.failurePoints}
-          selectLink={(id) => {
-            setSelectedId(null)
-            setSelectedLinkId(id)
-          }}
-          selectDevice={selectDevice}
-        />
-      )}
       <div className="health-overview">
         <div className="health-summary" aria-label="Device health summary">
-          {Object.entries({ up: 'up', down: 'down', stale: 'overdue', unknown: 'not monitored' }).map(
-            ([key, label], index) => (
-              <span key={key}>
-                {index > 0 && ' · '}
-                <button
-                  className={`summary-${key}`}
-                  aria-pressed={statusFilter === key}
-                  onClick={() => setStatusFilter(statusFilter === key ? 'all' : key)}
-                >
-                  {counts[key]} {label}
-                </button>
-              </span>
-            ),
-          )}
+          {Object.entries(HEALTH).map(([key, { label }]) => (
+            <button
+              key={key}
+              className={`summary-${key}`}
+              aria-pressed={statusFilter === key}
+              onClick={() => setStatusFilter(statusFilter === key ? 'all' : key)}
+            >
+              <strong>{counts[key]}</strong> {label}
+            </button>
+          ))}
         </div>
         {attention.length > 0 && (
           <details className="health-attention">
@@ -717,6 +708,9 @@ export default function Dashboard({
               {visible.map((node) => (
                 <article key={node.id} className="health-device-card">
                   <strong>{node.data.label}</strong>
+                  {node.data.ip && node.data.ip !== node.data.label && (
+                    <span className="health-address">{node.data.ip}</span>
+                  )}
                   <Status status={node.health} />
                   <InfoTooltip label={`Information for ${node.data.label}`}>
                     <span>{node.data.ip || 'No address'}</span>
@@ -739,6 +733,7 @@ export default function Dashboard({
       ) : (
         <div className={`health-map${dense || nodes.length >= 120 ? ' health-map-large' : ''}`}>
           <ReactFlow
+            style={{ position: 'absolute', inset: 0 }}
             key={`${layoutKey}-${effectiveCenterId}`}
             onNodesChange={(changes) => {
               onDimensionsChange(changes)
@@ -758,6 +753,7 @@ export default function Dashboard({
               setSelectedId(null)
               setHighlightedId(null)
             }}
+            preventScrolling={false}
             nodesDraggable={!viewer}
             onlyRenderVisibleElements={nodes.length >= 120 || edges.length >= 200}
             nodesConnectable={false}
@@ -838,6 +834,21 @@ export default function Dashboard({
             </div>
           )}
         </div>
+      )}
+      {!showInventory && (
+        <LinkOverview
+          summary={summary}
+          topology={!viewer && live ? live.inventory.topology : undefined}
+          dynamics={viewer ? undefined : live?.dynamics}
+          nodes={nodes}
+          tiers={tiers}
+          failurePoints={viewer ? undefined : live?.linkHealth?.failurePoints}
+          selectLink={(id) => {
+            setSelectedId(null)
+            setSelectedLinkId(id)
+          }}
+          selectDevice={selectDevice}
+        />
       )}
       {selectedLink && (
         <LinkDetails link={selectedLink} nodes={nodes} now={now} onClose={() => setSelectedLinkId(null)} />

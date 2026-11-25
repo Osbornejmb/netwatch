@@ -28,9 +28,17 @@ See [SNMP interface setup](SNMP-INTERFACES.md) and [how to interpret link eviden
 
 ## Reference
 
+- [First-time setup guide](SETUP.md) — start here: chronological commands and enrollment
+- [Setup reference](SETUP-REFERENCE.md) — advanced settings, maintenance and verification evidence
+
+- [Network setup and troubleshooting](NETWORK-TROUBLESHOOTING.md) — required input sources, Windows reachability, VLAN/trunk, SNMP and enrollment diagnostics
+- [Managed switch setup](../switchconfig.md) — Cisco IOS configuration with explicitly identified inputs
+
 - [ARCHITECTURE](ARCHITECTURE.md) — maintained reference
 - [DESIGN](DESIGN.md) — maintained reference
 - [DISCOVERY](DISCOVERY.md) — maintained reference
+- [LINK-HEALTH](LINK-HEALTH.md) — maintained reference for Connections, redundancy alerts and Map tools
+- [Repository audit](../AUDIT.md) — findings recorded against the audited working tree
 - [HOST-API](HOST-API.md) — maintained reference
 - [ICMP-COLLECTOR](ICMP-COLLECTOR.md) — maintained reference
 - [INCIDENTS-CHECKPOINT](INCIDENTS-CHECKPOINT.md) — historical log

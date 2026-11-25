@@ -232,6 +232,9 @@ function LocalDiscovery({ remote, stageDiscovery }) {
       <header className="page-heading">
         <h1 id="discovery-title">Discovered devices</h1>
         <div className="discovery-heading-actions">
+          <button className="button primary" disabled={busy} onClick={scan}>
+            {scanning ? 'Scanning…' : 'Scan now'}
+          </button>
           <button
             className="button secondary"
             disabled={busy || !pending.count}
@@ -259,9 +262,6 @@ function LocalDiscovery({ remote, stageDiscovery }) {
             }
           >
             Clear all
-          </button>
-          <button className="button primary" disabled={busy} onClick={scan}>
-            {scanning ? 'Scanning…' : 'Scan now'}
           </button>
         </div>
       </header>
@@ -307,8 +307,10 @@ function LocalDiscovery({ remote, stageDiscovery }) {
             return (
               <li key={device.id} className="discovery-row">
                 <div className="discovery-identity">
-                  <strong>{device.hostname || device.ip}</strong>
-                  {device.hostname && <span>{device.ip}</span>}
+                  <div className="discovery-device-name">
+                    <strong>{device.hostname || device.ip}</strong>
+                    {device.hostname && <span>{device.ip}</span>}
+                  </div>
                   <span>{statusLabel[device.status] || 'New'}</span>
                   {device.source === 'gateway' && device.status !== 'gone' && <span>Router · Default gateway</span>}
                   {device.source === 'gateway-mac' && device.status !== 'gone' && (

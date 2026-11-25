@@ -93,16 +93,32 @@ try {
     await page.getByText(/Router and switch mode is on/).waitFor()
     assert.equal(await page.getByRole('button', { name: 'Scan now' }).count(), 0)
   }
-  assert.equal(await page.getByLabel('Start device').count(), 0)
-  await page.locator('.topology-proposals > summary').click()
-  await page.getByText('Scheduled discovery · Off', { exact: true }).click()
+  assert.equal(await page.getByLabel('Manual start device').count(), 0)
+  assert.equal(await page.locator('.topology-proposals').evaluate((panel) => panel.open), false)
+  const scheduleToggle = page.getByRole('checkbox', { name: 'Run automatically' })
+  await scheduleToggle.check()
   await page.locator('select[name="discoverySeed"]').selectOption('Router')
   await page.locator('input[name="interval"]').fill('60')
   await page.getByRole('button', { name: 'Save schedule' }).click()
-  await page.getByText('Scheduled discovery · On', { exact: true }).waitFor()
+  await page.getByRole('status').getByText('Discovery schedule saved.').waitFor()
   assert.deepEqual(store.dynamics.schedule(), { seedId: 'Router', intervalMinutes: 60 })
-  await page.getByText('Scheduled discovery · On', { exact: true }).click()
-  await page.getByLabel('Start device').selectOption('Router')
+  await page.locator('.topology-proposals > summary').click()
+  await page.route('**/api/v1/discovery/runs', (route) => route.abort(), { times: 1 })
+  await page.getByText('Could not refresh topology discovery. Showing the last results.').waitFor()
+  await discovery.start('Router')
+  await page
+    .getByRole('status')
+    .getByText(
+      cdpOnly ? /Discovery complete · 2 connections to review/ : /Discovery complete · 1 connections to review/,
+    )
+    .waitFor()
+  await page.locator('.topology-proposals > summary').click()
+  await scheduleToggle.uncheck()
+  await page.getByRole('button', { name: 'Save schedule' }).click()
+  await page.waitForFunction(() => document.querySelector('button[type="submit"]').disabled === false)
+  assert.equal(store.dynamics.schedule().intervalMinutes, 0)
+  await page.locator('.topology-proposals > summary').click()
+  await page.getByLabel('Manual start device').selectOption('Router')
   await page.getByRole('button', { name: 'Find connections' }).click()
   await page
     .getByRole('status')
@@ -120,15 +136,49 @@ try {
   await preview
     .getByText(/Router \(port 1\).*Access switch \(port 2\)|Access switch \(port 2\).*Router \(port 1\)/)
     .waitFor()
+  const writeDraft = await page.evaluateHandle(() => Storage.prototype.setItem)
+  await page.evaluate(() => {
+    const write = Storage.prototype.setItem
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'netwatch-topology-v1' && JSON.parse(value).edges.length)
+        throw new DOMException('Fixture quota failure', 'QuotaExceededError')
+      return write.call(this, key, value)
+    }
+  })
   await preview.getByRole('button', { name: 'Add to draft', exact: true }).click()
-  await proposals.getByText('Added to the draft map. Review it in Edit map.').waitFor()
+  await preview
+    .getByRole('alert')
+    .getByText('Could not save the draft map. Check browser storage and try again.')
+    .waitFor({ timeout: 3000 })
+  assert.equal(discovery.latest().links.find(({ confidence }) => confidence === 'verified').status, 'proposed')
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('netwatch-topology-v1')).edges.length), 0)
+  await page.evaluate((write) => {
+    Storage.prototype.setItem = write
+  }, writeDraft)
+  await writeDraft.dispose()
+  await page.route(
+    '**/api/v1/discovery/runs/*/accept',
+    async (route) => {
+      const draft = await page.evaluate(() => JSON.parse(localStorage.getItem('netwatch-topology-v1')))
+      assert.equal(draft.edges.length, 1, 'Draft must be durable before the host records acceptance')
+      const response = await route.fetch()
+      assert.ok(response.ok())
+      await route.abort()
+    },
+    { times: 1 },
+  )
+  await preview.getByRole('button', { name: 'Add to draft', exact: true }).click()
+  await proposals.getByText('The draft map was saved. Could not confirm the proposal with the host.').waitFor()
+  assert.equal(discovery.latest().links.find(({ confidence }) => confidence === 'verified').status, 'accepted')
   assert.equal(store.revision(), 1)
   assert.equal(store.read().topology.edges.length, 0)
   await page.setViewportSize({ width: 390, height: 844 })
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1))
   if (infrastructureOnly && !cdpOnly && process.env.NETWATCH_TEST_SCREENSHOTS === '1')
     await page.screenshot({ path: 'docs/screenshots/router-switch-discovery.png' })
+  await page.reload()
   await page.getByRole('link', { name: 'Edit map', exact: true }).click()
+  await page.getByText(infrastructureOnly ? /3 devices · 1 connection/ : /2 devices · 1 connection/).waitFor()
   await page.getByRole('button', { name: 'Use this map', exact: true }).click()
   await page.getByRole('button', { name: 'Confirm replacement' }).click()
   await page.waitForFunction(() => !document.querySelector('dialog[open]'))

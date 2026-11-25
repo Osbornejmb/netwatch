@@ -33,13 +33,14 @@ const labels = {
 }
 const explain = (code) => labels[code] ?? 'Device details unavailable'
 
-async function request(path, body) {
+async function request(path, body, signal) {
   const response = await hostFetch(
     root + path,
     body === undefined
-      ? {}
+      ? { signal, cache: 'no-store' }
       : {
           method: 'POST',
+          signal,
           headers: { ...writeHeaders(), ...(body !== null && { 'Content-Type': 'application/json' }) },
           ...(body !== null && { body: JSON.stringify(body) }),
         },
@@ -73,48 +74,60 @@ export default function TopologyDiscovery({ stageDiscovery, infrastructureOnly =
   const [data, setData] = useState(null)
   const [seed, setSeed] = useState('')
   const [interval, setInterval] = useState(null)
+  const [scheduleEnabled, setScheduleEnabled] = useState(null)
   const [filter, setFilter] = useState('all')
   const [busy, setBusy] = useState(false)
   const [matches, setMatches] = useState({})
   const [preview, setPreview] = useState(null)
   const [message, setMessage] = useState('')
+  const [refreshError, setRefreshError] = useState(false)
   const run = data?.run
   const runId = run?.id
   const running = run?.status === 'running'
   const refresh = async () => setData(await request('runs'))
 
   useEffect(() => {
-    let stop = false
-    request('runs')
-      .then((value) => {
-        if (!stop) setData(value)
-      })
-      .catch(() => {
-        if (!stop) setMessage('Could not load topology discovery.')
-      })
-    return () => {
-      stop = true
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!running) return
-    let stop = false,
-      timer
+    if (busy) return
+    const controller = new AbortController()
+    const { signal } = controller
+    let timer
+    let inFlight = false
+    let retryLatest = false
     async function poll() {
+      if (document.hidden || inFlight) return
+      inFlight = true
       try {
-        const current = await request('runs/' + encodeURIComponent(runId))
-        if (!stop) setData((previous) => ({ ...previous, run: current }))
-        if (current.status !== 'running') return
-      } catch {}
-      if (!stop) timer = setTimeout(poll, 1000)
+        const fetchRunOnly = running && !retryLatest
+        const current = await request(
+          fetchRunOnly ? 'runs/' + encodeURIComponent(runId) : 'runs',
+          undefined,
+          AbortSignal.any([signal, AbortSignal.timeout(8000)]),
+        )
+        if (!signal.aborted) {
+          setData((previous) => (fetchRunOnly ? { ...previous, run: current } : current))
+          retryLatest = false
+          setRefreshError(false)
+        }
+      } catch {
+        retryLatest = true
+        if (!signal.aborted) setRefreshError(true)
+      } finally {
+        inFlight = false
+        if (!signal.aborted && !document.hidden) timer = setTimeout(poll, running && !retryLatest ? 1000 : 5000)
+      }
     }
-    timer = setTimeout(poll, 1000)
-    return () => {
-      stop = true
+    function visibilityChanged() {
       clearTimeout(timer)
+      if (!document.hidden) void poll()
     }
-  }, [running, runId])
+    void poll()
+    document.addEventListener('visibilitychange', visibilityChanged)
+    return () => {
+      controller.abort()
+      clearTimeout(timer)
+      document.removeEventListener('visibilitychange', visibilityChanged)
+    }
+  }, [busy, running, runId])
 
   const act = async (fn) => {
     setBusy(true)
@@ -138,15 +151,25 @@ export default function TopologyDiscovery({ stageDiscovery, infrastructureOnly =
       const body = { ids, baseRevision: await revision(), matches }
       const { draft } = await request(runPath + '/accept', { ...body, preview: true })
       await stageDiscovery(draft, true)
-      setPreview({ draft, body, path: runPath + '/accept' })
+      setPreview({ draft, body, path: runPath + '/accept', acknowledge: true })
     })
   const apply = () =>
     act(async () => {
-      const { draft } = await request(preview.path, preview.body)
+      const { draft } = preview.acknowledge
+        ? preview
+        : await request(preview.path, preview.body, AbortSignal.timeout(8000))
       await stageDiscovery(draft)
       setPreview(null)
+      if (preview.acknowledge) {
+        try {
+          await request(preview.path, preview.body, AbortSignal.timeout(8000))
+        } catch {
+          setMessage('The draft map was saved. Could not confirm the proposal with the host.')
+          return
+        }
+      }
       setMessage('Added to the draft map. Review it in Edit map.')
-      await refresh()
+      await refresh().catch(() => {})
     })
   const visibleDevices = (run?.devices ?? []).filter((device) => !infrastructureOnly || isInfrastructure(device.type))
   const devices = new Map(visibleDevices.map((device) => [device.chassisKey, device]))
@@ -169,92 +192,129 @@ export default function TopologyDiscovery({ stageDiscovery, infrastructureOnly =
             (filter === 'attention' && link.confidence !== 'verified') ||
             (filter === 'unmanaged' && linkDevices(link).some((device) => device?.state === 'unmanaged')),
         )
+  const proposalCount = proposed.length + hints.length
+  const scheduled = scheduleEnabled ?? Boolean(data?.schedule?.intervalMinutes)
   return (
-    <section className="inventory-controls" aria-label="Topology proposals">
+    <section className="discovery-topology" aria-label="Topology proposals">
+      {data?.schedule && (
+        <form
+          className="discovery-schedule"
+          aria-labelledby="discovery-schedule-title"
+          onSubmit={(event) => {
+            event.preventDefault()
+            const fields = new FormData(event.currentTarget)
+            void act(async () => {
+              const schedule = await request('schedule', {
+                seedId: fields.get('discoverySeed'),
+                intervalMinutes: scheduled ? Number(fields.get('interval')) : 0,
+              })
+              setData((previous) => ({ ...previous, schedule }))
+              setScheduleEnabled(null)
+              setInterval(null)
+              setMessage('Discovery schedule saved.')
+            })
+          }}
+        >
+          <h2 id="discovery-schedule-title">Scheduled discovery</h2>
+          <div className="discovery-schedule-fields">
+            <label className="discovery-schedule-toggle">
+              <input
+                type="checkbox"
+                checked={scheduled}
+                onChange={(event) => setScheduleEnabled(event.target.checked)}
+              />
+              Run automatically
+            </label>
+            <label>
+              Interval (minutes)
+              <input
+                name="interval"
+                type="number"
+                min="15"
+                max="1440"
+                step="1"
+                required={scheduled}
+                disabled={!scheduled}
+                placeholder="15–1440"
+                value={interval ?? (data.schedule.intervalMinutes || '')}
+                onChange={(event) => setInterval(event.target.value)}
+              />
+            </label>
+            <label>
+              Scheduled start device
+              <select name="discoverySeed" key={data.schedule.seedId} defaultValue={data.schedule.seedId || seed}>
+                <option value="">Choose an enrolled device</option>
+                {data.seeds.map(({ id, label }) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="submit" className="button secondary" disabled={busy}>
+              Save schedule
+            </button>
+          </div>
+        </form>
+      )}
+      {refreshError && (
+        <p className="discovery-message" role="status">
+          {data
+            ? 'Could not refresh topology discovery. Showing the last results.'
+            : 'Could not load topology discovery.'}
+        </p>
+      )}
+      {message && !preview && (
+        <p className="discovery-message" role="status">
+          {message}
+        </p>
+      )}
       <details className="topology-proposals" onToggle={(event) => setExpanded(event.currentTarget.open)}>
         <summary>
           Topology proposals
-          {(proposed.length > 0 || hints.length > 0) && (
-            <span className="topology-proposal-count"> · {proposed.length + hints.length} to review</span>
-          )}
+          <span className="topology-proposal-count">
+            {running
+              ? ' · Checking connections…'
+              : proposalCount
+                ? ' · ' + proposalCount + ' to review'
+                : data
+                  ? ' · Nothing to review'
+                  : ''}
+          </span>
         </summary>
         {expanded && (
           <div className="topology-proposal-controls">
-            {data?.schedule && (
-              <details>
-                <summary>Scheduled discovery · {data.schedule.intervalMinutes ? 'On' : 'Off'}</summary>
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    void act(async () => {
-                      const fields = new FormData(event.currentTarget)
-                      const schedule = await request('schedule', {
-                        seedId: fields.get('discoverySeed'),
-                        intervalMinutes: Number(fields.get('interval')),
-                      })
-                      setData((previous) => ({ ...previous, schedule }))
-                      setInterval(null)
-                      setMessage('Discovery schedule saved.')
-                    })
-                  }}
+            <div className="discovery-manual">
+              <label>
+                Manual start device
+                <select
+                  id="discovery-seed"
+                  value={seed}
+                  disabled={running || busy}
+                  onChange={(event) => setSeed(event.target.value)}
                 >
-                  <label>
-                    Rediscovery seed
-                    <select name="discoverySeed" key={data.schedule.seedId} defaultValue={data.schedule.seedId || seed}>
-                      <option value="">Choose an enrolled device</option>
-                      {data.seeds.map(({ id, label }) => (
-                        <option key={id} value={id}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Minutes between runs
-                    <input
-                      name="interval"
-                      type="number"
-                      min="0"
-                      max="1440"
-                      step="1"
-                      value={interval ?? data.schedule.intervalMinutes}
-                      onChange={(event) => setInterval(event.target.value)}
-                    />
-                  </label>
-                  <p>Enter 0 to turn scheduling off. Choose 15–1,440 minutes for automatic runs.</p>
-                  <button type="submit" className="button secondary" disabled={busy}>
-                    Save schedule
-                  </button>
-                </form>
-              </details>
-            )}
-            <label htmlFor="discovery-seed">Start device</label>
-            <select
-              id="discovery-seed"
-              value={seed}
-              disabled={running || busy}
-              onChange={(event) => setSeed(event.target.value)}
-            >
-              <option value="">Choose an enrolled device</option>
-              {(data?.seeds ?? []).map(({ id, label }) => (
-                <option key={id} value={id}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <button
-              className="button secondary"
-              disabled={running || busy || !seed}
-              onClick={() =>
-                act(async () => {
-                  const run = await request('runs', { seedId: seed })
-                  setMatches({})
-                  setData((previous) => ({ ...previous, run }))
-                })
-              }
-            >
-              Find connections
-            </button>
+                  <option value="">Choose an enrolled device</option>
+                  {(data?.seeds ?? []).map(({ id, label }) => (
+                    <option key={id} value={id}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className="button secondary"
+                disabled={running || busy || !seed}
+                onClick={() =>
+                  act(async () => {
+                    const run = await request('runs', { seedId: seed })
+                    setMatches({})
+                    setData((previous) => ({ ...previous, run }))
+                  })
+                }
+              >
+                Find connections
+              </button>
+            </div>
             {running && (
               <>
                 <p role="status">Checking connections · {run.progress?.queried ?? 0} devices checked</p>
@@ -459,7 +519,6 @@ export default function TopologyDiscovery({ stageDiscovery, infrastructureOnly =
                 </ul>
               </details>
             )}
-            {message && <p role="status">{message}</p>}
             {preview && (
               <ConfirmDialog
                 title="Add to draft map?"
@@ -470,6 +529,7 @@ export default function TopologyDiscovery({ stageDiscovery, infrastructureOnly =
                 onClose={() => setPreview(null)}
                 onConfirm={apply}
               >
+                {message && <p role="alert">{message}</p>}
                 <p>These connections will be available in Edit map. Use this map to review and apply your draft.</p>
                 {!!preview.draft.nodes.length && (
                   <ul>

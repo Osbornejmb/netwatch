@@ -1,6 +1,37 @@
 # NetWatch changelog
 
-## Unreleased
+## v0.2.4 Windows release
+
+- Preserve access policy and audit history when restoring a database.
+- Recover draft-map saves and reject stale dashboard revisions.
+- Save discovery drafts before recording proposal acceptance, and refresh open discovery views after scheduled runs.
+- Improve redundancy outage attribution using a single graph traversal.
+- Add a named Details button to dashboard device cards and dismiss details during dashboard history navigation.
+- Clarify offline backup instructions and extend automated regression coverage.
+
+Download the unsigned Windows x64 installer and verify it against SHA256SUMS.txt. Quit NetWatch and create the matching offline database backup before upgrading. See the [database upgrade guide](https://github.com/Osbornejmb/netwatch/blob/v0.2.4/docs/HOST-API.md#sqlite-migrations-and-retention). Physical switch and second-PC verification remain pending.
+
+[Changes since v0.2.3](https://github.com/Osbornejmb/netwatch/compare/v0.2.3...v0.2.4)
+
+## v0.2.3 Windows release
+
+- Keep the dashboard map visible at 100% browser zoom. Link details and redundancy tools expand below the map without resizing it.
+- Review a single connection list and use the device status chips to filter the map. The chips and navigation wrap on narrow screens.
+- Keep scan and bulk actions visible while scrolling Discovered devices. Set the interval and start device for scheduled topology discovery independently of manual runs.
+- Use **Clear draft map** next to **Use this map**. Clearing requires confirmation and affects the draft.
+
+Download the unsigned Windows x64 installer and verify it against SHA256SUMS.txt. Quit NetWatch and back up your database before upgrading. See the [database upgrade guide](https://github.com/Osbornejmb/netwatch/blob/v0.2.3/docs/HOST-API.md#sqlite-migrations-and-retention) for the matching backup required by older database versions.
+
+[Changes since v0.2.2](https://github.com/Osbornejmb/netwatch/compare/v0.2.2...v0.2.3)
+
+## v0.2.2 Windows prerelease
+
+- Added a way to clear the draft map.
+- Simplified map connections and improved readability on large maps.
+
+Download the Windows x64 installer and verify it against SHA256SUMS.txt. The installer is unsigned. Back up your database before upgrading.
+
+### Changes included in v0.2.2
 
 - Nearby discovery adds devices without a supported switch or router identity as endpoints. Choose Endpoint, Computer, Printer, Switch, or Router in Edit map. Device shapes and icons distinguish endpoints and infrastructure without changing the health colors.
 
