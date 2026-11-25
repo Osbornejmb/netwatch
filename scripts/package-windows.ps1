@@ -65,6 +65,7 @@ try {
       "[assembly: System.Reflection.AssemblyInformationalVersion(`"$version`")]"
     )
     Invoke-BuildCommand $csc @('/nologo', '/target:winexe', '/define:PACKAGED', "/out:$payload\NetWatch.exe",
+      ('/win32icon:' + (Join-Path $root 'desktop\NetWatch.ico')),
       '/reference:System.Windows.Forms.dll', '/reference:System.Drawing.dll', '/reference:System.Web.Extensions.dll',
       (Join-Path $root 'desktop\NetWatch.cs'), $assemblyInfo)
     $helpers = (New-Item -ItemType Directory (Join-Path $payload 'helpers')).FullName

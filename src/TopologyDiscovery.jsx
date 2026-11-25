@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { hostFetch } from './auth.js'
 import { writeHeaders } from './monitoring.js'
 import ConfirmDialog from './ConfirmDialog.jsx'
+import { isInfrastructure } from './device-types.js'
 
 const root = '/api/v1/discovery/'
 const labels = {
@@ -68,7 +69,7 @@ function DiscoveryTree({ devices }) {
   return render(branches.get(undefined) ?? [])
 }
 
-export default function TopologyDiscovery({ stageDiscovery }) {
+export default function TopologyDiscovery({ stageDiscovery, infrastructureOnly = false }) {
   const [expanded, setExpanded] = useState(false)
   const [data, setData] = useState(null)
   const [seed, setSeed] = useState('')
@@ -170,11 +171,16 @@ export default function TopologyDiscovery({ stageDiscovery }) {
       setMessage('Added to the draft map. Review it in Edit map.')
       await refresh().catch(() => {})
     })
-  const devices = new Map((run?.devices ?? []).map((device) => [device.chassisKey, device]))
+  const visibleDevices = (run?.devices ?? []).filter((device) => !infrastructureOnly || isInfrastructure(device.type))
+  const devices = new Map(visibleDevices.map((device) => [device.chassisKey, device]))
+  const hints = infrastructureOnly ? [] : (data?.hints ?? [])
   const linkDevices = (link) => [devices.get(link.source), devices.get(link.target)]
   const canAccept = (link) =>
-    link.confidence !== 'conflict' && linkDevices(link).every((device) => device?.type !== 'other')
-  const proposed = (run?.links ?? []).filter((link) => link.status === 'proposed')
+    link.confidence !== 'conflict' &&
+    linkDevices(link).every((device) => device?.type !== 'other' && !device?.observedOnly)
+  const proposed = (run?.links ?? []).filter(
+    (link) => link.status === 'proposed' && (!infrastructureOnly || linkDevices(link).every(Boolean)),
+  )
   const verified = proposed.filter((link) => link.confidence === 'verified' && canAccept(link))
   const displayed =
     proposed.length <= 1
@@ -186,7 +192,7 @@ export default function TopologyDiscovery({ stageDiscovery }) {
             (filter === 'attention' && link.confidence !== 'verified') ||
             (filter === 'unmanaged' && linkDevices(link).some((device) => device?.state === 'unmanaged')),
         )
-  const proposalCount = proposed.length + (data?.hints?.length ?? 0)
+  const proposalCount = proposed.length + hints.length
   const scheduled = scheduleEnabled ?? Boolean(data?.schedule?.intervalMinutes)
   return (
     <section className="discovery-topology" aria-label="Topology proposals">
@@ -327,7 +333,7 @@ export default function TopologyDiscovery({ stageDiscovery }) {
                   {run.status === 'partial' ? 'Partial results' : 'Discovery complete'} · {proposed.length} connections
                   to review
                 </p>
-                {!!run.cdpReports?.length && (
+                {!infrastructureOnly && !!run.cdpReports?.length && (
                   <details>
                     <summary>CDP reports ({run.cdpReports.length})</summary>
                     <ul>
@@ -348,17 +354,17 @@ export default function TopologyDiscovery({ stageDiscovery }) {
                     ))}
                   </ul>
                 )}
-                {!!run.devices.length && (
+                {!!visibleDevices.length && (
                   <details>
                     <summary>Discovery tree</summary>
-                    <DiscoveryTree devices={run.devices} />
+                    <DiscoveryTree devices={visibleDevices} />
                   </details>
                 )}
-                {!!run.devices.length && (
+                {!!visibleDevices.length && (
                   <details>
-                    <summary>Devices found ({run.devices.length})</summary>
+                    <summary>Devices found ({visibleDevices.length})</summary>
                     <ul>
-                      {[...run.devices]
+                      {[...visibleDevices]
                         .sort((a, b) => (a.depth ?? 99) - (b.depth ?? 99))
                         .map((device) => (
                           <li key={device.id}>
@@ -368,7 +374,7 @@ export default function TopologyDiscovery({ stageDiscovery }) {
                             {device.reason && ' · ' + explain(device.reason)}
                             {device.status === 'proposed' && (
                               <>
-                                {device.type !== 'other' && (
+                                {device.type !== 'other' && !device.observedOnly && (
                                   <button
                                     className="button secondary"
                                     disabled={busy}
@@ -447,6 +453,9 @@ export default function TopologyDiscovery({ stageDiscovery }) {
                         {linkDevices(link)[1]?.label || 'Unnamed device'} ({link.targetPort.label || 'port unknown'}) ·{' '}
                         {explain(link.confidence)}
                         {link.sourceProtocol === 'both' && ' · LLDP and CDP'}
+                        {link.sourceProtocol === 'cdp' && ' · CDP'}
+                        {linkDevices(link).some((device) => device?.observedOnly) &&
+                          ' · Neighbor has no port checks set up'}
                       </p>
                       <details>
                         <summary>Evidence</summary>
@@ -483,11 +492,11 @@ export default function TopologyDiscovery({ stageDiscovery }) {
                 </ul>
               </>
             )}
-            {!!data?.hints?.length && (
+            {!!hints.length && (
               <details>
                 <summary>Local connection hints</summary>
                 <ul>
-                  {data.hints.map((hint) => (
+                  {hints.map((hint) => (
                     <li key={hint.id}>
                       {hint.sourceLabel} ↔ {hint.targetLabel} · {hint.label}
                       <button

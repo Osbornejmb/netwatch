@@ -24,6 +24,8 @@ NetWatch monitors device reachability (ping), switch ports (SNMPv3) and reviewed
 
 ## 2. Find the actual network addresses
 
+Use the [routed monitoring tutorial](README.md#tutorial-for-monitoring-devices-across-routed-subnets) when the PC and devices are on different subnets. Start with known device IPs and manually mapped uplinks. Discovery in step 5 is optional.
+
 On the Windows PC running NetWatch, open PowerShell:
 
 ~~~powershell
@@ -56,8 +58,8 @@ Expected: replies if ICMP is permitted. A directly connected Ethernet subnet nee
 
 ## 3. Start the dashboard and save the first device
 
-1. In the Windows launcher, enable **Check devices on next start** if you want ping monitoring. Leave discovery, SNMP port checks and LAN sharing off for now.
-2. Click **Start**, then **Open dashboard** when available. Expected: a local dashboard at http://127.0.0.1:4317. A fresh map is empty.
+1. In the Windows launcher, enable **Check whether approved devices are online** if you want ping monitoring. Leave discovery, SNMP port checks and LAN sharing off for now.
+2. Click **Start NetWatch**, then **Open dashboard** when available. Expected: a local dashboard at http://127.0.0.1:4317. A fresh map is empty.
 3. In the browser, choose **Edit map → Add device**. Enter a label and the management IP from step 2; select **Switch** or **Router** based on the actual equipment.
 4. Click **Add device → Use this map → Confirm replacement**. This applies the browser draft to the saved monitored network. **On an existing map, review the replacement before confirming.**
 5. On **Dashboard**, select the device and choose **Turn checks on** if monitoring is desired. Expected: a recent **Last check** and **Up** when it replies.
@@ -66,7 +68,7 @@ The database is created automatically. Its normal launcher location is `%LOCALAP
 
 ## 4. Enable switch port monitoring (optional)
 
-Do this for each managed switch. SNMPv3 reads port status without changing device configuration.
+Do this for the switches or routers whose port readings you need. The NetWatch PC polls each management IP directly. Intermediate switches only need to carry the traffic.
 
 ### A. Check the switch first
 
@@ -91,17 +93,17 @@ If SNMP is not configured, follow [create the read-only account](../switchconfig
 
 ### B. Enroll in NetWatch
 
-1. In the Windows launcher click **Stop → Port monitoring…**.
+1. In the Windows launcher click **Stop NetWatch → Settings → Port monitoring…**.
 2. Select the **Saved device**. If missing, return to step 3 and apply the draft as Switch or Router.
 3. Enter **Authentication algorithm**, **SNMP username**, **Authentication password** and **Privacy password** from that device's configuration. Obtain passwords securely from the administrator; never share them in logs.
 4. Leave **VLAN context (optional)** blank for basic interface polling. For MAC forwarding-table discovery, enter the exact context from `show snmp context` after [configuring its read view](../switchconfig.md#d-expose-the-mac-forwarding-table). Management VLAN and forwarding context are not necessarily the same.
 5. Click **Test connection**. If it fails, verify username, passwords, host source ACL, UDP 161 and default IF-MIB permissions. Changing the VLAN context does not fix a default-context interface test.
-6. Click **Enable monitoring → Close**. Enable **Check ports on next start** and click **Start**.
+6. Click **Enable monitoring → Close**. Enable **Check switch and router ports** and click **Start NetWatch**.
 7. In the browser open the saved device's **Ports**. Expected: recent interface readings.
 
 ## 5. Discover devices and links (optional)
 
-1. On the launcher, click **Stop**, enable **Discover local network neighbors on next start**, then **Start**. Enable **Also check local devices with ICMP (slower)** only for an approved attached network.
+1. On the launcher, click **Stop NetWatch**, enable **Find nearby devices**, then **Start NetWatch**. Enable **Also ping nearby addresses** only for an approved attached network.
 2. In the dashboard open **Discovered devices → Scan now**.
 3. Choose **Add to draft** for recognized devices. A nearby scan is not hardware fingerprinting: a switch can appear as an endpoint. Correct the type in **Edit map**, then **Use this map → Confirm replacement**. Enable individual checks separately.
 4. Enroll each switch using step 4. For switch-to-switch links, verify both ends have [LLDP/CDP enabled and readable](../switchconfig.md#b-enable-and-verify-neighbor-discovery).
@@ -113,7 +115,7 @@ If SNMP is not configured, follow [create the read-only account](../switchconfig
    show lldp neighbors detail
    ~~~
 
-6. In **Discovered → Topology proposals**, choose **Manual start device → Find connections** (select the enrolled device, then click the button). Review the proposed connections and apply the draft. LLDP identity is required for the crawl; CDP also supplies local connection hints.
+6. In **Discovered → Topology proposals**, choose **Manual start device → Find connections** (select the enrolled device, then click the button). Review the proposed connections and apply the draft. NetWatch follows LLDP or CDP through enrolled devices. Directly reported unenrolled CDP neighbors can appear as one-sided uplink observations.
 7. Compare the saved links with the console results. A gateway route is not physical cable evidence.
 
 For access-port matches, configure the forwarding-table view/context and review **Local connection hints**. See [discovery reference](DISCOVERY.md#switch-port-matches).
@@ -128,7 +130,7 @@ Invoke-RestMethod http://127.0.0.1:4317/api/v1/health
 
 Expected: ready is true. This proves host readiness, not device health. Verify each enabled feature separately: recent Last check, fresh Ports readings and reviewed links matching actual ports.
 
-Click **Stop** to close the host/database or **Quit** to exit. Closing the browser or launcher window does not stop monitoring. Keep the PC awake and signed in.
+Click **Stop NetWatch** to close the host/database or **Quit** to exit. Closing the browser or launcher window does not stop monitoring. Keep the PC awake and signed in.
 
 ## 7. If something fails
 

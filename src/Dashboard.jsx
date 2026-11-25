@@ -124,12 +124,18 @@ export default function Dashboard({
   const [localNow, setNow] = useState(() => Date.now())
   const now = Math.max(localNow, Date.parse(host.receivedAt) || 0) + (host.clockOffset ?? 0)
   const {
-    nodes,
-    edges: sourceEdges,
+    nodes: inventoryNodes,
+    edges: inventoryLinks,
     checks,
   } = live
     ? { nodes: live.inventory.topology.nodes, edges: live.inventory.topology.edges, checks: live.checks }
     : { nodes: inventory, edges: inventoryEdges, checks: NO_CHECKS }
+  const infrastructureOnly = Boolean(live?.infrastructureOnly)
+  const nodes = infrastructureOnly ? inventoryNodes.filter(({ type }) => isInfrastructure(type)) : inventoryNodes
+  const visibleNodeIds = useMemo(() => new Set(nodes.map(({ id }) => id)), [nodes])
+  const sourceEdges = infrastructureOnly
+    ? inventoryLinks.filter(({ source, target }) => visibleNodeIds.has(source) && visibleNodeIds.has(target))
+    : inventoryLinks
   const portEvidence = live?.uplinkPorts
   const portFreshness = live?.uplinkStaleAfterMs
   const deadline = useMemo(
@@ -642,7 +648,8 @@ export default function Dashboard({
         <section className="health-inventory health-panel" id="inventory">
           <div className="health-panel-title">
             <h2>
-              All devices <span className="health-inventory-count">{visible.length}</span>
+              {infrastructureOnly ? 'Routers and switches' : 'All devices'}{' '}
+              <span className="health-inventory-count">{visible.length}</span>
             </h2>
             <span>{live ? 'Monitored network' : 'Draft map'}</span>
           </div>
@@ -775,13 +782,21 @@ export default function Dashboard({
           {!visible.length && (
             <div className="health-empty-map">
               <Network size={25} aria-hidden="true" />
-              <strong>{nodes.length ? 'No matching devices' : 'Your network starts here'}</strong>
+              <strong>
+                {nodes.length
+                  ? 'No matching devices'
+                  : infrastructureOnly
+                    ? 'No routers or switches to show'
+                    : 'Your network starts here'}
+              </strong>
               <p>
                 {nodes.length
                   ? 'Try another name or status filter.'
-                  : viewer
-                    ? 'There are no devices on the monitored map yet.'
-                    : 'Create a map, then choose which devices to monitor.'}
+                  : infrastructureOnly
+                    ? 'Add a router or switch in Edit map, or wait for one to appear in the monitored network.'
+                    : viewer
+                      ? 'There are no devices on the monitored map yet.'
+                      : 'Create a map, then choose which devices to monitor.'}
               </p>
               {(!viewer || nodes.length > 0) && (
                 <button

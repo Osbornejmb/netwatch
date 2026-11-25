@@ -105,7 +105,8 @@ HTTPS replaces HTTP on the same port for both loopback and LAN listeners. The ho
 On each Windows viewing PC, verify the CA certificate came from the NetWatch PC, then import only the public *rootCA.pem* from the directory reported by *mkcert -CAROOT*. Keep *rootCA-key.pem* and the NetWatch server key private. Trusting the CA lets it authenticate other sites as well. Your organization may require a managed trust store or separate browser import.
 
 ~~~powershell
-certutil.exe -user -addstore Root C:\Path\To\rootCA.pem
+$rootCaPath = Read-Host 'Full path to the verified public rootCA.pem file'
+certutil.exe -user -addstore Root $rootCaPath
 $hostUrl = Read-Host 'Exact HTTPS URL shown in the NetWatch launcher'
 Start-Process $hostUrl
 ~~~

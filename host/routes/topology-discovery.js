@@ -17,7 +17,12 @@ export function discoveryRoutes(discovery) {
     return {
       ...run,
       devices: run.devices.map((device) => {
-        if (device.enrolledId || saved.some((node) => node.chassisKey === device.chassisKey)) return device
+        if (device.enrolledId) {
+          const label = saved.find((node) => node.id === device.enrolledId)?.data.label
+          return label ? { ...device, label } : device
+        }
+        if (device.observedOnly) return device
+        if (saved.some((node) => node.chassisKey === device.chassisKey)) return device
         const matches = saved
           .filter((node) => !node.chassisKey && node.data.ip && device.addresses.includes(node.data.ip))
           .map(({ id, data }) => ({ id, label: data.label }))
@@ -90,6 +95,14 @@ export function discoveryRoutes(discovery) {
       const resolve = (key) => {
         const device = byKey.get(key)
         if (!device || !actualType(device.type)) throw invalid('Choose a router or switch proposal.')
+        if (device.observedOnly) throw invalid('Set up port checks for this neighbor before saving the proposal.', 409)
+        if (key.startsWith('cdp:') || device.identitySource === 'cdp') {
+          const enrolled = topology.nodes.find((node) => node.id === device.enrolledId)
+          if (!enrolled || !actualType(enrolled.type) || !device.addresses.includes(enrolled.data.ip))
+            throw invalid('The enrolled device address changed. Find connections again.', 409)
+          byId.set(enrolled.id, enrolled)
+          return enrolled.id
+        }
         const saved = topology.nodes.find((node) => node.chassisKey === key)
         const enrolled = topology.nodes.find((node) => node.id === device.enrolledId)
         if (enrolled?.chassisKey && enrolled.chassisKey !== key)
@@ -128,10 +141,10 @@ export function discoveryRoutes(discovery) {
         const target = resolve(link.target)
         if (source === target) throw invalid('The proposal resolves to a single saved device.', 409)
         return {
-          id: 'lldp-' + link.id,
+          id: (link.sourceProtocol === 'cdp' ? 'cdp-' : 'lldp-') + link.id,
           source,
           target,
-          label: link.sourceProtocol === 'both' ? 'LLDP + CDP' : 'LLDP',
+          label: link.sourceProtocol === 'both' ? 'LLDP + CDP' : link.sourceProtocol === 'cdp' ? 'CDP' : 'LLDP',
           uplink: { label: '', source: draftPort(link.sourcePort), target: draftPort(link.targetPort) },
         }
       })

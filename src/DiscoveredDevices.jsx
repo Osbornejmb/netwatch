@@ -2,6 +2,7 @@ import { hostFetch } from './auth.js'
 import ConfirmDialog from './ConfirmDialog'
 import TopologyDiscovery from './TopologyDiscovery.jsx'
 import { useCallback, useEffect, useState } from 'react'
+import useMonitoring from './useMonitoring.js'
 import InfoTooltip from './InfoTooltip'
 import { guessDeviceType } from './discoveryType.js'
 import { refreshLocalWriteToken, writeHeaders } from './monitoring.js'
@@ -10,6 +11,28 @@ const statusLabel = { new: 'New', changed: 'Changed', added: 'Added', gone: 'Not
 const seenAt = (value) =>
   new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 export default function DiscoveredDevices({ remote, stageDiscovery }) {
+  const { snapshot, state } = useMonitoring(true)
+  if (!snapshot && state === 'loading')
+    return (
+      <section className="page-content discovery-page" aria-label="Discovered devices">
+        <h1>Discovered devices</h1>
+        <p role="status">Loading discovery settings…</p>
+      </section>
+    )
+  if (snapshot?.infrastructureOnly)
+    return (
+      <section className="page-content discovery-page" aria-labelledby="discovery-title">
+        <header className="page-heading">
+          <h1 id="discovery-title">Discovered devices</h1>
+          <p>Router and switch mode is on. Use Topology proposals to find connections.</p>
+        </header>
+        <TopologyDiscovery stageDiscovery={stageDiscovery} infrastructureOnly />
+      </section>
+    )
+  return <LocalDiscovery remote={remote} stageDiscovery={stageDiscovery} />
+}
+
+function LocalDiscovery({ remote, stageDiscovery }) {
   const [confirm, setConfirm] = useState(null)
   const [devices, setDevices] = useState([]),
     [pending, setPending] = useState({ count: 0 }),

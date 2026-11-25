@@ -1,5 +1,18 @@
 # Working checkpoint
 
+## Current status (2026-11-25) — CDP topology fallback
+
+Topology proposals follow CDP across enrolled devices when LLDP data is missing and display directly reported unenrolled uplinks as one-sided observations. Cisco hardware verification remains pending.
+
+## Current status (2026-11-25) — simplified Windows launcher
+
+The launcher leads with host status and dashboard access. Settings now paints checkbox rows independently and fits the current work area, scrolling when needed. Verified the installed Settings layout on Windows, and checked Start and Stop with an empty test inventory.
+
+## Current status (2026-11-25) — router and switch mode
+
+The launcher mode limits uptime checks and monitoring views to routers and switches and pauses local neighbor scans. Enrolled topology discovery remains available. Live hardware verification is pending.
+
+
 ## Documentation follow-up (2026-11-25)
 
 - Streamlined the first-time guide into an ordered install → addresses → save device → SNMP → discovery → verification path. Preserved advanced settings and verification evidence in SETUP-REFERENCE.md; split blank-switch access setup from optional trunk configuration and added an existing-ACL correction path.

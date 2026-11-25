@@ -30,7 +30,8 @@ export function listDiscovered({ store, url, interfaces }) {
 
 export function scanNow(discovery) {
   let lastScanRequest = 0
-  return async () => {
+  return async ({ infrastructureOnly } = {}) => {
+    if (infrastructureOnly) return { state: 'disabled' }
     if (Date.now() - lastScanRequest < 30000) throw invalid('Wait before starting another scan.', 429)
     lastScanRequest = Date.now()
     await discovery?.runOnce()
@@ -47,7 +48,8 @@ export function removeDiscovered({ store, id }) {
   return { ok: true }
 }
 
-export async function addDiscoveredToMap({ store, discovery, interfaces, id, body }) {
+export async function addDiscoveredToMap({ store, discovery, interfaces, infrastructureOnly, id, body }) {
+  if (infrastructureOnly) throw invalid('Local neighbor discovery is paused in router and switch mode.', 409)
   const bulk = id === undefined
   const record = bulk ? null : store.discoveredDevice(id)
   if (!bulk && !record) throw invalid('Discovered device not found.', 404)

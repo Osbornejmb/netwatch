@@ -21,6 +21,8 @@ import { configuredCrawlLimits, createTopologyDiscovery, discoveryScope } from '
 import { setTimeout as delay } from 'node:timers/promises'
 const port = readPort()
 const allowLan = process.env.NETWATCH_LAN === '1'
+const infrastructureOnly = process.env.NETWATCH_INFRASTRUCTURE_ONLY === '1'
+const discoverNeighbors = !infrastructureOnly && process.env.NETWATCH_DISCOVERY === '1'
 let tls
 try {
   tls = readTlsOptions()
@@ -47,7 +49,12 @@ const runner = createWindowsProbe({
   prepare: () => prepareWindowsHelper({ directory: resolve(dirname(path), 'collector') }),
 })
 const probeGate = createProbeGate(8)
-const collector = createCollector(store, { enabled: process.env.NETWATCH_ICMP === '1', runner, probeGate })
+const collector = createCollector(store, {
+  enabled: process.env.NETWATCH_ICMP === '1',
+  infrastructureOnly,
+  runner,
+  probeGate,
+})
 const interfaces = createInterfaceCollector(store, {
   enabled: process.env.NETWATCH_SNMP === '1',
   vault: createCredentialVault(credentialDirectory(path)),
@@ -56,7 +63,7 @@ const interfaces = createInterfaceCollector(store, {
     store.dynamics.observe(snapshot.inventory.topology, snapshot.linkHealth)
   },
   onSwitchPorts(ports) {
-    if (ports.size && process.env.NETWATCH_DISCOVERY === '1')
+    if (ports.size && discoverNeighbors)
       linkScannedSwitchPorts(store, ports, store.recentDiscoveryAddresses(Date.now() - DISCOVERY_POLICY.intervalMs * 2))
   },
 })
@@ -65,8 +72,8 @@ const discoveryPrefix =
 if (!Number.isInteger(discoveryPrefix) || discoveryPrefix < 16 || discoveryPrefix > 30)
   throw new Error('NETWATCH_DISCOVERY_MAX_PREFIX must be a prefix length from 16 through 30.')
 const discovery = createDiscovery(store, {
-  enabled: process.env.NETWATCH_DISCOVERY === '1',
-  active: process.env.NETWATCH_DISCOVERY_ICMP === '1',
+  enabled: discoverNeighbors,
+  active: discoverNeighbors && process.env.NETWATCH_DISCOVERY_ICMP === '1',
   pingRunner: (ip, { signal }) => runner(ip, { signal }),
   probeGate,
   maxPrefix: discoveryPrefix,
@@ -94,6 +101,7 @@ const topologyDiscovery = createTopologyDiscovery(store, {
 })
 const hostOptions = {
   port,
+  infrastructureOnly,
   collector,
   interfaces,
   discovery,

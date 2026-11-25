@@ -14,13 +14,43 @@ const node = (id, type, last) => ({
   data: { label: id, ip: '192.168.9.' + last },
 })
 const nodes = [node('Router', 'router', 1), node('Access switch', 'switch', 2)]
-store.write({ source: 'inventory', topology: { nodes, edges: [] } }, 0)
+const infrastructureOnly = process.env.NETWATCH_TEST_INFRASTRUCTURE_ONLY === '1'
+const cdpOnly = process.env.NETWATCH_TEST_CDP_ONLY === '1'
+const inventoryNodes = infrastructureOnly ? [...nodes, node('Office printer', 'printer', 3)] : nodes
+store.write({ source: 'inventory', topology: { nodes: inventoryNodes, edges: [] } }, 0)
 for (const { id } of nodes) store.authorizeInterfaces(id, '00000000-0000-0000-0000-000000000001', 1)
 const discovery = createTopologyDiscovery(store, {
   allowed: discoveryScope({ interfaces: {}, additional: '192.168.9.0/24' }),
   limits: { ...crawlLimits, spacingMs: 0 },
   async read(id) {
     const router = id === 'Router'
+    if (cdpOnly)
+      return {
+        checkedAt: new Date().toISOString(),
+        state: 'identity_unavailable',
+        neighbors: [],
+        cdp: [
+          {
+            index: router ? 1 : 2,
+            address: '192.168.9.' + (router ? 2 : 1),
+            device: 'Switch',
+            localPort: { index: router ? 1 : 2, label: router ? 'port 1' : 'port 2' },
+            peerPort: router ? 'port 2' : 'port 1',
+          },
+          ...(router
+            ? [
+                {
+                  index: 3,
+                  address: '192.168.9.4',
+                  device: 'Unenrolled switch',
+                  capabilities: '00000008',
+                  localPort: { index: 3, label: 'Fa1/0/11' },
+                  peerPort: 'Fa1/0/12',
+                },
+              ]
+            : []),
+        ],
+      }
     return {
       checkedAt: new Date().toISOString(),
       chassisKey: key(router ? 1 : 2),
@@ -39,7 +69,7 @@ const discovery = createTopologyDiscovery(store, {
     }
   },
 })
-const server = createHost(store, { port: 0, topologyDiscovery: discovery })
+const server = createHost(store, { port: 0, topologyDiscovery: discovery, infrastructureOnly })
 server.listen(0, '127.0.0.1')
 await once(server, 'listening')
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] })
@@ -49,7 +79,20 @@ try {
   page.on('pageerror', (error) => errors.push(error.message))
   page.setDefaultTimeout(12000)
   await page.goto('http://127.0.0.1:' + server.address().port)
+  if (infrastructureOnly) {
+    await page.locator('.react-flow__node[data-id="Router"]').waitFor()
+    assert.equal(await page.locator('.react-flow__node[data-id="Office printer"]').count(), 0)
+    if (process.env.NETWATCH_TEST_SCREENSHOTS === '1')
+      await page.screenshot({ path: 'docs/screenshots/router-switch-dashboard.png' })
+    await page.getByRole('link', { name: 'Devices', exact: true }).click()
+    await page.getByText('Access switch', { exact: true }).first().waitFor()
+    assert.equal(await page.getByText('Office printer', { exact: true }).count(), 0)
+  }
   await page.getByRole('link', { name: 'Discovered', exact: true }).click()
+  if (infrastructureOnly) {
+    await page.getByText(/Router and switch mode is on/).waitFor()
+    assert.equal(await page.getByRole('button', { name: 'Scan now' }).count(), 0)
+  }
   assert.equal(await page.getByLabel('Manual start device').count(), 0)
   assert.equal(await page.locator('.topology-proposals').evaluate((panel) => panel.open), false)
   const scheduleToggle = page.getByRole('checkbox', { name: 'Run automatically' })
@@ -63,7 +106,12 @@ try {
   await page.route('**/api/v1/discovery/runs', (route) => route.abort(), { times: 1 })
   await page.getByText('Could not refresh topology discovery. Showing the last results.').waitFor()
   await discovery.start('Router')
-  await page.getByRole('status').getByText(/Discovery complete · 1 connections to review/).waitFor()
+  await page
+    .getByRole('status')
+    .getByText(
+      cdpOnly ? /Discovery complete · 2 connections to review/ : /Discovery complete · 1 connections to review/,
+    )
+    .waitFor()
   await page.locator('.topology-proposals > summary').click()
   await scheduleToggle.uncheck()
   await page.getByRole('button', { name: 'Save schedule' }).click()
@@ -74,8 +122,13 @@ try {
   await page.getByRole('button', { name: 'Find connections' }).click()
   await page
     .getByRole('status')
-    .getByText(/Discovery complete · 1 connections to review/)
+    .getByText(
+      cdpOnly ? /Discovery complete · 2 connections to review/ : /Discovery complete · 1 connections to review/,
+    )
     .waitFor()
+  if (cdpOnly) await page.getByText(/Unenrolled switch \(Fa1\/0\/12\).*One-sided.*CDP/).waitFor()
+  if (cdpOnly && process.env.NETWATCH_TEST_SCREENSHOTS === '1')
+    await page.screenshot({ path: 'docs/screenshots/cdp-topology-discovery.png' })
   assert.equal(store.revision(), 1)
   const proposals = page.getByRole('region', { name: 'Topology proposals' })
   await proposals.getByRole('button', { name: 'Review all verified' }).click()
@@ -93,35 +146,54 @@ try {
     }
   })
   await preview.getByRole('button', { name: 'Add to draft', exact: true }).click()
-  await preview.getByRole('alert').getByText('Could not save the draft map. Check browser storage and try again.').waitFor({ timeout: 3000 })
-  assert.equal(discovery.latest().links[0].status, 'proposed')
+  await preview
+    .getByRole('alert')
+    .getByText('Could not save the draft map. Check browser storage and try again.')
+    .waitFor({ timeout: 3000 })
+  assert.equal(discovery.latest().links.find(({ confidence }) => confidence === 'verified').status, 'proposed')
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('netwatch-topology-v1')).edges.length), 0)
-  await page.evaluate((write) => { Storage.prototype.setItem = write }, writeDraft)
+  await page.evaluate((write) => {
+    Storage.prototype.setItem = write
+  }, writeDraft)
   await writeDraft.dispose()
-  await page.route('**/api/v1/discovery/runs/*/accept', async (route) => {
-    const draft = await page.evaluate(() => JSON.parse(localStorage.getItem('netwatch-topology-v1')))
-    assert.equal(draft.edges.length, 1, 'Draft must be durable before the host records acceptance')
-    const response = await route.fetch()
-    assert.ok(response.ok())
-    await route.abort()
-  }, { times: 1 })
+  await page.route(
+    '**/api/v1/discovery/runs/*/accept',
+    async (route) => {
+      const draft = await page.evaluate(() => JSON.parse(localStorage.getItem('netwatch-topology-v1')))
+      assert.equal(draft.edges.length, 1, 'Draft must be durable before the host records acceptance')
+      const response = await route.fetch()
+      assert.ok(response.ok())
+      await route.abort()
+    },
+    { times: 1 },
+  )
   await preview.getByRole('button', { name: 'Add to draft', exact: true }).click()
   await proposals.getByText('The draft map was saved. Could not confirm the proposal with the host.').waitFor()
-  assert.equal(discovery.latest().links[0].status, 'accepted')
+  assert.equal(discovery.latest().links.find(({ confidence }) => confidence === 'verified').status, 'accepted')
   assert.equal(store.revision(), 1)
   assert.equal(store.read().topology.edges.length, 0)
   await page.setViewportSize({ width: 390, height: 844 })
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1))
+  if (infrastructureOnly && !cdpOnly && process.env.NETWATCH_TEST_SCREENSHOTS === '1')
+    await page.screenshot({ path: 'docs/screenshots/router-switch-discovery.png' })
   await page.reload()
   await page.getByRole('link', { name: 'Edit map', exact: true }).click()
-  await page.getByText(/2 devices · 1 connection/).waitFor()
+  await page.getByText(infrastructureOnly ? /3 devices · 1 connection/ : /2 devices · 1 connection/).waitFor()
   await page.getByRole('button', { name: 'Use this map', exact: true }).click()
   await page.getByRole('button', { name: 'Confirm replacement' }).click()
   await page.waitForFunction(() => !document.querySelector('dialog[open]'))
   const saved = store.read()
   assert.equal(saved.revision, 2)
   assert.equal(saved.topology.edges.length, 1)
-  assert.deepEqual(Object.values(saved.monitoring), [false, false])
+  if (cdpOnly) {
+    assert.equal(saved.topology.edges[0].label, 'CDP')
+    assert.ok(saved.topology.nodes.every((node) => !node.chassisKey))
+  }
+  assert.equal(saved.topology.nodes.length, inventoryNodes.length)
+  assert.deepEqual(
+    Object.values(saved.monitoring),
+    inventoryNodes.map(() => false),
+  )
   assert.deepEqual(errors, [])
   console.log('Topology discovery browser walkthrough passed with synthetic SNMP evidence.')
 } finally {
