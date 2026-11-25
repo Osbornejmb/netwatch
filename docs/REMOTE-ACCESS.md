@@ -79,13 +79,13 @@ Reopen the browser after a host restart to refresh the admin write token. Databa
 
 These steps are for manual certificate setup. If you used the installer's sharing option, use the connection file from **Remote access**. Launching the packaged app with both `NETWATCH_TLS_CERT` and `NETWATCH_TLS_KEY` set selects your own certificate for that run.
 
-On the NetWatch PC, create a certificate that covers every URL you intend to use, including the launcher's loopback URL. Use your organization's private CA or a local CA such as [mkcert](https://github.com/FiloSottile/mkcert). With mkcert installed, replace the example IP and hostname below with the actual private IP and name. The new directory lives outside the checkout.
+On the NetWatch PC, create a certificate that covers every URL you intend to use, including the launcher's loopback URL. Use your organization's private CA or a local CA such as [mkcert](https://github.com/FiloSottile/mkcert). With mkcert installed, replace `<NETWATCH_PC_IP>` with the PC's private address and `<NETWATCH_HOSTNAME>` with the DNS name viewers use. Remove the angle brackets, keep the quotes, and leave `127.0.0.1` as written for local dashboard access. The new directory lives outside the checkout.
 
 ~~~powershell
 $certDir = Join-Path $env:LOCALAPPDATA 'NetWatch\tls'
 New-Item -ItemType Directory -Force -Path $certDir | Out-Null
 mkcert -install
-mkcert -cert-file (Join-Path $certDir 'netwatch.pem') -key-file (Join-Path $certDir 'netwatch-key.pem') 127.0.0.1 192.168.1.20 netwatch-pc
+mkcert -cert-file (Join-Path $certDir 'netwatch.pem') -key-file (Join-Path $certDir 'netwatch-key.pem') 127.0.0.1 '<NETWATCH_PC_IP>' '<NETWATCH_HOSTNAME>'
 $env:NETWATCH_TLS_CERT = Join-Path $certDir 'netwatch.pem'
 $env:NETWATCH_TLS_KEY = Join-Path $certDir 'netwatch-key.pem'
 ~~~
@@ -102,9 +102,11 @@ HTTPS replaces HTTP on the same port for both loopback and LAN listeners. The ho
 
 On each Windows viewing PC, verify the CA certificate came from the NetWatch PC, then import only the public *rootCA.pem* from the directory reported by *mkcert -CAROOT*. Keep *rootCA-key.pem* and the NetWatch server key private. Trusting the CA lets it authenticate other sites as well. Your organization may require a managed trust store or separate browser import.
 
+Replace `<ROOT_CA_FILE>` with the full path to the verified public CA file on the viewing PC. Replace `<NETWATCH_HTTPS_URL>` with the full HTTPS URL shown by **Remote access** in the launcher, including its port. Remove the brackets and retain the quotes.
+
 ~~~powershell
-certutil.exe -user -addstore Root C:\Path\To\rootCA.pem
-Start-Process 'https://192.168.1.20:4317'
+certutil.exe -user -addstore Root '<ROOT_CA_FILE>'
+Start-Process '<NETWATCH_HTTPS_URL>'
 ~~~
 
 Use a URL covered by the certificate and shown by the launcher. If you move the host to a new IP, use its covered hostname or issue a new certificate. Browsers remember HSTS for the hostname, so switching an existing deployment back to HTTP may require clearing its HSTS state or waiting for it to expire.
@@ -153,14 +155,16 @@ node --test tests/lan.test.js tests/sessions.test.js tests/tls.test.js
 
 Expect localhost and private IPv4 listeners only. The LAN tests inject public socket peers and prove that forwarding headers cannot make a public peer private. If you have an isolated routed lab client that already has a nonprivate source address, use curl with its bound source address and expect 403 if the firewall permits the connection. Do not open an internet route for this test. A routed RFC1918 client is eligible by design.
 
+Replace `<LAB_CLIENT_SOURCE_IP>` with the nonprivate address already assigned to the isolated test client and `<NETWATCH_HTTPS_URL>` with the launcher URL. Keep the quotes and append `/api/v1/health` as shown.
+
 ~~~powershell
-curl.exe --interface 192.0.2.2 -sS -i https://192.168.1.20:4317/api/v1/health
+curl.exe --interface '<LAB_CLIENT_SOURCE_IP>' -sS -i '<NETWATCH_HTTPS_URL>/api/v1/health'
 ~~~
 
-On the second PC, replace the example URL with the copied one. Open it as viewer, inspect the Dashboard and device details, and confirm each restricted hash returns to Dashboard. Sign in as admin to open Edit map and apply an inventory change to the disposable database, then sign out. Run the browser test from a checkout with Chromium available, using only disposable test passwords. In Open viewer mode omit NETWATCH_VIEWER_PASSWORD.
+On the second PC, open the launcher URL as viewer, inspect the Dashboard and device details, and confirm each restricted hash returns to Dashboard. Sign in as admin to open Edit map and apply an inventory change to the disposable database, then sign out. Run the browser test from a checkout with Chromium available, using only disposable test passwords. In Open viewer mode omit NETWATCH_VIEWER_PASSWORD. Substitute the full launcher URL for `<NETWATCH_HTTPS_URL>` in the test variables below.
 
 ~~~powershell
-$env:NETWATCH_URL = 'https://192.168.1.20:4317'
+$env:NETWATCH_URL = '<NETWATCH_HTTPS_URL>'
 foreach ($route in 'topology','inventory','discovered') { Start-Process "$env:NETWATCH_URL/#$route" }
 curl.exe -sS -o NUL -w '%{http_code}' "$env:NETWATCH_URL/api/v1/topology"
 curl.exe -sS -o NUL -w '%{http_code}' -H 'Host: unrelated.example:4317' "$env:NETWATCH_URL/api/v1/auth/session"

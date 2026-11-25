@@ -140,6 +140,153 @@ test('malformed, mismatched, partial, timed-out, unauthorized and unresolved obs
   assert.deepEqual(cancelled.diagnostics, ['cancelled'])
 })
 
+test('identity-unavailable CDP fallback traverses an enrolled chain and verifies reciprocal ports without saving synthetic identities', async (t) => {
+  const outside = { deviceId: 'outside', type: 'switch', address: '10.20.30.40' }
+  const enrolled = [...targets.slice(0, 3), outside]
+  const reports = [
+    {
+      index: 1,
+      device: 'Generic Switch',
+      peerPort: 'Gi1/0/2',
+      address: address(1),
+      localPort: { index: 11, label: 'Gi1/0/1' },
+    },
+    {
+      index: 2,
+      device: 'Generic Switch',
+      peerPort: 'Gi1/0/4',
+      address: outside.address,
+      localPort: { index: 12, label: 'Gi1/0/3' },
+    },
+  ]
+  const samples = [
+    { state: 'identity_unavailable', checkedAt: at, name: 'Generic Switch', neighbors: [], cdp: reports },
+    {
+      state: 'identity_unavailable',
+      checkedAt: at,
+      name: 'Generic Switch',
+      neighbors: [],
+      cdp: [
+        {
+          index: 3,
+          device: 'Generic Switch',
+          peerPort: 'Gi1/0/1',
+          address: address(0),
+          localPort: { index: 21, label: 'Gi1/0/2' },
+        },
+        {
+          index: 4,
+          device: 'Generic Switch',
+          peerPort: 'Gi1/0/4',
+          address: address(2),
+          localPort: { index: 22, label: 'Gi1/0/3' },
+        },
+      ],
+    },
+    {
+      state: 'identity_unavailable',
+      checkedAt: at,
+      name: 'Generic Switch',
+      neighbors: [],
+      cdp: [
+        {
+          index: 5,
+          device: 'Generic Switch',
+          peerPort: 'GigabitEthernet1/0/3',
+          address: address(1),
+          localPort: { index: 23, label: 'GigabitEthernet1/0/4' },
+        },
+      ],
+    },
+  ]
+  const store = openStore(':memory:')
+  const nodes = enrolled.slice(0, 3).map(({ deviceId, type, address: ip }) => ({
+    id: deviceId,
+    type,
+    position: { x: 0, y: 0 },
+    data: { label: deviceId, ip },
+  }))
+  store.write({ source: 'inventory', topology: { nodes, edges: [] } }, 0)
+  const originalTopology = store.read().topology
+  for (const target of enrolled.slice(0, 3))
+    store.authorizeInterfaces(target.deviceId, '00000000-0000-0000-0000-000000000001', 1)
+  const service = createTopologyDiscovery(store, {
+    read: async (deviceId) => samples[idx(deviceId)],
+    allowed: scope,
+    limits: { ...crawlLimits, spacingMs: 0 },
+  })
+  t.after(async () => {
+    await service.stop()
+    store.close()
+  })
+
+  const runId = service.start('d0').id
+  for (let i = 0; i < 150 && service.get(runId).status === 'running'; i++) await delay(5)
+  const run = service.get(runId)
+  assert.equal(run.status, 'complete')
+  assert.deepEqual(run.devices.map(({ enrolledId }) => enrolledId).sort(), ['d0', 'd1', 'd2'])
+  assert.equal(run.devices.length, 3)
+  assert.ok(
+    run.devices.every(({ chassisKey, identitySource }) => chassisKey.startsWith('cdp:') && identitySource === 'cdp'),
+  )
+  assert.equal(run.devices[0].label, 'Generic Switch')
+  assert.equal(run.devices[1].label, 'Generic Switch')
+  assert.equal(run.links.length, 2)
+  assert.ok(run.links.every(({ confidence, sourceProtocol }) => confidence === 'verified' && sourceProtocol === 'cdp'))
+  assert.ok(
+    run.links.some(({ sourcePort, targetPort }) =>
+      [sourcePort.label, targetPort.label].includes('GigabitEthernet1/0/4'),
+    ),
+  )
+  assert.ok(run.cdpReports.some(({ address: ip }) => ip === outside.address))
+  assert.equal(
+    run.devices.some(({ addresses }) => addresses.includes(outside.address)),
+    false,
+  )
+  assert.equal(store.revision(), 1)
+  assert.deepEqual(store.read().topology, originalTopology)
+})
+
+test('an enrolled switch exposes a one-sided uplink without querying or enrolling its CDP neighbor', async () => {
+  const seed = targets[1]
+  const neighbor = {
+    address: address(2),
+    device: 'Unenrolled switch',
+    capabilities: '00000008',
+    index: 11,
+    localPort: { index: 11, label: 'FastEthernet1/0/11' },
+    peerPort: 'FastEthernet1/0/12',
+  }
+  const queried = []
+  const run = await crawlTopology({
+    seed,
+    targets: [seed],
+    allowed: scope,
+    limits: { ...crawlLimits, spacingMs: 0 },
+    signal: AbortSignal.timeout(1000),
+    async read(deviceId) {
+      queried.push(deviceId)
+      return {
+        checkedAt: at,
+        state: 'identity_unavailable',
+        cdp: [neighbor, { ...neighbor, address: address(3), capabilities: '00000080' }],
+      }
+    },
+  })
+  assert.deepEqual(queried, [seed.deviceId])
+  const peer = run.devices.find(({ observedOnly }) => observedOnly)
+  assert.deepEqual(peer.addresses, [neighbor.address])
+  assert.equal(peer.type, 'switch')
+  assert.equal(peer.reason, 'not_enrolled')
+  assert.equal(run.links.length, 1)
+  assert.equal(run.links[0].confidence, 'single_sided')
+  assert.equal(run.links[0].sourceProtocol, 'cdp')
+  assert.deepEqual(
+    [run.links[0].sourcePort.label, run.links[0].targetPort.label].sort(),
+    [neighbor.localPort.label, neighbor.peerPort].sort(),
+  )
+})
+
 test('walk handles bulk fallback, opaque chassis keys, named, aliased and MAC port resolution', async () => {
   const local = '1.0.8802.1.1.2.1.3',
     remote = '1.0.8802.1.1.2.1.4'
@@ -206,6 +353,48 @@ test('walk handles bulk fallback, opaque chassis keys, named, aliased and MAC po
     [10, 20, 30],
   )
   assert.deepEqual(result.neighbors[0].addresses, ['192.168.9.20'])
+})
+
+test('identity-unavailable LLDP read keeps CDP peer details and resolves the local interface label', async () => {
+  const cdp = '1.3.6.1.4.1.9.9.23.1.2.1.1'
+  const tables = new Map()
+  const put = (root, suffix, value) => tables.set(root + '.' + suffix, value)
+  const row = '1.1'
+  put(cdp + '.3', row, 1)
+  put(cdp + '.4', row, Buffer.from([192, 168, 9, 11]))
+  put(cdp + '.6', row, Buffer.from('Generic Switch'))
+  put(cdp + '.7', row, Buffer.from('Gi1/0/2'))
+  put(cdp + '.8', row, Buffer.from('Cisco fixture'))
+  put(cdp + '.9', row, Buffer.from([0x28]))
+  put('1.3.6.1.2.1.31.1.1.1.1', '1', Buffer.from('GigabitEthernet1/0/1'))
+  const end = { oid: '9', type: snmp.ObjectType.EndOfMibView }
+  const data = (oid, value) => ({
+    oid,
+    value,
+    type: Buffer.isBuffer(value) ? snmp.ObjectType.OctetString : snmp.ObjectType.Integer,
+  })
+  const result = await readDiscoveryLldp(async (method, cursors) => {
+    if (method === 'get') return []
+    const root = cursors[0]
+    const entries = [...tables]
+      .filter(([oid]) => oid.startsWith(root + '.') && oid > root)
+      .map(([oid, value]) => data(oid, value))
+    return [[...entries, end]]
+  }, at)
+
+  assert.equal(result.state, 'identity_unavailable')
+  assert.deepEqual(result.neighbors, [])
+  assert.deepEqual(result.cdp, [
+    {
+      index: 1,
+      device: 'Generic Switch',
+      peerPort: 'Gi1/0/2',
+      address: '192.168.9.11',
+      platform: 'Cisco fixture',
+      capabilities: '28',
+      localPort: { index: 1, label: 'GigabitEthernet1/0/1' },
+    },
+  ])
 })
 
 test('run progress, draft review and cancellation are isolated from saved inventory', async (t) => {

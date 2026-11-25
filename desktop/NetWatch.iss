@@ -13,6 +13,7 @@ MinVersion=10.0
 AppMutex=Local\NetWatch.InstalledDesktop
 CloseApplications=no
 UninstallDisplayIcon={app}\NetWatch.exe
+SetupIconFile=NetWatch.ico
 OutputDir={#NetWatchOutput}
 OutputBaseFilename=NetWatch-{#NetWatchVersion}-Windows-x64-Setup
 Compression=lzma2

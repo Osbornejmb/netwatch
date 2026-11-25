@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.IO;
 using System.Security.Principal;
 using System.Threading;
@@ -12,6 +13,7 @@ using System.Web.Script.Serialization;
 using System.Windows.Forms;
 
 public class DesktopSettings {
+ public bool infrastructureOnly {get;set;}
  public string node {get;set;} public string root {get;set;} public string database {get;set;} public bool icmp {get;set;} public bool discovery {get;set;} public bool discoveryIcmp {get;set;} public bool lan {get;set;}
  public bool managedSharing {get;set;} public bool? snmp {get;set;}
  public Dictionary<string,string> snmpPortContexts {get;set;}
@@ -31,26 +33,66 @@ public class NetWatchMenuColors : ProfessionalColorTable {
  public override Color MenuBorder {get{return Color.FromArgb(216,221,211);}}
 }
 public class NetWatch : Form {
+ static readonly Color Ink=Color.FromArgb(37,58,54);
+ static readonly Color Canvas=Color.FromArgb(244,243,238);
+ static readonly Color Paper=Color.FromArgb(252,251,247);
+ static readonly Color Green=Color.FromArgb(23,102,84);
+ static readonly Color Edge=Color.FromArgb(170,183,172);
+ sealed class LauncherCheckBox : CheckBox {
+  public LauncherCheckBox() {
+   SetStyle(ControlStyles.UserPaint|ControlStyles.AllPaintingInWmPaint|ControlStyles.Opaque|
+    ControlStyles.OptimizedDoubleBuffer|ControlStyles.ResizeRedraw,true);
+   SetStyle(ControlStyles.SupportsTransparentBackColor,false);
+   BackColor=Canvas;
+   CheckedChanged+=(s,e)=>Invalidate();
+  }
+  protected override void OnPaint(PaintEventArgs e) {
+   using(var background=new SolidBrush(BackColor))e.Graphics.FillRectangle(background,e.ClipRectangle);
+   var box=new Rectangle(1,(Height-16)/2,16,16);
+   var ink=Enabled?Ink:Color.FromArgb(105,118,108);
+   var fill=Checked?(Enabled?Green:Color.FromArgb(105,118,108)):Paper;
+   if(SystemInformation.HighContrast) {
+    ink=Enabled?SystemColors.WindowText:SystemColors.GrayText;
+    fill=Checked?SystemColors.Highlight:SystemColors.Window;
+   }
+   using(var brush=new SolidBrush(fill))e.Graphics.FillRectangle(brush,box);
+   using(var pen=new Pen(Checked?fill:ink))e.Graphics.DrawRectangle(pen,box);
+   if(Checked) {
+    e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
+    using(var pen=new Pen(SystemInformation.HighContrast?SystemColors.HighlightText:Paper,2))
+     e.Graphics.DrawLines(pen,new[]{new Point(box.Left+4,box.Top+8),new Point(box.Left+7,box.Top+11),new Point(box.Left+13,box.Top+5)});
+   }
+   var label=new Rectangle(25,0,Width-25,Height);
+   TextRenderer.DrawText(e.Graphics,Text,Font,label,ink,TextFormatFlags.VerticalCenter|
+    TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis|TextFormatFlags.PreserveGraphicsClipping|
+    TextFormatFlags.PreserveGraphicsTranslateTransform);
+   if(Focused&&ShowFocusCues)ControlPaint.DrawFocusRectangle(e.Graphics,ClientRectangle,ink,BackColor);
+  }
+ }
 #if PACKAGED
  static readonly string settingsPath=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"NetWatch","desktop.json");
- static readonly string sharingPath=Path.Combine(Path.GetDirectoryName(settingsPath),"sharing");
 #else
- readonly string settingsPath=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"desktop.json");
+ static readonly string settingsPath=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"desktop.json");
 #endif
+ static readonly string sharingPath=Path.Combine(Path.GetDirectoryName(settingsPath),"sharing");
  readonly string nodePath,appRoot;
  readonly JavaScriptSerializer json=new JavaScriptSerializer();
  DesktopSettings settings;
  Process host;
  NotifyIcon tray;
- Label status;
- CheckBox monitoring,discovery,discoveryIcmp,lan,portChecks;
+ Label status,statusTitle,settingsNote;
+ CheckBox monitoring,infrastructureOnly,discovery,discoveryIcmp,lan,portChecks;
  AccessWindow accessWindow;
  HostEvent accessInfo;
- Button start,stop,open;
+ Button lifecycle,open,settingsToggle;
+ Panel settingsPanel;
+ Panel settingsViewport;
+ Panel statusCard;
  ToolStripMenuItem trayStart,trayStop,trayOpen;
  string dashboardUrl="http://127.0.0.1:4317";
  bool quitting=false,settingUpPorts=false,restoringPortPreference=false;
  string state="stopped";
+ bool tlsError,localOnly;
 
  [STAThread] public static void Main(string[] args) {
   bool first;
@@ -95,22 +137,58 @@ public class NetWatch : Form {
   nodePath=settings==null?null:settings.node;appRoot=settings==null?null:settings.root;
 #endif
   if(settings==null||!Path.IsPathRooted(settings.database)||!File.Exists(nodePath)||String.IsNullOrEmpty(appRoot)||!File.Exists(Path.Combine(appRoot,"host","desktop.js")))throw new Exception("NetWatch files or settings are unavailable. Check the data path and reinstall NetWatch.");
-  Text="NetWatch";ClientSize=new Size(540,484);Font=new Font(SystemFonts.MessageBoxFont.FontFamily,10);BackColor=Color.FromArgb(244,243,238);ForeColor=Color.FromArgb(37,58,54);
-  FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;Icon=SystemIcons.Application;
-  var title=new Label{Text="Your network, at a glance",Font=new Font(Font,FontStyle.Bold),Location=new Point(20,18),AutoSize=true};Controls.Add(title);
-  status=new Label{Text="Stopped",Location=new Point(20,55),Size=new Size(500,65),AccessibleName="Host status"};Controls.Add(status);
-  start=new Button{Text="&Start",Location=new Point(20,125),Size=new Size(110,40)};start.Click+=(s,e)=>StartHost();Controls.Add(start);
-  stop=new Button{Text="S&top",Location=new Point(140,125),Size=new Size(110,40),Enabled=false};stop.Click+=(s,e)=>StopHost();Controls.Add(stop);
-  open=new Button{Text="&Open dashboard",Location=new Point(260,125),Size=new Size(160,40),Enabled=false};open.Click+=(s,e)=>OpenDashboard();Controls.Add(open);
-  var quit=new Button{Text="&Quit",Location=new Point(430,125),Size=new Size(90,40)};quit.Click+=(s,e)=>Quit();Controls.Add(quit);
-  monitoring=new CheckBox{Text="Check devices on next start",Checked=settings.icmp,Location=new Point(20,180),AutoSize=true};
-  monitoring.CheckedChanged+=(s,e)=>{try{settings.icmp=monitoring.Checked;File.WriteAllText(settingsPath,json.Serialize(settings));}catch(Exception ex){MessageBox.Show(ex.Message,"Unable to save settings");}};Controls.Add(monitoring);
-  discovery=new CheckBox{Text="Discover local network neighbors on next start",Checked=settings.discovery,Location=new Point(20,205),AutoSize=true};
-  discovery.CheckedChanged+=(s,e)=>{try{settings.discovery=discovery.Checked;File.WriteAllText(settingsPath,json.Serialize(settings));}catch(Exception ex){MessageBox.Show(ex.Message,"Unable to save settings");}};Controls.Add(discovery);
-  discoveryIcmp=new CheckBox{Text="Also check local devices with ICMP (slower)",Checked=settings.discoveryIcmp,Location=new Point(20,230),AutoSize=true,Enabled=settings.discovery};
-  discoveryIcmp.CheckedChanged+=(s,e)=>{try{settings.discoveryIcmp=discoveryIcmp.Checked;File.WriteAllText(settingsPath,json.Serialize(settings));}catch(Exception ex){MessageBox.Show(ex.Message,"Unable to save settings");}};Controls.Add(discoveryIcmp);
+  Text="NetWatch";ClientSize=new Size(520,284);Font=new Font("Segoe UI",10);BackColor=Canvas;ForeColor=Ink;
+  FormBorderStyle=FormBorderStyle.None;StartPosition=FormStartPosition.CenterScreen;
+  Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath)??SystemIcons.Application;
+  var header=new Panel{Location=new Point(1,1),Size=new Size(518,54),BackColor=Ink,ForeColor=Paper};
+  var brandImage=new PictureBox{Location=new Point(18,11),Size=new Size(32,32)};
+  using(var brandIcon=new Icon(Icon,32,32))brandImage.Image=brandIcon.ToBitmap();
+  var brandName=new Label{Text="NetWatch",Font=new Font(Font.FontFamily,14,FontStyle.Bold),Location=new Point(60,13),AutoSize=true};
+  var hide=new Button{Text="&Hide to tray",Location=new Point(396,7),Size=new Size(110,40),TabIndex=0};
+  StyleButton(hide,true);
+  hide.Click+=(s,e)=>Hide();
+  EnableWindowDrag(header,brandImage,brandName);
+  header.Controls.AddRange(new Control[]{brandImage,brandName,hide});
+  Controls.Add(header);
+  statusCard=new Panel{Location=new Point(20,70),Size=new Size(480,96),BackColor=Paper};
+  statusTitle=new Label{Font=new Font(Font.FontFamily,17,FontStyle.Bold),Location=new Point(16,9),AutoSize=true};
+  status=new Label{Location=new Point(17,44),Size=new Size(446,50),AccessibleName="Host status"};
+  statusCard.Controls.AddRange(new Control[]{statusTitle,status});
+  Controls.Add(statusCard);
+  lifecycle=new Button{Location=new Point(20,176),Size=new Size(140,42)};
+  lifecycle.Click+=(s,e)=>{if(host==null)StartHost();else StopHost();};
+  open=new Button{Text="&Open dashboard",Location=new Point(170,176),Size=new Size(174,42),Enabled=false};
+  open.Click+=(s,e)=>{if(tlsError&&host==null)StartHost(true);else OpenDashboard();};
+  settingsToggle=new Button{Text="S&ettings…",Location=new Point(20,228),Size=new Size(140,40)};
+  settingsToggle.Click+=(s,e)=>ToggleSettings();
+  var quit=new Button{Text="&Quit",Location=new Point(406,228),Size=new Size(94,40)};
+  quit.Click+=(s,e)=>Quit();
+  Controls.AddRange(new Control[]{lifecycle,open,settingsToggle,quit});
+  settingsViewport=new Panel{Location=new Point(20,282),Size=new Size(499,342),AutoScroll=true,Visible=false};
+  settingsPanel=new Panel{Location=Point.Empty,Size=new Size(480,342),BackColor=Canvas};
+  settingsNote=new Label{Location=new Point(0,1),Size=new Size(480,24)};
+  settingsPanel.Controls.Add(settingsNote);
+  settingsPanel.Controls.Add(SettingsHeading("Monitoring",29));
+  monitoring=new LauncherCheckBox{Text="Check whether approved devices are online",Checked=settings.icmp,Location=new Point(0,54),Size=new Size(440,24)};
+  monitoring.CheckedChanged+=(s,e)=>{try{settings.icmp=monitoring.Checked;File.WriteAllText(settingsPath,json.Serialize(settings));}catch(Exception ex){MessageBox.Show(ex.Message,"Unable to save settings");}};
+  settingsPanel.Controls.Add(monitoring);
+  discovery=new LauncherCheckBox{Text="Find nearby devices",Checked=settings.discovery,Location=new Point(0,164),Size=new Size(440,24)};
+  discovery.CheckedChanged+=(s,e)=>{try{settings.discovery=discovery.Checked;File.WriteAllText(settingsPath,json.Serialize(settings));}catch(Exception ex){MessageBox.Show(ex.Message,"Unable to save settings");}};
+  discoveryIcmp=new LauncherCheckBox{Text="Also ping nearby addresses",Checked=settings.discoveryIcmp,Location=new Point(20,191),Size=new Size(420,24)};
+  discoveryIcmp.CheckedChanged+=(s,e)=>{try{settings.discoveryIcmp=discoveryIcmp.Checked;File.WriteAllText(settingsPath,json.Serialize(settings));}catch(Exception ex){MessageBox.Show(ex.Message,"Unable to save settings");}};
   discovery.CheckedChanged+=(s,e)=>{discoveryIcmp.Enabled=discovery.Checked;if(!discovery.Checked){settings.discoveryIcmp=false;discoveryIcmp.Checked=false;}};
-  lan=new CheckBox{Text="Allow other PCs on this network",Checked=settings.lan,Location=new Point(20,255),AutoSize=true};
+  infrastructureOnly=new LauncherCheckBox{Text="Show and check only routers and switches",Checked=settings.infrastructureOnly,Location=new Point(0,81),Size=new Size(318,24)};
+  infrastructureOnly.CheckedChanged+=(s,e)=>{
+   try {
+    settings.infrastructureOnly=infrastructureOnly.Checked;
+    discovery.Enabled=!settings.infrastructureOnly;
+    discoveryIcmp.Enabled=discovery.Enabled&&settings.discovery;
+    UpdateSettingsNote();
+    File.WriteAllText(settingsPath,json.Serialize(settings));
+   }catch(Exception ex){MessageBox.Show(ex.Message,"Unable to save settings");}
+  };
+  settingsPanel.Controls.Add(infrastructureOnly);
+  lan=new LauncherCheckBox{Text="Allow other PCs on this network",Checked=settings.lan,Location=new Point(0,250),Size=new Size(318,24)};
   lan.CheckedChanged+=(s,e)=>{try{
    if(settings.lan==lan.Checked)return;
 #if PACKAGED
@@ -118,12 +196,19 @@ public class NetWatch : Form {
     if(!ConfigureSharing(this,settings,appRoot,nodePath))lan.Checked=false;
     return;
    }
+#else
+   if(lan.Checked&&!settings.managedSharing&&!ManualTlsConfigured()&&
+    String.IsNullOrEmpty(Environment.GetEnvironmentVariable("NETWATCH_TLS_PFX"))) {
+    lan.Checked=false;
+    MessageBox.Show(this,"Set up sharing with the Windows installer, or configure a certificate using the Remote access guide.","Sharing needs HTTPS");
+    return;
+   }
 #endif
    settings.lan=lan.Checked;File.WriteAllText(settingsPath,json.Serialize(settings));SendAccess("lan-preference",settings.lan?"enabled":"disabled",null,null);
-  }catch(Exception ex){MessageBox.Show(ex.Message,"Unable to save settings");}};Controls.Add(lan);
-  var access=new Button{Text="Remote access…",Location=new Point(350,251),Size=new Size(170,38)};
-  access.Click+=(s,e)=>ShowAccess();Controls.Add(access);
-  portChecks=new CheckBox{Text="Check ports on next start",Checked=settings.snmp??(Environment.GetEnvironmentVariable("NETWATCH_SNMP")=="1"),Location=new Point(20,305),AutoSize=true};
+  }catch(Exception ex){MessageBox.Show(ex.Message,"Unable to save settings");}};
+  var access=new Button{Text="Remote access…",Location=new Point(324,240),Size=new Size(156,40)};
+  access.Click+=(s,e)=>ShowAccess();
+  portChecks=new LauncherCheckBox{Text="Check switch and router ports",Checked=settings.snmp??(Environment.GetEnvironmentVariable("NETWATCH_SNMP")=="1"),Location=new Point(0,108),Size=new Size(318,24)};
   portChecks.CheckedChanged+=(s,e)=>{
    if(!restoringPortPreference&&!SavePortPreference(portChecks.Checked)) {
     restoringPortPreference=true;
@@ -132,57 +217,131 @@ public class NetWatch : Form {
     MessageBox.Show(this,"Could not save the port check setting.","Port monitoring");
    }
   };
-  Controls.Add(portChecks);
-  var ports=new Button{Text="Port monitoring…",Location=new Point(350,294),Size=new Size(170,38)};
-  ports.Click+=(s,e)=>ShowPortSetup();Controls.Add(ports);
-  var data=new TextBox{Text="Saved data: "+settings.database,ReadOnly=true,Multiline=true,BorderStyle=BorderStyle.None,BackColor=BackColor,ForeColor=ForeColor,Location=new Point(20,348),Size=new Size(500,40),AccessibleName="Saved data location"};Controls.Add(data);
-  Controls.Add(new Label{Text="Discovery lists nearby devices for review; it never enables monitoring.\nICMP discovery is separately optional. Saved devices need their own approval.\nStop or Quit pauses the host; sign-out also stops it.",Location=new Point(20,397),Size=new Size(500,70)});
-  foreach(Control control in Controls){var button=control as Button;if(button!=null){button.FlatStyle=FlatStyle.Flat;button.BackColor=Color.FromArgb(252,251,247);button.ForeColor=ForeColor;button.FlatAppearance.BorderColor=Color.FromArgb(170,183,172);button.UseVisualStyleBackColor=false;}}
+  var ports=new Button{Text="Port monitoring…",Location=new Point(324,98),Size=new Size(156,40)};
+  ports.Click+=(s,e)=>ShowPortSetup();
+  var data=new TextBox{Text=settings.database,ReadOnly=true,BackColor=Color.FromArgb(252,251,247),ForeColor=ForeColor,Location=new Point(0,310),Width=480,AccessibleName="Saved data location"};
+  settingsPanel.Controls.AddRange(new Control[]{portChecks,ports,SettingsHeading("Local discovery",140),discovery,discoveryIcmp,
+   SettingsHeading("Sharing",223),lan,access,SettingsHeading("Saved data location",285),data});
+  settingsViewport.Controls.Add(settingsPanel);
+  Controls.Add(settingsViewport);
+  foreach(var button in new[]{lifecycle,open,settingsToggle,quit,access,ports})StyleButton(button,false);
   var menu=new ContextMenuStrip{BackColor=Color.FromArgb(252,251,247),ForeColor=ForeColor,Renderer=new ToolStripProfessionalRenderer(new NetWatchMenuColors())};menu.Items.Add("Show controls",null,(s,e)=>ShowControls());
   trayStart=new ToolStripMenuItem("Start",null,(s,e)=>StartHost());menu.Items.Add(trayStart);
   trayStop=new ToolStripMenuItem("Stop",null,(s,e)=>StopHost()){Enabled=false};menu.Items.Add(trayStop);
   trayOpen=new ToolStripMenuItem("Open dashboard",null,(s,e)=>OpenDashboard()){Enabled=false};menu.Items.Add(trayOpen);
   menu.Items.Add(new ToolStripSeparator());menu.Items.Add("Quit NetWatch",null,(s,e)=>Quit());
   tray=new NotifyIcon{Icon=Icon,Text="NetWatch: stopped",ContextMenuStrip=menu,Visible=true};tray.DoubleClick+=(s,e)=>ShowControls();
+  SetState("stopped","Start NetWatch to open the dashboard.");
+  ActiveControl=lifecycle;
   FormClosing+=(s,e)=>{if(e.CloseReason==CloseReason.UserClosing&&!quitting){e.Cancel=true;Hide();}};
-  FormClosed+=(s,e)=>{tray.Visible=false;tray.Dispose();};
+  FormClosed+=(s,e)=>{tray.Visible=false;tray.Dispose();brandImage.Image.Dispose();};
   var showTimer=new System.Windows.Forms.Timer{Interval=250};showTimer.Tick+=(s,e)=>{if(showRequest.WaitOne(0))ShowControls();};showTimer.Start();FormClosed+=(s,e)=>showTimer.Dispose();
+ }
+ protected override void OnPaint(PaintEventArgs e) {
+  base.OnPaint(e);
+  using(var border=new Pen(Edge))e.Graphics.DrawRectangle(border,0,0,ClientSize.Width-1,ClientSize.Height-1);
+ }
+ void EnableWindowDrag(params Control[] grip) {
+  foreach(var control in grip) {
+   Point offset=Point.Empty;
+   control.MouseDown+=(s,e)=>{
+    if(e.Button!=MouseButtons.Left)return;
+    offset=new Point(Cursor.Position.X-Left,Cursor.Position.Y-Top);
+    control.Capture=true;
+   };
+   control.MouseMove+=(s,e)=>{
+    if(control.Capture&&e.Button==MouseButtons.Left)
+     Location=new Point(Cursor.Position.X-offset.X,Cursor.Position.Y-offset.Y);
+   };
+   control.MouseUp+=(s,e)=>control.Capture=false;
+  }
+ }
+ Label SettingsHeading(string text,int top) {
+  return new Label{Text=text,Font=new Font(Font,FontStyle.Bold),Location=new Point(0,top),AutoSize=true};
+ }
+ void ToggleSettings() {
+  bool expanded=!settingsViewport.Visible;
+  if(expanded) {
+   Rectangle available=Screen.FromControl(this).WorkingArea;
+   settingsViewport.Height=Math.Min(settingsPanel.Height,Math.Max(1,available.Height-settingsViewport.Top-12));
+   int height=settingsViewport.Bottom+12;
+   Top=Math.Max(available.Top,Math.Min(Top,available.Bottom-height));
+   ClientSize=new Size(ClientSize.Width,height);
+   settingsViewport.AutoScrollPosition=Point.Empty;
+  } else {
+   ClientSize=new Size(ClientSize.Width,settingsViewport.Top+2);
+  }
+  settingsViewport.Visible=expanded;
+  settingsToggle.Text=expanded?"Hide s&ettings":"S&ettings…";
+  Invalidate(true);
+ }
+ void UpdateSettingsNote() {
+  settingsNote.Text=host!=null?"Stop NetWatch to change startup settings.":
+   settings.infrastructureOnly?"Router and switch mode pauses local discovery.":"Startup settings apply when you start NetWatch.";
+ }
+ static void StyleButton(Button button,bool primary) {
+  button.FlatStyle=FlatStyle.Flat;
+  button.UseVisualStyleBackColor=false;
+  button.BackColor=primary?Color.FromArgb(23,102,84):Color.FromArgb(252,251,247);
+  button.ForeColor=primary?Paper:Ink;
+  button.FlatAppearance.BorderColor=primary?Green:Edge;
+  button.FlatAppearance.MouseOverBackColor=primary?Color.FromArgb(20,85,71):Color.FromArgb(231,239,230);
+  button.FlatAppearance.MouseDownBackColor=primary?Ink:Color.FromArgb(218,233,221);
  }
  void ShowControls(){Show();WindowState=FormWindowState.Normal;Activate();}
  void UI(Action action){if(!IsDisposed&&IsHandleCreated)BeginInvoke(action);}
  void SetState(string next,string message) {
   state=next;
+  if(next!="error")tlsError=false;
+  else if(message!=null)tlsError=message.Contains("HTTPS");
   if(next=="running") {
-   message=settings.icmp?"NetWatch is running. Device checks are on.":"NetWatch is running. Device checks are paused.";
-   if(settings.lan&&accessInfo!=null&&!accessInfo.adminConfigured)message+="\nSet an admin password under Remote access.";
+   message=settings.icmp?"Device checks are on.":"Device checks are paused.";
+   if(settings.infrastructureOnly)message+=" Router and switch mode is on.";
+   if(localOnly)message+=" Dashboard available on this PC only.";
+   else if(settings.lan&&accessInfo!=null&&!accessInfo.adminConfigured)message+="\nSet an admin password under Remote access.";
   }
   else if(next=="error"&&message==null)message=status.Text;
-  else if(next=="error")message=message.Contains("HTTPS")?
+  else if(next=="error")message=tlsError?
 #if PACKAGED
-   "Open Remote access and choose Set up or repair sharing. To use only this PC, turn off Allow other PCs on this network.":
+   "Repair sharing in Remote access, or start on this PC for now.":
 #else
-   "Check the HTTPS certificate and key. See Direct HTTPS in the Remote access guide.":
+   "Sharing needs a valid HTTPS certificate. You can start on this PC for now.":
 #endif
    "NetWatch could not continue. Check that another copy is not already running and that your saved data is available.";
-  status.Text=message;status.AccessibleName="NetWatch status: "+message;tray.Text="NetWatch: "+next;
+  statusTitle.Text=next=="running"?"Running":next=="starting"?"Starting":
+   next=="stopping"?"Stopping":next=="error"?"Needs attention":"Stopped";
+  statusCard.BackColor=next=="running"?Color.FromArgb(229,240,231):next=="error"?Color.FromArgb(250,235,219):Paper;
+  statusTitle.ForeColor=next=="running"?Green:Ink;
+  status.Text=message;tray.Text="NetWatch: "+next;
   bool idle=host==null;
-  start.Enabled=trayStart.Enabled=idle&&!quitting;stop.Enabled=trayStop.Enabled=!idle&&next!="stopping";
-  open.Enabled=trayOpen.Enabled=next=="running";monitoring.Enabled=discovery.Enabled=lan.Enabled=portChecks.Enabled=idle;discoveryIcmp.Enabled=idle&&settings.discovery;
+  trayStart.Enabled=idle&&!quitting;
+  trayStop.Enabled=!idle&&next!="stopping";
+  lifecycle.Text=idle?"&Start NetWatch":"S&top NetWatch";
+  lifecycle.Enabled=idle?trayStart.Enabled:trayStop.Enabled;
+  trayOpen.Enabled=next=="running";
+  open.Enabled=trayOpen.Enabled||(tlsError&&idle&&!quitting);
+  open.Text=tlsError?"Start on &this PC":"&Open dashboard";
+  monitoring.Enabled=infrastructureOnly.Enabled=lan.Enabled=portChecks.Enabled=idle;discovery.Enabled=idle&&!settings.infrastructureOnly;discoveryIcmp.Enabled=discovery.Enabled&&settings.discovery;
+  StyleButton(lifecycle,idle);
+  StyleButton(open,open.Enabled);
+  AcceptButton=open.Enabled?open:lifecycle;
+  if(open.Enabled&&lifecycle.Focused)open.Focus();
+  UpdateSettingsNote();
  }
- void StartHost() {
+ void StartHost(bool onlyThisPc=false) {
   if(host!=null||settingUpPorts)return;
+  localOnly=onlyThisPc;
   try {
    var info=new ProcessStartInfo(nodePath,"host/desktop.js"){WorkingDirectory=appRoot,UseShellExecute=false,CreateNoWindow=true,RedirectStandardInput=true,RedirectStandardOutput=true,RedirectStandardError=true,StandardOutputEncoding=Encoding.UTF8,StandardErrorEncoding=Encoding.UTF8};
    info.EnvironmentVariables["NETWATCH_DB"]=settings.database;info.EnvironmentVariables["NETWATCH_ICMP"]=settings.icmp?"1":"0";info.EnvironmentVariables["NETWATCH_DISCOVERY"]=settings.discovery?"1":"0";info.EnvironmentVariables["NETWATCH_DISCOVERY_ICMP"]=settings.discovery&&settings.discoveryIcmp?"1":"0";
+   info.EnvironmentVariables["NETWATCH_INFRASTRUCTURE_ONLY"]=settings.infrastructureOnly?"1":"0";
    if(settings.snmp.HasValue)info.EnvironmentVariables["NETWATCH_SNMP"]=settings.snmp.Value?"1":"0";
    info.EnvironmentVariables["NETWATCH_SNMP_PORT_CONTEXTS"]=FormatPortContexts();
-   info.EnvironmentVariables["NETWATCH_LAN"]=settings.lan?"1":"0";
-#if PACKAGED
-   if(settings.managedSharing&&!(settings.lan&&ManualTlsConfigured())) {
+   info.EnvironmentVariables["NETWATCH_LAN"]=settings.lan&&!localOnly?"1":"0";
+   if(localOnly||(settings.managedSharing&&!(settings.lan&&ManualTlsConfigured()))) {
     info.EnvironmentVariables.Remove("NETWATCH_TLS_CERT");info.EnvironmentVariables.Remove("NETWATCH_TLS_KEY");info.EnvironmentVariables.Remove("NETWATCH_TLS_PFX");
-    if(settings.lan)info.EnvironmentVariables["NETWATCH_TLS_PFX"]=Path.Combine(sharingPath,"netwatch.pfx");
+    if(settings.lan&&!localOnly)info.EnvironmentVariables["NETWATCH_TLS_PFX"]=Path.Combine(sharingPath,"netwatch.pfx");
    }
-#endif
    accessInfo=null;
    host=new Process{StartInfo=info,EnableRaisingEvents=true};
    host.OutputDataReceived+=(s,e)=>{if(e.Data==null)return;try{var item=json.Deserialize<HostEvent>(e.Data);UI(()=>{if(item.type=="access"){ApplyAccess(item);return;}if(!String.IsNullOrEmpty(item.dashboardUrl))dashboardUrl=item.dashboardUrl;SetState(item.state,item.message);});}catch{}};
@@ -238,11 +397,11 @@ public class NetWatch : Form {
    } else ApplyAccess(LocalAccess(appRoot,nodePath,settings.database,message));
   } catch {ApplyAccess(new HostEvent{error="Unable to update access settings. Check passwords and try again."});}
  }
-#if PACKAGED
  static bool ManualTlsConfigured() {
   return !String.IsNullOrEmpty(Environment.GetEnvironmentVariable("NETWATCH_TLS_CERT"))&&
    !String.IsNullOrEmpty(Environment.GetEnvironmentVariable("NETWATCH_TLS_KEY"));
  }
+#if PACKAGED
  static DesktopSettings LoadInstalledSettings() {
   string directory=Path.GetDirectoryName(settingsPath);
   Directory.CreateDirectory(directory);

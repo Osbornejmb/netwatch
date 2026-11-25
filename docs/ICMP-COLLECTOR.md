@@ -1,15 +1,17 @@
 # Windows ICMP collector (2.2)
 
-The host has an opt-in Windows ICMP collector. Dashboard observation integration is implemented locally for issue #6. Separately, opt-in local discovery may use the same bounded probe runner for a directly attached private IPv4 subnet. Discovery results are review-only; only the explicit Add to map action saves a device and enables its normal checks. See DISCOVERY.md.
+The opt-in Windows ICMP collector checks individually approved device IPs on the saved map, including across routed subnets. Configure routing and allow ICMP echo and replies between the NetWatch PC and each target. Discovery can separately use the same probe runner on directly attached private IPv4 networks. Devices added to the map start with checks off. See the [routed monitoring tutorial](README.md#tutorial-for-monitoring-devices-across-routed-subnets).
 
 
 The Windows helper cache uses source-hash filenames and a SHA-256 sidecar for each compiled executable. A missing or mismatched sidecar triggers a rebuild on the next preparation. The sidecar detects cache changes when it remains intact.
 
 ## Enable deliberately
 
+`NETWATCH_INFRASTRUCTURE_ONLY=1` limits checks to approved routers and switches. It also pauses the separate local discovery scan. The monitoring authorization for each saved device is retained.
+
 Requires Windows 10/11, Node 22.13+, the Windows .NET Framework v4 runtime/compiler, and OS permission to send ICMP. No administrator elevation or PowerShell execution-policy change is requested. The framework compiler must be present and permitted by application control. On a non-Windows host the enabled collector reports `unsupported`; it never substitutes another platform's ping command.
 
-1. Back up the database before upgrading (`npm.cmd run db -- backup C:\NetWatchBackups\before-2.2.sqlite`, host stopped). Schema v1 upgrades transactionally to v2, preserving inventory, sequence IDs, revisions and existing checks. V1 and v2 backups remain accepted. A compatible host migrates a restored v1 backup on its next start. Older hosts reject v2 rather than guessing its shape.
+1. Stop the host and back up the database with `npm.cmd run db -- backup "<BACKUP_FILE_PATH>"`. Replace `<BACKUP_FILE_PATH>` with the full path for a new backup file in an existing writable folder. Remove the brackets and keep the quotes. Schema v1 upgrades transactionally to v2, preserving inventory, sequence IDs, revisions and existing checks. V1 and v2 backups remain accepted. A compatible host migrates a restored v1 backup on its next start. Older hosts reject v2 rather than guessing its shape.
 2. Start the host normally and prepare **only your approved device inventory**. In Backup → Local host storage, save the inventory, choose each authorized host device, check Authorize ICMP checks, and preview/confirm Save to host. New/imported entries default disabled. Do not opt in the starter placeholders or sample devices.
 3. Stop the host, then explicitly enable the collector in the PowerShell session:
 

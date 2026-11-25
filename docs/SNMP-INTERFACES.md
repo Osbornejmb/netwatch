@@ -10,14 +10,16 @@ Cisco documents SNMPv3 on the [3750](https://www.cisco.com/c/en/us/td/docs/switc
 
 ## Set up in the Windows launcher
 
-Add the switch or router and its management IP to the saved map, then stop the host in the launcher. Choose **Port monitoring**, select the saved device, and enter its read-only SNMPv3 username, authentication algorithm and passwords. Choose **Test connection** to confirm NetWatch can read port status, then **Enable monitoring** to test again and protect the profile under your Windows account. Start the host and open the device’s **Ports** or **Network neighbors**. The launcher remembers **Check ports on next start**. Clear that setting and restart the host to pause collection for enrolled devices.
+Port monitoring polls the saved management IP directly over UDP 161, including across routed subnets. Intermediate switches only need to forward traffic. Enable SNMPv3 on the equipment whose port readings you need. For a manually mapped uplink, one enrolled end supplies one-sided evidence, and both enrolled ends can supply both port readings. See the [routed monitoring tutorial](README.md#tutorial-for-monitoring-devices-across-routed-subnets).
+
+Add the switch or router and its management IP to the saved map, then stop the host in the launcher. Choose **Settings → Port monitoring…**, select the saved device, and enter its read-only SNMPv3 username, authentication algorithm and passwords. Choose **Test connection** to confirm NetWatch can read port status, then **Enable monitoring** to test again and protect the profile under your Windows account. Start the host and open the device’s **Ports** or **Network neighbors**. The launcher remembers **Check switch and router ports**. Clear that setting and restart the host to pause collection for enrolled devices.
 
 ## Terminal setup
 
 1. Update dependencies with `npm.cmd ci` and run `npm.cmd run build`. Stop/Quit the host using this database first. Preserve a verified offline database backup before the schema upgrade.
 2. Set `NETWATCH_DB` to the same absolute database path shown by your launcher, or use the repository default `data/netwatch.sqlite`. Use one authoritative database; setup does not copy your browser working copy automatically.
 3. Run `npm.cmd run snmp -- list` to list saved IDs/labels and interface-configuration state. Save your approved device to the host first if it is absent.
-4. In an interactive local terminal, run `npm.cmd run snmp -- set <saved-device-id>`. Verify the displayed device/address. Enter the authentication algorithm, then the hidden username/authentication/privacy inputs. Do not paste credentials into chat, environment variables, command arguments, topology JSON or files. Ctrl+C cancels password entry.
+4. In an interactive local terminal, run `npm.cmd run snmp -- set <DEVICE_ID>`. Replace `<DEVICE_ID>`, including the angle brackets, with the exact ID beside that device in the preceding `list` output. Verify the displayed device/address. Enter the authentication algorithm, then the hidden username/authentication/privacy inputs. Do not paste credentials into chat, environment variables, command arguments, topology JSON or files. Ctrl+C cancels password entry.
 5. Use SNMPv3 **authPriv** with AES-128 privacy. `sha256` is supported when the device supports it; explicitly select `sha` (HMAC-SHA-1) for compatible older IOS images. MD5, DES, noAuth, v1 and v2c are not offered, and there is no automatic downgrade. Configure the device separately with a read-only account restricted to this host and the required MIB view. Do not grant SNMP write privileges.
 6. Start the local host from that terminal:
 
@@ -29,7 +31,7 @@ npm.cmd start
 The host still binds only to `127.0.0.1:4317`. This is independent of `NETWATCH_ICMP` and the existing per-device ICMP opt-in. Enable ICMP separately only for approved targets if you also want reachability status. Stop the terminal host before starting another launcher-owned host.
 
 7. Open saved-device details → **Ports**. The browser reads results every five seconds only while that section is open; those reads do not issue SNMP requests. It shows 50 interfaces per page, admin/oper state, sample time and conservative receive/send rates. A replying device can remain Up while an interface is Down; stale/paused/error views show last-known interface information and unavailable rates.
-8. To revoke interface monitoring, stop the host and run `npm.cmd run snmp -- remove <saved-device-id>`. This also removes that ID's protected profile, including after the device has been deleted. Removing a device or changing its address/type automatically revokes authorization and deletes its old interface observations; an orphan protected file cannot reauthorize it. Re-adding an identical ID/address cannot inherit the old credential authorization. Label/layout changes preserve authorization.
+8. To revoke interface monitoring, stop the host and run `npm.cmd run snmp -- remove <DEVICE_ID>`, replacing `<DEVICE_ID>` with the exact ID used when enrolling the device. This also removes that ID's protected profile, including after the device has been deleted. Removing a device or changing its address/type automatically revokes authorization and deletes its old interface observations; an orphan protected file cannot reauthorize it. Re-adding an identical ID/address cannot inherit the old credential authorization. Label/layout changes preserve authorization.
 
 ## Credentials and backup
 

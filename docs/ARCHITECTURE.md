@@ -1,5 +1,9 @@
 # NetWatch architecture
 
+Topology discovery uses LLDP chassis and port evidence. When a link lacks LLDP data, it can follow CDP reports by matching the advertised management address to an enrolled device. CDP run identities reference existing devices and do not become saved chassis identities.
+
+The router and switch mode is a host startup setting. It restricts ICMP targets to approved infrastructure, pauses broad neighbor discovery, and supplies the display mode through snapshots. The saved inventory and monitoring approvals are retained.
+
 The current UI uses one off-white theme across the map, editor, dialogs and Windows controls. Draft edits remain separate from the monitored network; the editor’s Use this map action fetches current saved inventory and prepares a reviewed, revision-checked replacement without automatically enabling new/changed targets. See DESIGN.md and REDESIGN-CHECKPOINT.md.
 
 ## Opt-in interface collection (#7, local implementation)

@@ -62,6 +62,17 @@ export function configuredCrawlLimits(env = process.env) {
 }
 const chassis = (key) =>
   typeof key === 'string' && /^(mac:(?:[a-f\d]{2}:){5}[a-f\d]{2}|lldp:[1-7]:[a-f\d]{64})$/.test(key)
+const cdpKey = (target) => 'cdp:' + stable([target.deviceId, target.address])
+const portName = (label) =>
+  label
+    .toLowerCase()
+    .replace(
+      /^(fastethernet|gigabitethernet|tengigabitethernet|ethernet|port-channel)(?=\d)/,
+      (prefix) =>
+        ({ fastethernet: 'fa', gigabitethernet: 'gi', tengigabitethernet: 'te', ethernet: 'et', 'port-channel': 'po' })[
+          prefix
+        ],
+    )
 const text = (value) =>
   typeof value === 'string'
     ? value
@@ -93,6 +104,8 @@ export async function crawlTopology({
   const sightings = new Map()
   const cdpReports = []
   const byAddress = new Map(targets.map((target) => [target.address, target]))
+  const enrolledKeys = new Map()
+  const chassisAliases = new Map()
   const queue = [{ target: seed, depth: 0, expected: null }]
   const queued = new Set([seed.deviceId])
   const attempted = new Set()
@@ -126,7 +139,7 @@ export async function crawlTopology({
     if (signal.aborted) break
     if (Array.isArray(result?.cdp) && cdpReports.length < 512) {
       for (const entry of result.cdp.slice(0, Math.min(128, 512 - cdpReports.length))) {
-        if (!Number.isInteger(entry.index) || entry.index < 1 || entry.index > 2147483647) continue
+        if (!Number.isInteger(entry?.index) || entry.index < 1 || entry.index > 2147483647) continue
         cdpReports.push({
           reporterId: target.deviceId,
           sourceProtocol: 'cdp',
@@ -140,27 +153,64 @@ export async function crawlTopology({
         })
       }
     }
-    if (!chassis(result?.chassisKey) || (expected && result.chassisKey !== expected)) {
-      const reason =
-        expected && chassis(result?.chassisKey)
-          ? 'identity_conflict'
-          : [
-                'cancelled',
-                'credentials_unavailable',
-                'credentials_rejected',
-                'collection_unavailable',
-                'snmp_timeout',
-                'snmp_limit',
-                'snmp_failed',
-                'monitoring_busy',
-              ].includes(result?.error)
-            ? result.error
-            : 'identity_unavailable'
+    const actualKey = chassis(result?.chassisKey) ? result.chassisKey : null
+    const reportedKey = chassisAliases.get(actualKey) ?? actualKey
+    const lldpRows = Array.isArray(result?.neighbors) ? result.neighbors.slice(0, limits.neighbors) : []
+    const cdpRows = (Array.isArray(result?.cdp) ? result.cdp : []).slice(0, 128).flatMap((row) => {
+      if (!row) return []
+      const address = typeof row.address === 'string' && isIP(row.address) ? row.address : ''
+      if (address === target.address) return []
+      const enrolled = address && allowed(address) ? byAddress.get(address) : undefined
+      const flags =
+        typeof row.capabilities === 'string' && /^[a-f\d]{2,8}$/i.test(row.capabilities)
+          ? Number.parseInt(row.capabilities, 16)
+          : 0
+      const type = enrolled?.type ?? (flags & 8 ? 'switch' : flags & 1 ? 'router' : '')
+      if (!['router', 'switch'].includes(type)) return []
+      const localPort = port({ ...row.localPort, index: row.index })
+      const peerPort = port({ label: row.peerPort })
+      if (!localPort.index || !peerPort.label) return []
+      // Keep the LLDP sighting and its conflict checks when both protocols report this link.
+      if (
+        lldpRows.some(
+          (entry) =>
+            entry?.localPort?.index === localPort.index ||
+            (Array.isArray(entry?.addresses) &&
+              entry.addresses.includes(row.address) &&
+              portName(text(entry.peerPort?.label)) === portName(peerPort.label)),
+        )
+      )
+        return []
+      const peer = enrolled ?? { address, type }
+      return [{ peer, localPort, peerPort, name: row.device, source: 'cdp' }]
+    })
+    const fallback = !actualKey && result?.state === 'identity_unavailable' && cdpRows.length > 0
+    const knownDevice = devices.get(reportedKey)
+    const conflict =
+      reportedKey &&
+      ((expected && chassis(expected) && reportedKey !== expected) ||
+        (knownDevice?.enrolledId && knownDevice.enrolledId !== target.deviceId))
+    if ((!actualKey && !fallback) || conflict) {
+      const reason = conflict
+        ? 'identity_conflict'
+        : [
+              'cancelled',
+              'credentials_unavailable',
+              'credentials_rejected',
+              'collection_unavailable',
+              'snmp_timeout',
+              'snmp_limit',
+              'snmp_failed',
+              'monitoring_busy',
+            ].includes(result?.error)
+          ? result.error
+          : 'identity_unavailable'
       diagnostics.add(reason)
       if (expected && devices.has(expected)) devices.get(expected).reason = reason
       continue
     }
-    const device = ensure(result.chassisKey)
+    const key = expected ?? reportedKey ?? cdpKey(target)
+    const device = ensure(key)
     if (!device) {
       diagnostics.add('proposal_limit')
       break
@@ -171,32 +221,54 @@ export async function crawlTopology({
       label: device.label || text(result.name),
       type: target.type,
       enrolledId: target.deviceId,
+      ...(fallback && { identitySource: 'cdp' }),
     })
+    enrolledKeys.set(target.deviceId, key)
+    if (actualKey && actualKey !== key) chassisAliases.set(actualKey, key)
     if (!device.addresses.includes(target.address) && device.addresses.length < 8) device.addresses.push(target.address)
     delete device.reason
-    if (result.state === 'empty') diagnostics.add('empty_lldp')
+    if (result.state === 'empty' && !cdpRows.length) diagnostics.add('empty_lldp')
     if (result.state === 'partial' || result.neighbors?.length > limits.neighbors) diagnostics.add('neighbor_limit')
-    for (const row of (Array.isArray(result.neighbors) ? result.neighbors : []).slice(0, limits.neighbors)) {
-      if (!chassis(row.chassisKey) || row.chassisKey === device.chassisKey) continue
+    for (const row of [...lldpRows, ...cdpRows].slice(0, limits.neighbors)) {
+      if (!row) continue
+      const addresses = row.peer
+        ? row.peer.address
+          ? [row.peer.address]
+          : []
+        : (Array.isArray(row.addresses) ? row.addresses : [])
+            .slice(0, 8)
+            .filter((address) => typeof address === 'string' && isIP(address))
+      const eligible = ['switch', 'router'].includes(row.peer?.type ?? row.type)
+        ? addresses
+            .filter(allowed)
+            .map((address) => byAddress.get(address))
+            .find(Boolean)
+        : undefined
+      const peerKey = row.peer
+        ? row.peer.deviceId
+          ? (enrolledKeys.get(row.peer.deviceId) ?? cdpKey(row.peer))
+          : 'cdp:' + stable(row.peer.address || [key, row.localPort.index, row.name, row.peerPort.label])
+        : (chassisAliases.get(row.chassisKey) ?? row.chassisKey)
+      if ((!row.peer && !chassis(row.chassisKey)) || peerKey === device.chassisKey) continue
       if (sightings.size >= limits.proposals) {
         diagnostics.add('proposal_limit')
         break
       }
-      const peer = ensure(row.chassisKey)
+      const peer = ensure(peerKey)
       if (!peer) {
         diagnostics.add('proposal_limit')
         break
       }
-      const addresses = (Array.isArray(row.addresses) ? row.addresses : [])
-        .slice(0, 8)
-        .filter((address) => typeof address === 'string' && isIP(address))
       peer.addresses = [...new Set([...peer.addresses, ...addresses])].slice(0, 8)
       if (peer.depth === undefined || peer.depth > depth + 1) {
         peer.depth = depth + 1
         peer.via = device.chassisKey
       }
       if (!peer.label) peer.label = text(row.name)
-      if (peer.state !== 'manageable' && ['switch', 'router'].includes(row.type)) peer.type = row.type
+      const type = row.peer?.type ?? row.type
+      if (peer.state !== 'manageable' && ['switch', 'router'].includes(type)) peer.type = type
+      if (row.peer?.deviceId) peer.enrolledId = row.peer.deviceId
+      if (row.peer && !row.peer.deviceId) peer.observedOnly = true
       const local = port(row.localPort),
         remote = port(row.peerPort)
       const endpoints = [
@@ -210,14 +282,10 @@ export async function crawlTopology({
         local,
         remote,
         checkedAt: result.checkedAt,
-        sourceProtocol: row.source === 'both' ? 'both' : 'lldp',
+        sourceProtocol: ['both', 'cdp'].includes(row.source) ? row.source : 'lldp',
         ...(row.protocolConflict === true && { protocolConflict: true }),
       })
-      if (peer.state === 'manageable' || !['router', 'switch'].includes(row.type)) continue
-      const eligible = addresses
-        .filter(allowed)
-        .map((address) => byAddress.get(address))
-        .find(Boolean)
+      if (peer.state === 'manageable' || !['router', 'switch'].includes(type)) continue
       if (!eligible) {
         peer.reason ??= addresses.some(allowed)
           ? 'not_enrolled'
@@ -231,6 +299,7 @@ export async function crawlTopology({
         continue
       }
       if (queued.has(eligible.deviceId)) continue
+      enrolledKeys.set(eligible.deviceId, peerKey)
       queued.add(eligible.deviceId)
       queue.push({ expected: peer.chassisKey, target: eligible, depth: depth + 1 })
     }
@@ -253,8 +322,8 @@ export async function crawlTopology({
       (candidate) =>
         row.local.label &&
         row.remote.label &&
-        candidate.local.label === row.remote.label &&
-        candidate.remote.label === row.local.label &&
+        portName(candidate.local.label) === portName(row.remote.label) &&
+        portName(candidate.remote.label) === portName(row.local.label) &&
         (!candidate.local.subtype || !row.remote.subtype || candidate.local.subtype === row.remote.subtype) &&
         (!candidate.remote.subtype || !row.local.subtype || candidate.remote.subtype === row.local.subtype),
     )
@@ -287,7 +356,7 @@ export async function crawlTopology({
       sourcePort: ends[0][1],
       targetPort: ends[1][1],
       confidence,
-      sourceProtocol: row.sourceProtocol === 'both' || reciprocal?.sourceProtocol === 'both' ? 'both' : 'lldp',
+      sourceProtocol: reciprocal && reciprocal.sourceProtocol !== row.sourceProtocol ? 'both' : row.sourceProtocol,
       status: 'proposed',
       evidence: reciprocal ? [row, reciprocal] : [row],
     })

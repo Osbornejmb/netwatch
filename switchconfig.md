@@ -1,6 +1,6 @@
 # Configure a managed switch for NetWatch
 
-Use this guide to set up read-only SNMPv3 monitoring and discover which switch ports connect to neighboring devices. The basic monitoring setup applies to managed switches that expose standard interface MIBs. Forwarding-table discovery also depends on the switch's VLAN support and the tables it exposes. The Cisco IOS example below includes the additional configuration verified on a Catalyst 3750.
+Use this guide to set up read-only SNMPv3 port monitoring for switches you have added by management IP. Standard interface MIBs supply port status and counters for manually mapped uplinks. VLAN forwarding tables, LLDP, and CDP support optional discovery. The Cisco IOS example below includes the additional configuration verified on a Catalyst 3750.
 
 ## 1. Prepare the switch and network
 
@@ -46,36 +46,50 @@ Each switch has its own forwarding-table context. Interface polling, LLDP, and C
 
 ## Cisco IOS example from a blank switch
 
-The examples use VLAN 100, a switch management IP of `192.0.2.2/24`, and a NetWatch PC at `192.0.2.10`. Replace the addresses, VLAN, and interface names with your own. Use the switch console during initial setup. Apply the matching trunk settings at the other end and give that switch a different management IP. Skip sections that are already configured on an in-service switch.
+Run these commands at the Cisco IOS console. Before pasting a block, replace each `<PLACEHOLDER>` with the value for this switch and remove the angle brackets. Use the same value wherever a placeholder repeats. Skip sections that are already configured on an in-service switch.
+
+| Placeholder | Value to enter |
+| --- | --- |
+| `<MANAGEMENT_VLAN_ID>`, `<ACCESS_VLAN_ID>` | Numeric VLAN IDs from your network plan for switch management and the endpoint port. These may be the same VLAN. |
+| `<MANAGEMENT_VLAN_NAME>` | The name approved for the management VLAN. |
+| `<SWITCH_MANAGEMENT_IP>`, `<SWITCH_SUBNET_MASK>` | The unique management IP assigned to this switch and its dotted-decimal subnet mask. |
+| `<ACCESS_PORT>`, `<TRUNK_PORT>` | Exact IOS interface names for the endpoint and the uplink. Check the cabling and `show interfaces status`. |
+| `<TRUNK_VLAN_LIST>` | The VLAN IDs this trunk should carry, as a comma-separated list or range accepted by IOS. Verify the same VLANs at the other end. |
+| `<NETWATCH_PC_IP>` | The source IP the switch sees from the Windows PC running NetWatch. Use its stable address, accounting for any address translation. |
+| `<SNMP_ACL_NUMBER>` | The approved numbered standard ACL that permits the NetWatch PC. Check `show access-lists` before creating or modifying an ACL. |
+| `<SNMP_GROUP>`, `<DEFAULT_READ_VIEW>`, `<VLAN_READ_VIEW>` | The SNMPv3 group name, its default read-view name, and the separate view name for optional VLAN forwarding-table access. Reuse your approved names or assign unused names. |
+| `<SNMP_USERNAME>` | The account name created for NetWatch. Enter the same username in the launcher. |
+| `<AUTH_PASSPHRASE>`, `<PRIVACY_PASSPHRASE>` | The distinct authentication and privacy passphrases for that SNMPv3 account. Enter them only in your switch console and NetWatch launcher. |
+| `<VLAN_CONTEXT>` | The exact context name for the endpoint VLAN reported by `show snmp context`. This is only needed for optional forwarding-table discovery. |
 
 ### A. Create the VLAN, management interface, and ports
 
-This example uses `Fa1/0/9` for an endpoint and `Fa1/0/2` for the inter-switch trunk.
+Use the access and trunk port names for the switch you are configuring. Give the switch at the other end its own management IP.
 
 ```text
 configure terminal
-vlan 100
- name NETWATCH-LAB
+vlan <MANAGEMENT_VLAN_ID>
+ name <MANAGEMENT_VLAN_NAME>
 exit
-interface vlan 100
- ip address 192.0.2.2 255.255.255.0
+interface vlan <MANAGEMENT_VLAN_ID>
+ ip address <SWITCH_MANAGEMENT_IP> <SWITCH_SUBNET_MASK>
  no shutdown
 exit
-interface fastethernet1/0/9
+interface <ACCESS_PORT>
  switchport mode access
- switchport access vlan 100
+ switchport access vlan <ACCESS_VLAN_ID>
  no shutdown
 exit
-interface fastethernet1/0/2
+interface <TRUNK_PORT>
  switchport trunk encapsulation dot1q
  switchport mode trunk
- switchport trunk allowed vlan add 100
+ switchport trunk allowed vlan add <TRUNK_VLAN_LIST>
  no shutdown
 end
 show ip interface brief
-show interfaces fastethernet1/0/9 switchport
+show interfaces <ACCESS_PORT> switchport
 show interfaces trunk
-show mac address-table interface fastethernet1/0/9
+show mac address-table interface <ACCESS_PORT>
 ```
 
 If the switch only supports 802.1Q, it may omit the encapsulation command. Verify the allowed and native VLANs on both ends. If the monitoring PC is on another subnet, configure the switch's management return path for that network. An SVI may remain down until the VLAN has an active member port.
@@ -87,7 +101,7 @@ Enable LLDP on the switch and allow it to transmit and receive on the inter-swit
 ```text
 configure terminal
 lldp run
-interface fastethernet1/0/2
+interface <TRUNK_PORT>
  lldp transmit
  lldp receive
 end
@@ -100,28 +114,28 @@ Use CDP where both sides support it and your network permits it. NetWatch can us
 ```text
 configure terminal
 cdp run
-interface fastethernet1/0/2
+interface <TRUNK_PORT>
  cdp enable
 end
 show cdp neighbors detail
 ```
 
-Verify the neighbor's management address, local interface, and remote port. Enable the chosen protocol on the corresponding interface of the other switch. The CDP hint can work on its own. The separate **Find connections** crawler requires a usable LLDP chassis identity.
+Verify the neighbor's management address, local interface, and remote port. Enable the chosen protocol on the corresponding interface of the other switch. **Find connections** can follow CDP when LLDP is unavailable if the advertised address matches an enrolled switch or router within the discovery range.
 
 ### C. Create the read-only SNMPv3 account and views
 
-Replace the source PC address, username, and both passphrase placeholders. Use an appropriate unused ACL number or reuse the existing restricted ACL. The default view grants uptime, interface counters, LLDP, and CDP. Omit the discovery subtree for a protocol you do not use.
+Use the approved SNMP names, ACL and passphrases from the table above. The default view grants uptime, interface counters, LLDP, and CDP. Omit the discovery subtree for a protocol you do not use.
 
 ```text
 configure terminal
-access-list 42 permit host 192.0.2.10
-snmp-server view NETWATCH sysUpTime included
-snmp-server view NETWATCH ifTable included
-snmp-server view NETWATCH ifXTable included
-snmp-server view NETWATCH 1.0.8802.1.1.2 included
-snmp-server view NETWATCH 1.3.6.1.4.1.9.9.23.1.2.1.1 included
-snmp-server group NETWATCH v3 priv read NETWATCH access 42
-snmp-server user netwatch-poller NETWATCH v3 auth sha <AUTH_PASSPHRASE> priv aes 128 <PRIVACY_PASSPHRASE>
+access-list <SNMP_ACL_NUMBER> permit host <NETWATCH_PC_IP>
+snmp-server view <DEFAULT_READ_VIEW> sysUpTime included
+snmp-server view <DEFAULT_READ_VIEW> ifTable included
+snmp-server view <DEFAULT_READ_VIEW> ifXTable included
+snmp-server view <DEFAULT_READ_VIEW> 1.0.8802.1.1.2 included
+snmp-server view <DEFAULT_READ_VIEW> 1.3.6.1.4.1.9.9.23.1.2.1.1 included
+snmp-server group <SNMP_GROUP> v3 priv read <DEFAULT_READ_VIEW> access <SNMP_ACL_NUMBER>
+snmp-server user <SNMP_USERNAME> <SNMP_GROUP> v3 auth sha <AUTH_PASSPHRASE> priv aes 128 <PRIVACY_PASSPHRASE>
 end
 show snmp group
 show snmp user
@@ -133,26 +147,26 @@ With IOS `auth sha`, select **SHA-1** in the NetWatch launcher. The privacy sett
 
 ### D. Expose the MAC forwarding table
 
-If `show snmp context` lists the endpoint VLAN as `vlan-100`, add a dedicated read view and a group entry for that exact context. Keep the default group entry for interface polling and neighbor discovery.
+If `show snmp context` lists a context for the endpoint VLAN, add a dedicated read view and a group entry for that exact context. Keep the default group entry for interface polling and neighbor discovery.
 
 ```text
 configure terminal
-snmp-server view NETWATCH-VLAN100 1.3.6.1.2.1.17.1.4.1.2 included
-snmp-server view NETWATCH-VLAN100 1.3.6.1.2.1.17.4.3.1.2 included
-snmp-server group NETWATCH v3 priv context vlan-100 read NETWATCH-VLAN100 access 42
+snmp-server view <VLAN_READ_VIEW> 1.3.6.1.2.1.17.1.4.1.2 included
+snmp-server view <VLAN_READ_VIEW> 1.3.6.1.2.1.17.4.3.1.2 included
+snmp-server group <SNMP_GROUP> v3 priv context <VLAN_CONTEXT> read <VLAN_READ_VIEW> access <SNMP_ACL_NUMBER>
 end
 show snmp group
 show snmp view
-show mac address-table interface fastethernet1/0/9
+show mac address-table interface <ACCESS_PORT>
 ```
 
 If the switch exposes the forwarding table in the default context, use this block instead of the named VLAN view. Grant the VLAN-aware forwarding column when the switch supports it. NetWatch falls back to the standard forwarding column when the VLAN-aware table is empty.
 
 ```text
 configure terminal
-snmp-server view NETWATCH 1.3.6.1.2.1.17.1.4.1.2 included
-snmp-server view NETWATCH 1.3.6.1.2.1.17.7.1.2.2.1.2 included
-snmp-server view NETWATCH 1.3.6.1.2.1.17.4.3.1.2 included
+snmp-server view <DEFAULT_READ_VIEW> 1.3.6.1.2.1.17.1.4.1.2 included
+snmp-server view <DEFAULT_READ_VIEW> 1.3.6.1.2.1.17.7.1.2.2.1.2 included
+snmp-server view <DEFAULT_READ_VIEW> 1.3.6.1.2.1.17.4.3.1.2 included
 end
 show snmp view
 ```
@@ -163,16 +177,16 @@ If the switch exposes these tables and you want NetWatch to use them for link he
 
 ```text
 configure terminal
-snmp-server view NETWATCH 1.3.6.1.2.1.17.1.4.1.2 included
-snmp-server view NETWATCH 1.3.6.1.2.1.17.2.15.1.3 included
-snmp-server view NETWATCH 1.2.840.10006.300.43.1.2.1.1.13 included
+snmp-server view <DEFAULT_READ_VIEW> 1.3.6.1.2.1.17.1.4.1.2 included
+snmp-server view <DEFAULT_READ_VIEW> 1.3.6.1.2.1.17.2.15.1.3 included
+snmp-server view <DEFAULT_READ_VIEW> 1.2.840.10006.300.43.1.2.1.1.13 included
 end
 show snmp view
 ```
 
 ### F. Enroll, test, and save
 
-1. [Enroll the switch in NetWatch](#4-enroll-the-switch-in-netwatch). Enter `vlan-100` in the launcher's **VLAN context** field only if you used the named context above. Save it during enrollment or with **Save context**.
+1. [Enroll the switch in NetWatch](#4-enroll-the-switch-in-netwatch). Enter the same value you used for `<VLAN_CONTEXT>` in the launcher's **VLAN context** field if you enabled named-context forwarding-table access. Save it during enrollment or with **Save context**.
 2. [Review the discovered connections](#5-review-and-save-the-discovered-connections). Confirm the access-port hint and switch-to-switch link against the switch console.
 3. Save the switch configuration after verifying the results.
 
@@ -187,9 +201,9 @@ copy running-config startup-config
 | Switch is missing from **Port monitoring…** | Save the device with its management IP and type **Switch**, then stop the host before opening enrollment. |
 | No fresh readings in **Ports** | Check the collector setting, connectivity, source ACL, and SNMPv3 authentication and privacy settings. |
 | Port readings work, but the VLAN request returns authorization error 16 | Verify the exact context name and the group's read access in that context. |
-| Port readings work, but no **Seen on** match appears | Check Windows' neighbor entry with `arp -a <endpoint-IP>`. Compare its MAC with the switch's forwarding table. An empty bridge-port table can indicate a missing read-view subtree or the wrong context. |
+| Port readings work, but no **Seen on** match appears | Run `arp -a <ENDPOINT_IP>` on the NetWatch PC. Replace `<ENDPOINT_IP>` with the assigned IP of the endpoint you are looking for and remove the brackets. Compare its MAC with the switch's forwarding table. An empty bridge-port table can indicate a missing read-view subtree or the wrong context. |
 | A PC appears on an inter-switch trunk | Check LLDP or CDP neighbor evidence on that port and the default SNMPv3 read view. Enroll the switch the PC is plugged into to find its access port. |
-| **Device identity unavailable** appears under **Topology proposals** | This describes the separate LLDP topology crawl. Check **Discovered devices** and **Local connection hints** for forwarding-table and CDP hints. |
+| **Device identity unavailable** appears under **Topology proposals** | NetWatch could not read an LLDP chassis ID or find a readable CDP report for an enrolled neighbor in range. Check the CDP neighbor table, CDP access in the SNMP read view, and each neighbor's saved address and enrollment. |
 | **Review gateway hint** is the only option | A gateway hint describes routing. Check the switch reads before using it to reason about physical connections. |
 
 See [NetWatch discovery behavior](docs/DISCOVERY.md) and [SNMP port monitoring](docs/SNMP-INTERFACES.md).

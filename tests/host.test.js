@@ -120,6 +120,32 @@ test('loopback API enforces origin, host, write intent, payload bounds, error sh
  const chunked=await new Promise((resolve,reject)=>{const req=http.request(base+'/api/v1/topology',{method:'PUT',headers:{'Content-Type':'application/json','X-NetWatch-Write':token,'Transfer-Encoding':'chunked'}},res=>{res.resume();resolve(res.statusCode)});req.on('error',reject);req.end(' '.repeat(MAX_BODY+1))});assert.equal(chunked,413)
  assert.equal((await fetch(base+'/api/v1/checks',{method:'POST'})).status,404)
 })
+test('router and switch mode advertises its scope and blocks local scans without altering inventory', async (t) => {
+ const { store, dir } = fixture(t)
+ store.write(input({ r1: true }), 0)
+ let scans = 0
+ const server = createHost(store, {
+  port: 0,
+  dist: writeTokenFixture(dir),
+  infrastructureOnly: true,
+  discovery: { snapshot: () => ({ state: 'disabled' }), runOnce: () => { scans++ } },
+ })
+ await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+ t.after(() => new Promise(resolve => server.close(resolve)))
+ const base = 'http://127.0.0.1:' + server.address().port
+ const snapshot = await (await fetch(base + '/api/v1/snapshot')).json()
+ assert.equal(snapshot.infrastructureOnly, true)
+ assert.deepEqual(snapshot.inventory.topology, store.read().topology)
+ const token = await fetchWriteToken(base)
+ const scan = await fetch(base + '/api/v1/discovered/scan-now', {
+  method: 'POST',
+  headers: { 'X-NetWatch-Write': token },
+ })
+ assert.equal(scan.status, 200)
+ assert.deepEqual(await scan.json(), { state: 'disabled' })
+ assert.equal(scans, 0)
+})
+
 test('v10 removes operator credentials and sessions while preserving other access and audit history', t => {
  const dir=mkdtempSync(join(tmpdir(),'netwatch-auth-v9-')),path=join(dir,'db')
  t.after(()=>rmSync(dir,{recursive:true,force:true}))

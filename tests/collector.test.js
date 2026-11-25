@@ -24,6 +24,31 @@ function setup(t, count=1) {
 const collector=(store,runner,options={})=>createCollector(store,{enabled:true,platform:'win32',runner,...options})
 const tick=()=>new Promise(resolve=>setImmediate(resolve))
 
+test('router and switch mode only visits authorized infrastructure devices', async (t) => {
+  const { store, input } = setup(t, 4)
+  input.topology.nodes[0].type = 'router'
+  input.topology.nodes[2].type = 'printer'
+  input.monitoring.d3 = false
+  store.write(input, 1)
+  const targets = []
+  const c = collector(store, async (address) => {
+    targets.push(address)
+    return up
+  }, { infrastructureOnly: true })
+  await c.runOnce()
+  await c.stop()
+  assert.deepEqual(targets.sort(), ['192.0.2.1', '192.0.2.2'])
+  assert.equal(store.read().monitoring.d2, true)
+  const unrestricted = collector(store, async (address) => {
+    targets.push(address)
+    return up
+  })
+  targets.length = 0
+  await unrestricted.runOnce()
+  await unrestricted.stop()
+  assert.deepEqual(targets.sort(), ['192.0.2.1', '192.0.2.2', '192.0.2.3'])
+})
+
 test('shutdown waits for helper preparation and aborted child close before releasing workers',async t=>{
  const {store}=setup(t);let prepared
  const preparing=new Promise(resolve=>{prepared=resolve})

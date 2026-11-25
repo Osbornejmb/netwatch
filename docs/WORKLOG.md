@@ -1,5 +1,17 @@
 # Working checkpoint
 
+## Current status (2026-11-25) — CDP topology fallback
+
+Topology proposals follow CDP across enrolled devices when LLDP data is missing and display directly reported unenrolled uplinks as one-sided observations. Cisco hardware verification remains pending.
+
+## Current status (2026-11-25) — simplified Windows launcher
+
+The launcher leads with host status and dashboard access. Settings now paints checkbox rows independently and fits the current work area, scrolling when needed. Verified the installed Settings layout on Windows, and checked Start and Stop with an empty test inventory.
+
+## Current status (2026-11-25) — router and switch mode
+
+The launcher mode limits uptime checks and monitoring views to routers and switches and pauses local neighbor scans. Enrolled topology discovery remains available. Live hardware verification is pending.
+
 ## Current status (2026-11-20) — richer link evidence
 
 - Link details show fresh spanning tree evidence, derived rates, and bundle availability. Discovery review includes matching CDP observations. SQLite v13 requires an offline backup of a v12 database. See the [Phase 4 report](refocus/REPORT-PHASE-4.md).

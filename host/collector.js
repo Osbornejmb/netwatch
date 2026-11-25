@@ -1,10 +1,12 @@
 import { ICMP_POLICY, cycleBudget, freshnessPolicy, transition } from './icmp-policy.js'
 import { createWindowsProbe, validateProbeResult } from './windows-probe.js'
+import { isInfrastructure } from '../src/device-types.js'
 
 export function createCollector(
   store,
   {
     enabled = false,
+    infrastructureOnly = false,
     platform = process.platform,
     runner = createWindowsProbe(),
     now = () => Date.now(),
@@ -32,7 +34,8 @@ export function createCollector(
     policy,
   }
   const stamp = () => new Date(now()).toISOString()
-  const authorized = (inventory, node) => inventory.monitoring[node.id] === true && !!node.data.ip
+  const authorized = (inventory, node) =>
+    inventory.monitoring[node.id] === true && !!node.data.ip && (!infrastructureOnly || isInfrastructure(node.type))
   function snapshot() {
     return {
       ...info,

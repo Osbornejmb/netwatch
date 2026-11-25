@@ -1,6 +1,10 @@
 # Windows tray and desktop controls
 
-The per-user launcher runs the NetWatch host in the signed-in Windows account. Open NetWatch after signing in and click **Start**.
+The per-user launcher runs the NetWatch host in the signed-in Windows account. Open NetWatch after signing in and click **Start NetWatch**. The status panel shows when the host is ready, and **Open dashboard** becomes available.
+
+For a new installation used on one PC, leave sharing off. For access from other PCs, the Windows installer can set up HTTPS and save the certificate for later launches. Both launcher builds reuse that managed certificate. If HTTPS setup prevents startup, **Start on this PC** opens a local-only session and keeps the saved sharing preference for your next normal start.
+
+Open **Settings** to find monitoring, local discovery, sharing, and the saved data location. On shorter screens, scroll within Settings to reach the lower options. With the host stopped, select **Show and check only routers and switches** to hide endpoints from monitoring views and pause their checks and local neighbor scans. Start the host to apply the setting. Keep **Check whether approved devices are online** enabled for uptime checks and **Check switch and router ports** enabled for enrolled-device topology scans.
 
 ## Standalone installer
 
@@ -18,9 +22,11 @@ On a Windows build machine with Node.js 22.13+, npm, the .NET Framework compiler
 
 Bump the version in `package.json` and `package-lock.json` before building a new installer. The installer filename, Windows version information, and installed launcher use that version. Setup builds in the release folder keep their original filenames.
 
+Replace `<INNO_SETUP_COMPILER_PATH>` with the full path to `ISCC.exe` in your Inno Setup installation. Remove the angle brackets and keep the quotes around the path.
+
 ```powershell
 npm.cmd ci
-.\scripts\package-windows.ps1 -Compiler 'C:\Path\To\ISCC.exe'
+.\scripts\package-windows.ps1 -Compiler '<INNO_SETUP_COMPILER_PATH>'
 ```
 
 The installer and its SHA-256 hash are reported at the end. The installer is written to `.tools\release`.
@@ -37,15 +43,15 @@ npm.cmd run desktop:setup -- --desktop-shortcut
 
 Omit `--desktop-shortcut` if no desktop shortcut is wanted. Setup compiles the repository-owned WinForms source using the installed Framework64 compiler, writes `%LOCALAPPDATA%\NetWatch\NetWatch.exe` and `desktop.json`, and optionally creates `NetWatch.lnk` on the current user's actual Desktop. No administrator or execution-policy change is needed. Re-running setup preserves the database path and device and port monitoring, discovery and LAN preferences and updates only this launcher's shortcut; unrelated shortcuts are refused. Quit the tray app before updating its executable.
 
-The shortcut opens host controls. Click **Start**, **Stop**, **Open dashboard**, or **Quit**. Keyboard shortcuts are Alt+S, Alt+T, Alt+O and Alt+Q. Double-click the tray icon to show controls; its context menu offers the same actions. Closing the window hides it to the tray and does not stop collection. Opening the launcher again restores the same controller, including when hidden; it does not start a second host. **Quit stops the owned host before exiting.** Closing a dashboard browser does not stop anything.
+The shortcut opens host controls. Use **Start NetWatch**, **Stop NetWatch**, **Open dashboard**, or **Quit**. Keyboard shortcuts are Alt+S, Alt+T, Alt+O and Alt+Q. Alt+E opens or hides **Settings**. Double-click the tray icon to show controls; its context menu offers the same actions. Closing the window hides it to the tray and does not stop collection. Opening the launcher again restores the same controller, including when hidden; it does not start a second host. **Quit stops the owned host before exiting.** Closing a dashboard browser does not stop anything.
 
 ## Inventory, monitoring and storage
 
 Default persistent data is `%LOCALAPPDATA%\NetWatch\data\netwatch.sqlite`, outside installed program files. A new data directory starts with an empty inventory. The control window shows the database path. `desktop.json` stores the selected database and device and port monitoring, discovery and LAN preferences. Source setup also records the checkout and Node paths. Keep those paths available for the source launcher and rerun source setup if either moves. To select a compatible existing database, stop NetWatch, back up the database and set `database` to its absolute path in `desktop.json`.
 
-The **Check devices on next start** and **Discover local network neighbors on next start** checkboxes are off on first setup and apply on the next Start. Discovery is limited to directly attached IPv4 networks and its results require review. On the host PC, explicit Add to map turns on checks for that saved device; the global collector must still be enabled, and the discovery sweep does not create saved-device observations. The host/collector status is refreshed while the owned process runs. This is host process readiness, not device up/down.
+The **Check whether approved devices are online** and **Find nearby devices** checkboxes are off on first setup and apply on the next Start. Discovery is limited to directly attached IPv4 networks and its results require review. On the host PC, explicit Add to map turns on checks for that saved device; the global collector must still be enabled, and the discovery sweep does not create saved-device observations. The host/collector status is refreshed while the owned process runs. This is host process readiness, not device up/down.
 
-Choose **Port monitoring** while the host is stopped to select a saved device, test its SNMPv3 connection and enable read-only port checks. **Check ports on next start** applies to enrolled devices and is remembered across launcher restarts. See [Port monitoring setup](SNMP-INTERFACES.md#set-up-in-the-windows-launcher).
+Choose **Port monitoring** while the host is stopped to select a saved device, test its SNMPv3 connection and enable read-only port checks. **Check switch and router ports** applies to enrolled devices and is remembered across launcher restarts. See [Port monitoring setup](SNMP-INTERFACES.md#set-up-in-the-windows-launcher).
 
 The Node controller forks only its own host and uses private parent-child IPC for readiness/shutdown. Stop drains workers, closes SQLite and releases its lock. No HTTP start/stop endpoint is added. It cannot stop a separately started host/service: an occupied port or database produces an actionable error instead. Controller input closure requests graceful shutdown; abrupt Windows process-tree termination or a machine crash can leave the existing unclean-shutdown lock. The host and maintenance commands log and replace a stale lock when its local owner PID has exited or its owner record is unreadable and the directory is over 60 seconds old. If a lock remains, use the recovery procedure in HOST-API.md. Never delete a database to recover startup.
 

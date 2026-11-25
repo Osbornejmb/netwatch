@@ -1,6 +1,6 @@
 # NetWatch
 
-NetWatch shows how your routers and switches connect, which ports have evidence, and where a switch has lost a backup path. Start with an empty map, then review discovered links or map the ports yourself. Choose root routers and save a redundancy baseline so the dashboard can compare the links you expect with what the host observes. [How NetWatch decides a link is healthy](docs/LINK-HEALTH.md)
+NetWatch monitors switches, routers, and servers from a Windows PC. Add known device IPs across routed subnets, draw the uplinks you care about, and optionally read live port status with SNMPv3. Device scans are optional.
 
 ## Screenshots
 
@@ -21,37 +21,29 @@ Screenshots use a test inventory with documentation addresses.
 ### 2. Open the dashboard
 
 1. Open the Windows **Start** menu, search for **NetWatch**, and open the app.
-2. Select **Check devices on next start**. This lets NetWatch ask the devices you choose whether they are responding.
-3. Click **Start**, wait until NetWatch says it is running, then click **Open dashboard**. The dashboard opens in your web browser and runs from this PC.
+2. Open **Settings** and select **Check whether approved devices are online**. This lets NetWatch ask the devices you choose whether they are responding.
+3. Click **Start NetWatch**, wait until NetWatch says it is running, then click **Open dashboard**. The dashboard opens in your web browser and runs from this PC.
 
-### 3. Add your first switch or router
+### 3. Add known devices across subnets
 
-1. Find its **management IP address**, the network address you use to open the device’s settings. If you don’t know it, ask the person who set up the device. You can also try [Find a device automatically](#find-a-device-automatically).
-2. In the dashboard, choose **Edit map → Add device**. Choose **Switch** or **Router**, enter a name you’ll recognize and the device’s IP address, then choose **Add device**.
-3. Choose **Use this map**, review the device you added, then choose **Confirm replacement**. This applies your draft map so the running app can use it.
-4. Return to **Dashboard**. If you’re still looking at your draft, choose **View options → Show → Monitored network**.
-5. Select the device and choose **Turn checks on**. Wait for **Last check** to show a time. **Up** means the device answered the check. If the check fails, confirm the address and that this PC can reach it.
+1. Ask your network team for the individual device IPs, including the management IPs of switches and routers. Use a stable source IP for the NetWatch PC. Confirm routing and a return path to each target subnet.
+2. Allow ICMP echo requests and replies between that PC and the approved targets, including through device firewalls. Try one known device in each subnet from the NetWatch PC before adding the rest.
+3. In **Edit map → Add device**, choose the appropriate type and enter a name you recognize. Use **Endpoint** for a server. In the IP field, enter the individual IP assigned to that device from your inventory. A subnet address or CIDR identifies a network, so use the device IP by itself.
+4. Choose **Use this map → Confirm replacement**. On the **Monitored network** dashboard, open each device and select **Turn checks on**. Leave **Show and check only routers and switches** off if you also want to check servers.
 
-### 4. Optional — see what is connected to a switch port
+Keep **Find nearby devices** off for a manually maintained network. See the [routed monitoring tutorial](docs/README.md#tutorial-for-monitoring-devices-across-routed-subnets) for a firewall checklist and troubleshooting steps.
 
-1. [Configure the switch for NetWatch](switchconfig.md). The guide starts with the switch console and covers account creation, VLAN forwarding tables, LLDP, and Cisco CDP.
-2. In the Windows NetWatch launcher, click **Stop**. Open **Port monitoring…** and select the switch already saved on your map.
-3. Enter its read-only SNMPv3 credentials. If its forwarding table requires a named context, enter the exact name in **VLAN context**. Leave it blank for the default context. Use a NetWatch build that includes this field.
-4. Select **Test connection → Enable monitoring**. NetWatch saves the context for the selected switch. For an enrolled switch, **Save context** changes the context without re-entering credentials.
-5. Start the host and check **Devices → Ports** for recent readings. Then select **Discovered → Scan now**, review the port hint, and save the draft with **Use this map**.
+### 4. Map and monitor important uplinks
 
-Enroll each managed switch whose access ports you want to discover. LLDP or CDP can identify the neighbor on a trunk. The switch an endpoint is plugged into supplies the MAC forwarding evidence for its access port. [Discovery guide](docs/DISCOVERY.md#switch-port-matches)
+1. In **Edit map**, draw the connection and use **Uplinks & redundancy** to assign the physical ports. Apply the draft with **Use this map → Confirm replacement**.
+2. For live readings, allow read-only SNMPv3 from the NetWatch PC to UDP 161 on each switch or router whose ports you want to monitor. Intermediate switches forward the traffic normally. They only need SNMP if you want readings from their own ports.
+3. Stop the host, open **Settings → Port monitoring…**, select the saved device, then choose **Test connection → Enable monitoring**. Confirm **Check switch and router ports** is on, start NetWatch, and open the device's **Ports** or the map connection. One enrolled end gives one-sided evidence. Enroll both ends for port readings from both devices.
 
-
-Keep the NetWatch PC awake, connected, and signed in while you want checks to run. Start NetWatch again after signing back in. For updates and uninstall steps, see the [Windows launcher guide](docs/WINDOWS-LAUNCHER.md).
+See the [SNMP setup guide](docs/SNMP-INTERFACES.md#set-up-in-the-windows-launcher) and [link health guide](docs/LINK-HEALTH.md). Keep the NetWatch PC awake, connected, and signed in while monitoring.
 
 ### Find a device automatically
 
-1. In the Windows NetWatch app, click **Stop** and wait for it to finish. Turn on **Discover local network neighbors on next start**, then click **Start** and **Open dashboard**.
-2. In the dashboard, open **Discovered devices → Scan now** and wait for the scan to finish. NetWatch looks on the nearby private networks the PC is directly connected to.
-3. Choose **Add to draft** for a device you recognize. Review the draft in **Edit map** and choose **Use this map**, then **Confirm replacement**. Enable checks separately after saving the device. [Discovery guide](docs/DISCOVERY.md)
-
-To discover switch-to-switch connections, enroll the devices for SNMPv3 port checks. Under **Discovered → Topology proposals**, choose a router or switch and select **Find connections**. Review the proposed ports and devices before adding them to the draft.
+Use [local discovery](docs/DISCOVERY.md) to review nearby devices or [Topology proposals](docs/DISCOVERY.md#review-lldp-topology-proposals) to review reported connections. Both workflows are optional when you already know the device IPs and uplinks.
 
 ### Set up from the project files
 
@@ -84,7 +76,7 @@ For help with launcher setup, see the [Windows launcher guide](docs/WINDOWS-LAUN
 
 ## Read device status
 
-An optional Windows-host SNMPv3 feature adds interface status and traffic rates under device details → **Ports**. In the Windows launcher, stop the host and choose **Port monitoring** to test and enroll a saved device for port checks; it does not change ping-based device health. See [SNMP interface setup](docs/SNMP-INTERFACES.md). VLAN 100 access-port matching and CDP trunk detection were verified on a Catalyst 3750. Check the switch setup guide for the required SNMP views.
+An optional Windows-host SNMPv3 feature adds interface status and traffic rates under device details → **Ports**. In the Windows launcher, stop the host and choose **Settings → Port monitoring…** to test and enroll a saved device for port checks; it does not change ping-based device health. See [SNMP interface setup](docs/SNMP-INTERFACES.md). VLAN 100 access-port matching and CDP trunk detection were verified on a Catalyst 3750. Check the switch setup guide for the required SNMP views.
 
 Use **Edit map → Uplinks & redundancy** to map both ends of a connection, add a parallel link with different ports, or set a link role. To save a redundancy baseline, choose the protected device and its mapped connections, then select the root routers. **Use this map** previews and applies the draft. Existing router groups still show their port-based status on the dashboard. Map line colors continue to show device reachability.
 

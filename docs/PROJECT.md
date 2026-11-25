@@ -4,6 +4,8 @@ Current UI direction: a shared warm off-white design, everyday wording, a map-fi
 
 ## Primary outcome
 
+Operators can maintain a map from known IP addresses and uplinks, then monitor it across routed networks. Device uptime checks use ICMP. Read-only SNMPv3 supplies port evidence for selected switches and routers. Discovery is optional.
+
 A network operator opens the dashboard and immediately sees device reachability, where attention is needed, and how affected devices connect. The user's reference is a large up/down network map; NetWatch should make it cleaner through a viewport-filling topology, directly colored devices and paths, a small horizontal top menu, optional view controls, and click-to-open device details. The opening screen has no sidebar, summary-card row, or device table. A red router/path must not turn an independently responding redundant switch red.
 
 ## Priority order

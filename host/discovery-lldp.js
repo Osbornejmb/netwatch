@@ -147,8 +147,21 @@ export async function readDiscoveryLldp(request, checkedAt) {
   if (!Array.isArray(scalar) || scalar.length > identityOids.length) throw Error('snmp_invalid')
   const values = new Map(scalar.filter((row) => !snmp.isVarbindError(row)).map(({ oid, value }) => [oid, value]))
   const key = chassisKey(values.get(identityOids[0]), values.get(identityOids[1]))
-  if (!key)
-    return { checkedAt, state: 'identity_unavailable', neighbors: [], cdp: await readCdp(request).catch(() => []) }
+  if (!key) {
+    const cdp = await readCdp(request).catch(() => [])
+    if (cdp.length) {
+      const names = await table(request, '1.3.6.1.2.1.31.1.1.1.1', 512).catch(() => null)
+      const descriptions = cdp.some(({ index }) => !text(names?.rows.get(String(index))))
+        ? await table(request, '1.3.6.1.2.1.2.2.1.2', 512).catch(() => null)
+        : null
+      for (const row of cdp) {
+        const index = String(row.index)
+        const label = text(names?.rows.get(index)) || text(descriptions?.rows.get(index))
+        if (label) row.localPort = { index: row.index, label }
+      }
+    }
+    return { checkedAt, state: 'identity_unavailable', neighbors: [], cdp }
+  }
   let partial = false
   const read = async (oid, cap = 512) => {
     const result = await table(request, oid, cap)
@@ -220,6 +233,11 @@ export async function readDiscoveryLldp(request, checkedAt) {
     })
   }
   const cdp = await readCdp(request).catch(() => [])
+  const byIndex = new Map(interfaces.map((port) => [port.index, port]))
+  for (const row of cdp) {
+    const port = byIndex.get(row.index)
+    if (port?.name) row.localPort = { ...port, label: port.name }
+  }
   return {
     checkedAt,
     chassisKey: key,
