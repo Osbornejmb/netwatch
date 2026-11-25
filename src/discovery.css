@@ -1,0 +1,94 @@
+.discovery-page > .discovery-page-heading {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  position: static;
+  border-bottom: 0;
+}
+
+.discovery-section {
+  padding: clamp(12px, 2vw, 20px);
+  margin-block: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.discovery-section-heading {
+  margin-bottom: 12px;
+}
+
+.discovery-section-heading h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 650;
+}
+
+.discovery-section-heading p,
+.discovery-filter-scope {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.discovery-local-heading {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding-block: 8px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.discovery-notice {
+  padding: 10px 12px;
+  background: var(--canvas);
+  border-radius: 8px;
+}
+
+.discovery-notice p {
+  margin: 0 0 8px;
+}
+
+.discovery-draft-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.discovery-section .discovery-schedule {
+  background: var(--canvas);
+  margin-top: 8px;
+}
+
+.discovery-schedule > .discovery-filter-scope {
+  margin-bottom: 8px;
+}
+
+.discovery-section .topology-proposals {
+  padding-inline: 8px;
+}
+
+.discovery-section [tabindex='-1']:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+@media (max-width: 720px) {
+  .discovery-local-heading .discovery-heading-actions {
+    justify-content: flex-start;
+  }
+
+  .discovery-toolbar input {
+    flex: 0 0 100%;
+  }
+}

@@ -32,6 +32,38 @@ public class NetWatchMenuColors : ProfessionalColorTable {
  public override Color MenuItemBorder {get{return Color.FromArgb(23,102,84);}}
  public override Color MenuBorder {get{return Color.FromArgb(216,221,211);}}
 }
+public static class NetWatchDialogStyle {
+ static readonly Color Canvas=Color.FromArgb(244,243,238);
+ static readonly Color Paper=Color.FromArgb(252,251,247);
+ static readonly Color Ink=Color.FromArgb(37,58,54);
+ static readonly Color Edge=Color.FromArgb(170,183,172);
+ public static void Prepare(Form form) {
+  form.AutoScaleDimensions=new SizeF(96F,96F);
+  form.AutoScaleMode=AutoScaleMode.Dpi;
+  form.BackColor=SystemInformation.HighContrast?SystemColors.Control:Canvas;
+  form.ForeColor=SystemInformation.HighContrast?SystemColors.ControlText:Ink;
+ }
+ public static void Apply(Control parent) {
+  bool highContrast=SystemInformation.HighContrast;
+  foreach(Control control in parent.Controls) {
+   if(control is TextBox||control is ComboBox||control is ListView){control.BackColor=highContrast?SystemColors.Window:Paper;control.ForeColor=highContrast?SystemColors.WindowText:Ink;}
+   if(control is RadioButton)control.BackColor=highContrast?SystemColors.Control:Canvas;
+   if(control is Button) {
+    var button=(Button)control;
+    button.BackColor=highContrast?SystemColors.Control:Paper;
+    button.ForeColor=highContrast?SystemColors.ControlText:Ink;
+    button.UseVisualStyleBackColor=highContrast;
+    button.FlatStyle=highContrast?FlatStyle.Standard:FlatStyle.Flat;
+    if(!highContrast) {
+     button.FlatAppearance.BorderColor=Edge;
+     button.FlatAppearance.MouseOverBackColor=Color.FromArgb(231,239,230);
+     button.FlatAppearance.MouseDownBackColor=Color.FromArgb(218,233,221);
+    }
+   }
+   Apply(control);
+  }
+ }
+}
 public class NetWatch : Form {
  static readonly Color Ink=Color.FromArgb(37,58,54);
  static readonly Color Canvas=Color.FromArgb(244,243,238);
@@ -409,7 +441,8 @@ public class NetWatch : Form {
    new DesktopSettings{database=Path.Combine(directory,"data","netwatch.sqlite")};
  }
  static string ChooseViewerMode(IWin32Window owner,string currentMode) {
-  using(var dialog=new Form{Text="Share NetWatch on your network",ClientSize=new Size(450,225),StartPosition=owner==null?FormStartPosition.CenterScreen:FormStartPosition.CenterParent,FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false,MinimizeBox=false,BackColor=Color.FromArgb(244,243,238),ForeColor=Color.FromArgb(37,58,54)}) {
+  using(var dialog=new Form{Text="Share NetWatch on your network",ClientSize=new Size(450,225),StartPosition=owner==null?FormStartPosition.CenterScreen:FormStartPosition.CenterParent,FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false,MinimizeBox=false}) {
+   NetWatchDialogStyle.Prepare(dialog);
    var password=new RadioButton{Text="Require a viewing password",Location=new Point(16,58),Size=new Size(418,32),Checked=currentMode!="open"};
    var openMode=new RadioButton{Text="No viewer password",Location=new Point(16,94),Size=new Size(418,32),Checked=currentMode=="open"};
    var next=new Button{Text="Continue",Location=new Point(215,169),Size=new Size(105,40),DialogResult=DialogResult.OK};
@@ -421,6 +454,7 @@ public class NetWatch : Form {
     next,cancel
    });
    dialog.AcceptButton=next;dialog.CancelButton=cancel;
+   NetWatchDialogStyle.Apply(dialog);
    return dialog.ShowDialog(owner)==DialogResult.OK?(openMode.Checked?"open":"password"):null;
   }
  }
@@ -599,7 +633,7 @@ public class PortSetupWindow : Form {
   this.saveContext=saveContext;
   Text="Port monitoring";ClientSize=new Size(480,544);StartPosition=FormStartPosition.CenterParent;
   FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=false;MinimizeBox=false;
-  BackColor=Color.FromArgb(244,243,238);ForeColor=Color.FromArgb(37,58,54);
+  NetWatchDialogStyle.Prepare(this);
 
   AddLabel("Use the device’s read-only SNMPv3 account with AES-128 privacy.",16,42);
   AddLabel("Saved device",66,22);
@@ -616,8 +650,8 @@ public class PortSetupWindow : Form {
   context=new TextBox{Location=new Point(16,375),Width=300,MaxLength=32,AccessibleName="VLAN context"};
   Controls.Add(context);
   saveVlan=AddButton("Save context",324,140);
-  saveVlan.Location=new Point(324,369);
-  saveVlan.Height=32;
+  saveVlan.Location=new Point(324,365);
+  saveVlan.Height=40;
   saveVlan.Click+=(s,e)=>SaveSelectedContext();
   AddLabel("Use the exact context name from the switch. Leave blank for the default.",405,22);
   status=AddLabel("Reading saved devices…",430,56);
@@ -638,6 +672,8 @@ public class PortSetupWindow : Form {
   privacy.TextChanged+=(s,e)=>ClearTest();
   FormClosing+=(s,e)=>{if(busy&&e.CloseReason==CloseReason.UserClosing)e.Cancel=true;};
   Shown+=async (s,e)=>await LoadDevices();
+  UpdateControls();
+  NetWatchDialogStyle.Apply(this);
  }
  Label AddLabel(string text,int top,int height) {
   var label=new Label{Text=text,Location=new Point(16,top),Size=new Size(448,height)};
@@ -733,7 +769,7 @@ public class AccessWindow : Form {
   int extra=setup==null?0:42;
   Text="Remote access";ClientSize=new Size(570,555+extra);FormBorderStyle=FormBorderStyle.FixedDialog;
   StartPosition=FormStartPosition.CenterParent;MaximizeBox=false;MinimizeBox=false;
-  BackColor=Color.FromArgb(244,243,238);ForeColor=Color.FromArgb(37,58,54);
+  NetWatchDialogStyle.Prepare(this);
   status=new Label{Location=new Point(16,14),Size=new Size(538,44),Text="Reading access settings…"};Controls.Add(status);
   var admin=AddButton("Set admin password…",16,63,170);admin.Click+=(s,e)=>Password("admin");
   var viewer=AddButton("Set viewer password…",198,63,175);viewer.Click+=(s,e)=>Password("viewer");
@@ -744,7 +780,7 @@ public class AccessWindow : Form {
   urls=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Location=new Point(16,148),Size=new Size(430,30),AccessibleName="Reachable URLs"};Controls.Add(urls);
   copy=AddButton("Copy URL",458,145,96);
   copy.Click+=(s,e)=>{if(urls.SelectedItem!=null)Clipboard.SetText((string)urls.SelectedItem);};
-  networkNote=new Label{Location=new Point(16,184),Size=new Size(538,46)};Controls.Add(networkNote);
+  networkNote=new Label{Location=new Point(16,190),Size=new Size(538,40)};Controls.Add(networkNote);
   if(setup!=null) {
    AddButton("Set up or repair sharing…",16,230,252).Click+=(s,e)=>setup();
    AddButton("Save connection file…",282,230,272).Click+=(s,e)=>export();
@@ -757,9 +793,10 @@ public class AccessWindow : Form {
   audit=new ListView{View=View.Details,Location=new Point(16,418+extra),Size=new Size(538,125),FullRowSelect=true,AccessibleName="Access log"};
   audit.Columns.Add("Last activity",150);audit.Columns.Add("Action",190);audit.Columns.Add("Details",170);Controls.Add(audit);
   var close=AddButton("Close",458,354+extra,96);close.DialogResult=DialogResult.Cancel;CancelButton=close;
+  NetWatchDialogStyle.Apply(this);
  }
  Button AddButton(string text,int x,int y,int width) {
-  var button=new Button{Text=text,Location=new Point(x,y),Size=new Size(width,36),BackColor=Color.FromArgb(252,251,247),FlatStyle=FlatStyle.Flat};
+  var button=new Button{Text=text,Location=new Point(x,y),Size=new Size(width,40),BackColor=Color.FromArgb(252,251,247),FlatStyle=FlatStyle.Flat};
   Controls.Add(button);return button;
  }
  public void Apply(HostEvent item) {
@@ -790,7 +827,8 @@ public class AccessWindow : Form {
   PromptPassword(this,"Set "+role+" password",(password,confirmation)=>{send("set-"+role+"-password",null,password,confirmation);return true;});
  }
  public static bool PromptPassword(IWin32Window owner,string title,Func<string,string,bool> submit) {
-  using(var dialog=new Form{Text=title,ClientSize=new Size(430,220),StartPosition=owner==null?FormStartPosition.CenterScreen:FormStartPosition.CenterParent,FormBorderStyle=FormBorderStyle.FixedDialog,MinimizeBox=false,MaximizeBox=false,BackColor=Color.FromArgb(244,243,238),ForeColor=Color.FromArgb(37,58,54)}) {
+  using(var dialog=new Form{Text=title,ClientSize=new Size(430,220),StartPosition=owner==null?FormStartPosition.CenterScreen:FormStartPosition.CenterParent,FormBorderStyle=FormBorderStyle.FixedDialog,MinimizeBox=false,MaximizeBox=false}) {
+   NetWatchDialogStyle.Prepare(dialog);
    var first=new TextBox{UseSystemPasswordChar=true,MaxLength=128,Location=new Point(16,37),Width=398,AccessibleName="New password"};
    var second=new TextBox{UseSystemPasswordChar=true,MaxLength=128,Location=new Point(16,90),Width=398,AccessibleName="Confirm password"};
    var help=new Label{Text="Use at least 12 characters.",Location=new Point(16,122),Size=new Size(398,40)};
@@ -798,6 +836,7 @@ public class AccessWindow : Form {
    var cancel=new Button{Text="Cancel",Location=new Point(314,166),Size=new Size(100,40),DialogResult=DialogResult.Cancel};
    dialog.Controls.AddRange(new Control[]{new Label{Text="New password",Location=new Point(16,15),AutoSize=true},first,new Label{Text="Confirm password",Location=new Point(16,69),AutoSize=true},second,help,save,cancel});
    dialog.AcceptButton=save;dialog.CancelButton=cancel;
+   NetWatchDialogStyle.Apply(dialog);
    save.Click+=(s,e)=>{
     if(first.Text.Length<12||first.Text!=second.Text){help.Text="Enter at least 12 characters and make both entries match.";return;}
     if(!submit(first.Text,second.Text)){help.Text="Couldn't save that password. Try a password you haven't used for NetWatch.";return;}

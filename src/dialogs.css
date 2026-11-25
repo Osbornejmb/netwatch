@@ -1,0 +1,131 @@
+.access-screen {
+  background: var(--canvas);
+}
+
+.access-form {
+  gap: 1rem;
+  border: 1px solid var(--border);
+  box-shadow: 0 18px 60px #253a3614;
+}
+
+.access-form h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  letter-spacing: -0.04em;
+}
+
+.access-form .access-help {
+  margin: -0.6rem 0 0.2rem;
+  color: var(--muted);
+}
+
+.access-form label {
+  gap: 0.45rem;
+  font-weight: 550;
+}
+
+.access-form input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.access-form input:focus-visible {
+  outline-offset: 2px;
+}
+
+.access-form [role='alert'] {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #d9aaa4;
+  border-radius: 8px;
+  background: #f8e9e5;
+  color: #762b28;
+}
+
+.access-loading p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.access-log-dialog {
+  width: min(620px, calc(100vw - 32px));
+}
+
+.access-log-dialog .access-log {
+  max-height: min(52vh, 480px);
+  margin: 1rem 0 0;
+  padding: 0 0 0 1.5rem;
+  overflow: auto;
+}
+
+.access-log-dialog .access-log li {
+  gap: 0.15rem;
+  padding: 0.65rem 0.5rem 0.65rem 0.2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.access-log-dialog .access-log li span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.access-log-dialog .modal-actions {
+  align-items: center;
+}
+
+.access-log-dialog .modal-actions a {
+  text-decoration: none;
+}
+
+.recovery-dialog,
+.confirm-dialog {
+  width: min(540px, calc(100vw - 32px));
+}
+
+.recovery-dialog > p,
+.confirm-dialog > p {
+  line-height: 1.65;
+}
+
+.backup-recovery > details > summary {
+  white-space: nowrap;
+}
+
+.backup-recovery .backup-panel {
+  max-height: min(75dvh, 640px);
+}
+
+.backup-recovery .backup-panel > p:first-child {
+  margin-top: 0;
+}
+
+.backup-recovery .backup-status {
+  min-height: 1.5em;
+}
+
+@media (max-width: 720px) {
+  .access-form {
+    padding: 1.25rem;
+  }
+
+  .access-log-dialog .modal-actions {
+    align-items: stretch;
+  }
+
+  .access-log-dialog .modal-actions > * {
+    flex: 1 1 100%;
+  }
+
+  .recovery-dialog .modal-actions,
+  .confirm-dialog .modal-actions {
+    align-items: stretch;
+  }
+
+  .recovery-dialog .modal-actions > button,
+  .confirm-dialog .modal-actions > button {
+    flex: 1 1 100%;
+  }
+}

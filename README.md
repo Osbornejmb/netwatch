@@ -12,6 +12,8 @@ Screenshots use a test inventory with documentation addresses.
 
 ## Set up NetWatch on Windows
 
+For the Linux x64 dashboard and local host package, see [Run NetWatch on Linux](docs/LINUX.md).
+
 **New to NetWatch? Follow the [complete first-time setup guide](docs/SETUP.md)** for requirements, installation, actual network input sources, first run, verification, troubleshooting and maintenance.
 
 Before configuring a device, use the [network input checklist and troubleshooting guide](docs/NETWORK-TROUBLESHOOTING.md) to find the actual host IPv4, switch management IP, VLAN, ACL and SNMP username. Do not copy another network's addresses.

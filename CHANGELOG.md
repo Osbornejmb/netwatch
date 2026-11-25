@@ -1,5 +1,14 @@
 # NetWatch changelog
 
+## v0.2.5 Windows and Linux release
+
+- Put local scans and their results first on Discovered. Manual topology proposals and scheduled discovery remain available farther down the page.
+- Clarify which results search, status filters, and bulk draft actions affect. Improve page navigation, retry messages, and links to the draft map.
+- Improve sign-in, access log, recovery, and launcher dialog layouts.
+- Publish a Windows x64 installer and a Linux x64 dashboard and host archive. The Linux package requires Node.js 22.13 or newer. Active network collection and the tray launcher are available on Windows.
+
+Verify the download against `SHA256SUMS.txt`. Quit the Windows launcher and back up the existing database before upgrading.
+
 ## v0.2.4 Windows release
 
 - Preserve access policy and audit history when restoring a database.

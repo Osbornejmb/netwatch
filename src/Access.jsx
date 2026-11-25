@@ -61,7 +61,14 @@ export default function Access() {
   if (!session)
     return (
       <main className="access-screen">
-        <p role="status">{loadError ? 'NetWatch access is unavailable.' : 'Connecting to NetWatch…'}</p>
+        <section className="access-form access-loading" aria-labelledby="access-loading-title">
+          <h1 id="access-loading-title">NetWatch</h1>
+          <p role="status">
+            {loadError
+              ? 'NetWatch access is unavailable. Check that the host is running, then refresh this page.'
+              : 'Connecting to NetWatch…'}
+          </p>
+        </section>
       </main>
     )
   if (session.authenticated && !form) {
@@ -107,13 +114,21 @@ export default function Access() {
   const needsPassword = role !== 'viewer' || session.viewerMode !== 'open'
   return (
     <main className="access-screen">
-      <form className="access-form" onSubmit={(event) => void signIn(event, role)} key={role}>
+      <form
+        className="access-form"
+        onSubmit={(event) => void signIn(event, role)}
+        key={role}
+        aria-describedby="access-help"
+      >
         <h1>NetWatch</h1>
+        <p id="access-help" className="access-help">
+          {role === 'admin' ? 'Sign in to manage your monitored network.' : 'Sign in to view the monitored network.'}
+        </p>
         {session.message && <p role="status">{session.message}</p>}
         {needsPassword && (
           <label>
             {role === 'admin' ? 'Admin password' : 'Viewer password'}
-            <input name="password" type="password" autoComplete="current-password" required maxLength={128} />
+            <input name="password" type="password" autoComplete="current-password" autoFocus required maxLength={128} />
           </label>
         )}
         {error && <p role="alert">{error}</p>}

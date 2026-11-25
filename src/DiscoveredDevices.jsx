@@ -1,39 +1,62 @@
 import { hostFetch } from './auth.js'
 import ConfirmDialog from './ConfirmDialog'
 import TopologyDiscovery from './TopologyDiscovery.jsx'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import useMonitoring from './useMonitoring.js'
 import InfoTooltip from './InfoTooltip'
 import { guessDeviceType } from './discoveryType.js'
 import { refreshLocalWriteToken, writeHeaders } from './monitoring.js'
+import './discovery.css'
 
 const statusLabel = { new: 'New', changed: 'Changed', added: 'Added', gone: 'Not seen' }
 const seenAt = (value) =>
   new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 export default function DiscoveredDevices({ remote, stageDiscovery }) {
   const { snapshot, state } = useMonitoring(true)
-  if (!snapshot && state === 'loading')
-    return (
-      <section className="page-content discovery-page" aria-label="Discovered devices">
-        <h1>Discovered devices</h1>
+  const topologyHeading = useRef(null)
+  const loading = !snapshot && state === 'loading'
+  const infrastructureOnly = Boolean(snapshot?.infrastructureOnly)
+  return (
+    <section className="page-content discovery-page" aria-labelledby="discovery-title">
+      <header className="page-heading discovery-page-heading">
+        <h1 id="discovery-title">Discovered devices</h1>
+        {!loading && !infrastructureOnly && (
+          <button className="button secondary" onClick={() => topologyHeading.current?.focus()}>
+            Jump to topology
+          </button>
+        )}
+      </header>
+      {loading ? (
         <p role="status">Loading discovery settings…</p>
-      </section>
-    )
-  if (snapshot?.infrastructureOnly)
-    return (
-      <section className="page-content discovery-page" aria-labelledby="discovery-title">
-        <header className="page-heading">
-          <h1 id="discovery-title">Discovered devices</h1>
-          <p>Router and switch mode is on. Use Topology proposals to find connections.</p>
-        </header>
-        <TopologyDiscovery stageDiscovery={stageDiscovery} infrastructureOnly />
-      </section>
-    )
-  return <LocalDiscovery remote={remote} stageDiscovery={stageDiscovery} />
+      ) : (
+        <>
+          {infrastructureOnly ? (
+            <p className="discovery-notice" role="status">
+              Router and switch mode is on. Local scans are paused.
+            </p>
+          ) : (
+            <LocalDiscovery remote={remote} stageDiscovery={stageDiscovery} />
+          )}
+          <section className="discovery-section" aria-labelledby="topology-section-title">
+            <div className="discovery-section-heading">
+              <h2 id="topology-section-title" ref={topologyHeading} tabIndex={-1}>
+                Topology connections
+              </h2>
+              <p>Find links and uplink ports from enrolled switches and routers.</p>
+            </div>
+            <TopologyDiscovery stageDiscovery={stageDiscovery} infrastructureOnly={infrastructureOnly} />
+          </section>
+        </>
+      )}
+    </section>
+  )
 }
 
 function LocalDiscovery({ remote, stageDiscovery }) {
   const [confirm, setConfirm] = useState(null)
+  const [listState, setListState] = useState('loading')
+  const [draftReady, setDraftReady] = useState(false)
+  const searchInput = useRef(null)
   const [devices, setDevices] = useState([]),
     [pending, setPending] = useState({ count: 0 }),
     [busy, setBusy] = useState(false),
@@ -53,10 +76,20 @@ function LocalDiscovery({ remote, stageDiscovery }) {
     setPending({ count: value.pendingCount ?? 0, version: value.pendingVersion })
     setNextAfter(value.nextAfter)
     setAfter(cursor)
+    setListState('ready')
+    return value.devices.length
   }, [])
-  useEffect(() => {
-    void refresh(0).catch(() => setMessage('Connect to the NetWatch host to review discovered devices.'))
+  const loadFirst = useCallback(async () => {
+    setListState('loading')
+    try {
+      await refresh(0)
+    } catch {
+      setListState('unavailable')
+    }
   }, [refresh])
+  useEffect(() => {
+    void loadFirst()
+  }, [loadFirst])
   useEffect(() => {
     if (!scanning) return
     let stopped = false,
@@ -83,7 +116,9 @@ function LocalDiscovery({ remote, stageDiscovery }) {
     try {
       let body = {}
       if (kind === 'add-to-map') {
-        const inventory = await hostFetch('/api/v1/topology').then((r) => r.json())
+        const response = await hostFetch('/api/v1/topology')
+        if (!response.ok) throw Error()
+        const inventory = await response.json()
         body = { baseRevision: inventory.revision }
       }
       const r = await hostFetch(`/api/v1/discovered/${encodeURIComponent(device.id)}/${kind}`, {
@@ -93,9 +128,20 @@ function LocalDiscovery({ remote, stageDiscovery }) {
       })
       if (!r.ok) throw Error()
       const result = await r.json()
-      if (result.draft) await stageDiscovery(result.draft)
-      await refresh(after)
+      if (result.draft) {
+        await stageDiscovery(result.draft)
+        setDraftReady(true)
+      }
       setMessage(result.draft ? 'Added to the draft map.' : 'Removed from discovered devices.')
+      try {
+        const count = await refresh(after)
+        if (!count && pages.length) {
+          await refresh(pages.at(-1))
+          setPages(pages.slice(0, -1))
+        }
+      } catch {
+        setMessage('The update succeeded. Refresh this page to see the current results.')
+      }
     } catch {
       setMessage('Could not update this device. Refresh and try again.')
     } finally {
@@ -108,9 +154,13 @@ function LocalDiscovery({ remote, stageDiscovery }) {
     try {
       const r = await hostFetch('/api/v1/discovered/clear', { method: 'POST', headers: writeHeaders() })
       if (!r.ok) throw Error()
-      setPages([])
-      await refresh(0)
-      setMessage('Discovery list cleared.')
+      try {
+        await refresh(0)
+        setPages([])
+        setMessage('Discovery list cleared.')
+      } catch {
+        setMessage('The discovery list was cleared. Refresh this page to update the results.')
+      }
     } catch {
       setMessage('Could not clear discovered devices. Refresh and try again.')
     } finally {
@@ -137,12 +187,25 @@ function LocalDiscovery({ remote, stageDiscovery }) {
       if (!response.ok) throw Error()
       const { addedCount, existingCount, draft } = await response.json()
       await stageDiscovery(draft)
+      setDraftReady(true)
       setMessage(
         `Added ${addedCount} to the draft map.${existingCount ? ` Already on the map: ${existingCount}.` : ''}`,
       )
       await refresh(after).catch(() => {})
     } catch {
       setMessage('Could not add the scanned devices.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  const turnPage = async (cursor, history) => {
+    setBusy(true)
+    setMessage('')
+    try {
+      await refresh(cursor)
+      setPages(history)
+    } catch {
+      setMessage('Could not load that page. Showing the current results.')
     } finally {
       setBusy(false)
     }
@@ -228,11 +291,14 @@ function LocalDiscovery({ remote, stageDiscovery }) {
               ? 'Saving scan results…'
               : 'Starting scan…'
   return (
-    <section className="page-content discovery-page" aria-labelledby="discovery-title">
-      <header className="page-heading">
-        <h1 id="discovery-title">Discovered devices</h1>
+    <section className="discovery-section" aria-labelledby="local-discovery-title">
+      <header className="discovery-section-heading discovery-local-heading">
+        <div>
+          <h2 id="local-discovery-title">Local scan results</h2>
+          <p>Review devices seen on networks directly connected to this PC.</p>
+        </div>
         <div className="discovery-heading-actions">
-          <button className="button primary" disabled={busy} onClick={scan}>
+          <button className="button primary" disabled={busy || listState === 'loading'} onClick={scan}>
             {scanning ? 'Scanning…' : 'Scan now'}
           </button>
           <button
@@ -241,7 +307,7 @@ function LocalDiscovery({ remote, stageDiscovery }) {
             onClick={() =>
               setConfirm({
                 title: 'Add all to draft?',
-                message: `Add ${pending.count} results from the latest scan across all pages. New devices start with checks off.`,
+                message: `Add ${pending.count} results from the latest scan across all pages. Search and filters do not limit this action. New devices start with checks off.`,
                 label: 'Add all',
                 onConfirm: addAll,
               })
@@ -265,7 +331,6 @@ function LocalDiscovery({ remote, stageDiscovery }) {
           </button>
         </div>
       </header>
-      <TopologyDiscovery stageDiscovery={stageDiscovery} />
       {scanning && (
         <div
           className="discovery-progress"
@@ -273,6 +338,7 @@ function LocalDiscovery({ remote, stageDiscovery }) {
           aria-label="Network scan progress"
           aria-valuemax={progress?.total || 100}
           aria-valuenow={['icmp', 'names', 'routes'].includes(progress?.phase) ? progress.processed : undefined}
+          aria-valuetext={phase}
         >
           <span className="discovery-spinner" aria-hidden="true" />
           <span>{phase}</span>
@@ -281,24 +347,52 @@ function LocalDiscovery({ remote, stageDiscovery }) {
       <p className="discovery-message" role="status">
         {message}
       </p>
+      {draftReady && (
+        <a className="discovery-draft-link" href="#topology">
+          Open draft map
+        </a>
+      )}
       {devices.length > 0 && (
-        <div className="discovery-toolbar">
-          <input
-            aria-label="Search this page"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Find a device"
-          />
-          <select aria-label="Device status" value={filter} onChange={(event) => setFilter(event.target.value)}>
-            <option value="all">All statuses</option>
-            {Object.entries(statusLabel).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <>
+          <div
+            className="discovery-toolbar"
+            role="group"
+            aria-label="Search and filter this page"
+            aria-describedby="discovery-filter-scope"
+          >
+            <input
+              ref={searchInput}
+              aria-label="Search this page"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search this page"
+            />
+            <select aria-label="Device status" value={filter} onChange={(event) => setFilter(event.target.value)}>
+              <option value="all">All statuses</option>
+              {Object.entries(statusLabel).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            {(query || filter !== 'all') && (
+              <button
+                className="button secondary"
+                onClick={() => {
+                  setQuery('')
+                  setFilter('all')
+                  searchInput.current?.focus()
+                }}
+              >
+                Reset filters
+              </button>
+            )}
+          </div>
+          <p id="discovery-filter-scope" className="discovery-filter-scope" role="status">
+            Showing {visible.length} of {devices.length} devices. Search and status apply only to this page.
+          </p>
+        </>
       )}
       {visible.length ? (
         <ul className="discovery-list" aria-label="Discovery results">
@@ -369,9 +463,20 @@ function LocalDiscovery({ remote, stageDiscovery }) {
             )
           })}
         </ul>
+      ) : listState === 'loading' ? (
+        <p className="discovery-empty" role="status">
+          Loading local scan results…
+        </p>
+      ) : listState === 'unavailable' ? (
+        <div className="discovery-notice">
+          <p role="status">Connect to the NetWatch host to review discovered devices.</p>
+          <button className="button secondary" disabled={busy} onClick={loadFirst}>
+            Retry results
+          </button>
+        </div>
       ) : (
         <p className="discovery-empty">
-          {devices.length ? 'No devices match these filters.' : 'No discovered devices yet.'}
+          {devices.length ? 'No devices on this page match these filters.' : 'No discovered devices yet.'}
         </p>
       )}
       {(pages.length > 0 || nextAfter !== null) && (
@@ -379,12 +484,7 @@ function LocalDiscovery({ remote, stageDiscovery }) {
           <button
             className="button secondary"
             disabled={busy || !pages.length}
-            onClick={() => {
-              const previous = pages.at(-1) ?? 0
-              void refresh(previous)
-                .then(() => setPages(pages.slice(0, -1)))
-                .catch(() => setMessage('Could not load the previous page.'))
-            }}
+            onClick={() => turnPage(pages.at(-1) ?? 0, pages.slice(0, -1))}
           >
             Previous
           </button>
@@ -392,11 +492,7 @@ function LocalDiscovery({ remote, stageDiscovery }) {
           <button
             className="button secondary"
             disabled={busy || nextAfter === null}
-            onClick={() => {
-              void refresh(nextAfter)
-                .then(() => setPages([...pages, after]))
-                .catch(() => setMessage('Could not load the next page.'))
-            }}
+            onClick={() => turnPage(nextAfter, [...pages, after])}
           >
             Next
           </button>
