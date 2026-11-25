@@ -48,7 +48,7 @@ Use this path for a source checkout or your own certificate. On the NetWatch PC,
 Stop the tray host first. Set both [HTTPS file settings](#direct-https) in the same terminal before enabling LAN sharing. Use its database path if you want to share its existing inventory.
 
 ~~~powershell
-$env:NETWATCH_DB = Join-Path $env:LOCALAPPDATA 'NetWatch\data\netwatch.sqlite'
+$env:NETWATCH_DB = Read-Host 'Exact absolute database path shown by the NetWatch launcher'
 npm.cmd run auth -- set-admin-password
 npm.cmd run auth -- set-viewer-password
 npm.cmd run auth -- viewer-mode password

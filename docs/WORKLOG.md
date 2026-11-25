@@ -2,6 +2,8 @@
 
 ## Documentation follow-up (2026-11-25)
 
+- Added [first-time setup guide](SETUP.md) covering installation, configuration, first run, verification, troubleshooting and maintenance; linked from README and documentation index. Recorded the v0.2.4 automated release evidence and explicitly separated file review from unperformed clean Windows and hardware acceptance.
+
 - Documented session troubleshooting for generic startup errors, draft versus saved infrastructure enrollment, missing Ethernet gateway hints, Windows source IP versus management IP, SNMP ACL/user mismatches, VLAN context spelling, and ordered reachability and topology checks. See [Network setup and troubleshooting](NETWORK-TROUBLESHOOTING.md). Configuration guidance now obtains real addresses from the host/device instead of copying sample IPs. This is documentation only; no new hardware acceptance or software fix is claimed.
 
 ## Current status (2026-11-24)
