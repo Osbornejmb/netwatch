@@ -73,7 +73,15 @@ The latest explicit user decision defines scope. Code and passing checks establi
 - **Post-Merge Cleanup:** After a feature or bugfix branch is successfully merged, automatically prune stale remote tracking references and delete the local branch (`git branch -d <branch>`).
 - **Protected Branches:** Never delete or force-push to core branches (`main`, `master`, `dev`, `develop`). Always switch back to the main branch before running cleanup commands.
 
+## Setup documentation standard
+
+- Maintain `docs/SETUP.md` as the short chronological first-time reader's guide; move exhaustive configuration, maintenance and verification evidence to `docs/SETUP-REFERENCE.md`. Put the next command immediately after its prerequisites, identify the device/terminal, and separate optional branches from the normal setup. Before writing, inspect manifests/lockfiles, environment examples, build/start scripts, CI, configuration readers, migration code and existing docs. Resolve conflicts against code and report remaining ambiguity.
+- Cover overview, requirements, installation (installer versus source), configuration/defaults and database, first run, verification, troubleshooting, and maintenance. Use numbered steps, exact UI labels, location of each action, expected observations, warnings before risky steps and real screenshots only.
+- Label automated tests, file-checked instructions and unverified manual/hardware steps separately; never invent output. Test in an isolated environment when available; do not change live devices or data without authorization. Hand off missing information, conflicts and untested steps.
+
 ## UI & UX Copywriting Rules
+
+- In user-facing configuration guides, identify every required network input and its authoritative source (host adapter from ipconfig and route table, device management IP from console, exact SNMP user/context and ACL from device). Do not present arbitrary sample IPs as runnable configuration; retain intentional loopback and synthetic test fixtures.
 
 - Use one warm off-white design across the dashboard, editor, dialogs and Windows controls. Pure white (`#fff`, `#ffffff`, `rgb(255,255,255)`) is not allowed for app surfaces, text, borders or icons; use the shared off-white tokens, including text on dark buttons.
 - Prefer everyday labels: Edit map, Draft map, Monitored network, Ports, Outages and Overdue. Keep technical protocol/storage details in setup documentation; preserve the distinction between draft edits and the monitored network.

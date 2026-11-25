@@ -12,6 +12,10 @@ Screenshots use a test inventory with documentation addresses.
 
 ## Set up NetWatch on Windows
 
+**New to NetWatch? Follow the [complete first-time setup guide](docs/SETUP.md)** for requirements, installation, actual network input sources, first run, verification, troubleshooting and maintenance.
+
+Before configuring a device, use the [network input checklist and troubleshooting guide](docs/NETWORK-TROUBLESHOOTING.md) to find the actual host IPv4, switch management IP, VLAN, ACL and SNMP username. Do not copy another network's addresses.
+
 ### 1. Install NetWatch
 
 1. On the Windows 10 or 11 PC you want to use for monitoring, open [NetWatch releases](https://github.com/Osbornejmb/netwatch/releases). Choose v0.2.1 or later for the Windows VLAN context field and switch discovery fixes.
@@ -27,7 +31,7 @@ Screenshots use a test inventory with documentation addresses.
 
 ### 3. Add your first switch or router
 
-1. Find its **management IP address**, the network address you use to open the device’s settings. If you don’t know it, ask the person who set up the device. You can also try [Find a device automatically](#find-a-device-automatically).
+1. Find its **management IP address**, the network address you use to open the device’s settings. On Cisco IOS, run `show ip interface brief` at the console and identify the management SVI or routed interface. If assigning a new address, obtain an unused one from the network administrator. You can also try [Find a device automatically](#find-a-device-automatically).
 2. In the dashboard, choose **Edit map → Add device**. Choose **Switch** or **Router**, enter a name you’ll recognize and the device’s IP address, then choose **Add device**.
 3. Choose **Use this map**, review the device you added, then choose **Confirm replacement**. This applies your draft map so the running app can use it.
 4. Return to **Dashboard**. If you’re still looking at your draft, choose **View options → Show → Monitored network**.
@@ -47,6 +51,8 @@ Enroll each managed switch whose access ports you want to discover. LLDP or CDP 
 Keep the NetWatch PC awake, connected, and signed in while you want checks to run. Start NetWatch again after signing back in. For updates and uninstall steps, see the [Windows launcher guide](docs/WINDOWS-LAUNCHER.md).
 
 ### Find a device automatically
+
+Nearby scans do not fingerprint hardware. A management IP, DHCP server address or responding ping does not by itself identify a switch or router. Without a default gateway on the Ethernet adapter, no default-gateway router hint is expected. Manually select the verified device type in Edit map and apply the draft.
 
 1. In the Windows NetWatch app, click **Stop** and wait for it to finish. Turn on **Discover local network neighbors on next start**, then click **Start** and **Open dashboard**.
 2. In the dashboard, open **Discovered devices → Scan now** and wait for the scan to finish. NetWatch looks on the nearby private networks the PC is directly connected to.

@@ -1,5 +1,11 @@
 # NetWatch documentation
 
+- [First-time setup guide](SETUP.md) — start here: chronological commands and enrollment
+- [Setup reference](SETUP-REFERENCE.md) — advanced settings, maintenance and verification evidence
+
+- [Network setup and troubleshooting](NETWORK-TROUBLESHOOTING.md) — required input sources, Windows reachability, VLAN/trunk, SNMP and enrollment diagnostics
+- [Managed switch setup](../switchconfig.md) — Cisco IOS configuration with explicitly identified inputs
+
 - [ARCHITECTURE](ARCHITECTURE.md) — maintained reference
 - [DESIGN](DESIGN.md) — maintained reference
 - [DISCOVERY](DISCOVERY.md) — maintained reference

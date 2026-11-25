@@ -10,6 +10,8 @@ Cisco documents SNMPv3 on the [3750](https://www.cisco.com/c/en/us/td/docs/switc
 
 ## Set up in the Windows launcher
 
+Before enrollment, follow the [network input checklist](NETWORK-TROUBLESHOOTING.md). Obtain the management IP from the device console, source IPv4 from the host's `ipconfig /all` and route table, and the exact username/authentication from `show snmp user`. Verify the group's source ACL on each switch, especially after DHCP changes. A discovered device or browser draft must be applied to the saved map with Switch or Router type. Test connection uses the default IF-MIB context; VLAN context is only for forwarding-table reads. See the [ordered troubleshooting tests](NETWORK-TROUBLESHOOTING.md#3-check-snmp-on-each-switch-independently) if the test fails.
+
 Add the switch or router and its management IP to the saved map, then stop the host in the launcher. Choose **Port monitoring**, select the saved device, and enter its read-only SNMPv3 username, authentication algorithm and passwords. Choose **Test connection** to confirm NetWatch can read port status, then **Enable monitoring** to test again and protect the profile under your Windows account. Start the host and open the device’s **Ports** or **Network neighbors**. The launcher remembers **Check ports on next start**. Clear that setting and restart the host to pause collection for enrolled devices.
 
 ## Terminal setup
