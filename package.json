@@ -20,7 +20,7 @@
     "format:check": "prettier --check host src"
   },
   "dependencies": {
-    "@xyflow/react": "^12.8.5",
+    "@xyflow/react": "^13.0.2",
     "lucide-react": "^1.72.0",
     "net-snmp": "3.29.2",
     "react": "^19.3.1",
