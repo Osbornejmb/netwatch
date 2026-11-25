@@ -2,6 +2,8 @@
 
 Use this guide to set up read-only SNMPv3 monitoring and discover which switch ports connect to neighboring devices. The basic monitoring setup applies to managed switches that expose standard interface MIBs. Forwarding-table discovery also depends on the switch's VLAN support and the tables it exposes. The Cisco IOS example below includes the additional configuration verified on a Catalyst 3750.
 
+**Start here:** If you already have a working management IP, skip the blank-switch VLAN/trunk commands. Check Windows reachability and the existing SNMP configuration first. For a new switch, follow sections A–F in order. Only an authorized administrator should change device configuration.
+
 ## 1. Prepare the switch and network
 
 1. Use the switch's local console or management interface to assign it a unique management IP. Use the management VLAN, subnet mask, and gateway or return route appropriate for your network.
@@ -55,7 +57,6 @@ Supply the actual access and trunk ports from cable tracing and `show interfaces
 ```text
 configure terminal
 vlan <MANAGEMENT_VLAN_ID>
- name NETWATCH-LAB
 exit
 interface vlan <MANAGEMENT_VLAN_ID>
  ip address <SWITCH_MANAGEMENT_IPV4> <MANAGEMENT_SUBNET_MASK>
@@ -66,19 +67,26 @@ interface <PC_ACCESS_PORT>
  switchport access vlan <MANAGEMENT_VLAN_ID>
  no shutdown
 exit
+end
+show ip interface brief
+show interfaces <PC_ACCESS_PORT> switchport
+show mac address-table interface <PC_ACCESS_PORT>
+```
+
+If connecting a second switch, configure the actual inter-switch port on both ends. On an existing trunk do not replace allowed VLANs or change encapsulation unnecessarily. Only for a new trunk, run the following after confirming the required VLANs and native VLAN on both ends. If the switch only supports 802.1Q, omit the encapsulation command.
+
+~~~text
+configure terminal
 interface <LOCAL_TRUNK_PORT>
  switchport trunk encapsulation dot1q
  switchport mode trunk
  switchport trunk allowed vlan add <MANAGEMENT_VLAN_ID>
  no shutdown
 end
-show ip interface brief
-show interfaces <PC_ACCESS_PORT> switchport
 show interfaces trunk
-show mac address-table interface <PC_ACCESS_PORT>
-```
+~~~
 
-If the switch only supports 802.1Q, it may omit the encapsulation command. Verify the allowed and native VLANs on both ends. If the monitoring PC is on another subnet, configure the switch's management return path for that network. An SVI may remain down until the VLAN has an active member port.
+For the remote switch, substitute its own trunk port. The block adds the management VLAN; obtain any additional required VLANs from the network plan. Verify the allowed and native VLANs on both ends. If the monitoring PC is on another subnet, configure the switch's management return path for that network. An SVI may remain down until the VLAN has an active member port.
 
 ### B. Enable and verify neighbor discovery
 
@@ -130,6 +138,21 @@ show snmp context
 ```
 
 With IOS `auth sha`, select **SHA-1** in the NetWatch launcher. The privacy setting is **AES-128**. [Cisco SNMP configuration guide](https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst3750/software/release/15-0_2_se/configuration/guide/scg3750/swsnmp.html) · [Cisco CDP MIB reference](https://www.cisco.com/c/en/us/td/docs/security/ise/1-4-1/admin_guide/b_ise_admin_guide_141/b_ise_admin_guide_141_chapter_0100001.pdf)
+
+#### Correct an existing source ACL
+
+On the switch console, run `show snmp group` and `show access-lists` to identify the ACL already used by SNMP. On Windows, use `ipconfig /all` and `route print -4` to obtain the actual host source IPv4. Review ACL usage and rule order before editing. If the address is missing and you are authorized to add it, preserve existing rules and ensure the new permit precedes any explicit deny.
+
+~~~text
+configure terminal
+ip access-list standard <SNMP_ACL_NUMBER>
+permit host <NETWATCH_PC_IPV4>
+exit
+end
+show access-lists <SNMP_ACL_NUMBER>
+~~~
+
+Test the existing username and credentials in NetWatch before saving the configuration. Do not create a second group or user just to fix an ACL mismatch.
 
 ### D. Expose the MAC forwarding table
 

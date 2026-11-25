@@ -75,7 +75,7 @@ The latest explicit user decision defines scope. Code and passing checks establi
 
 ## Setup documentation standard
 
-- Maintain `docs/SETUP.md` as the first-time reader's guide. Before writing, inspect manifests/lockfiles, environment examples, build/start scripts, CI, configuration readers, migration code and existing docs. Resolve conflicts against code and report remaining ambiguity.
+- Maintain `docs/SETUP.md` as the short chronological first-time reader's guide; move exhaustive configuration, maintenance and verification evidence to `docs/SETUP-REFERENCE.md`. Put the next command immediately after its prerequisites, identify the device/terminal, and separate optional branches from the normal setup. Before writing, inspect manifests/lockfiles, environment examples, build/start scripts, CI, configuration readers, migration code and existing docs. Resolve conflicts against code and report remaining ambiguity.
 - Cover overview, requirements, installation (installer versus source), configuration/defaults and database, first run, verification, troubleshooting, and maintenance. Use numbered steps, exact UI labels, location of each action, expected observations, warnings before risky steps and real screenshots only.
 - Label automated tests, file-checked instructions and unverified manual/hardware steps separately; never invent output. Test in an isolated environment when available; do not change live devices or data without authorization. Hand off missing information, conflicts and untested steps.
 
