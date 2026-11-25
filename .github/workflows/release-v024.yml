@@ -1,0 +1,84 @@
+name: Publish NetWatch v0.2.4 release
+
+on:
+  workflow_run:
+    workflows: [Checks]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: netwatch-v024-release
+
+jobs:
+  windows:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - id: release
+        name: Check release version and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($version -ne '0.2.4') { exit 0 }
+          gh release view v0.2.4 --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) { exit 0 }
+          'build=true' >> $env:GITHUB_OUTPUT
+          exit 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        if: steps.release.outputs.build == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - if: steps.release.outputs.build == 'true'
+        run: npm ci
+      - name: Build and smoke test the Windows installer
+        if: steps.release.outputs.build == 'true'
+        shell: pwsh
+        run: |
+          $compiler = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6/ISCC.exe'
+          if (!(Test-Path -LiteralPath $compiler)) {
+            choco install innosetup --no-progress -y
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          ./scripts/package-windows.ps1 -Compiler $compiler
+          $installer = Get-Item -LiteralPath '.tools/release/NetWatch-0.2.4-Windows-x64-Setup.exe'
+          $prefix = Join-Path $env:RUNNER_TEMP 'netwatch-release-smoke'
+          $setup = Start-Process -FilePath $installer.FullName -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="' + $prefix + '"') -WindowStyle Hidden -Wait -PassThru
+          if ($setup.ExitCode -ne 0) { throw "Installer exited with code $($setup.ExitCode)." }
+          $launcher = Get-Item -LiteralPath (Join-Path $prefix 'NetWatch.exe')
+          if ($launcher.VersionInfo.FileVersion -ne '0.2.4.0') { throw 'Unexpected installed launcher version.' }
+          Push-Location $prefix
+          try {
+            $env:NETWATCH_DB = Join-Path $env:RUNNER_TEMP 'netwatch-release-smoke.sqlite'
+            & './node.exe' --input-type=module --eval "import {openStore} from './host/store.js'; const s=openStore(process.env.NETWATCH_DB); if(s.read().topology.nodes.length || s.db.prepare('PRAGMA user_version').get().user_version!==14) process.exitCode=1; s.close()"
+            if ($LASTEXITCODE -ne 0) { throw 'Installed host failed database smoke test.' }
+          } finally { Pop-Location }
+          $hash = (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $($installer.Name)" | Set-Content -Encoding ascii '.tools/release/SHA256SUMS.txt'
+      - name: Publish release with installer and checksum
+        if: steps.release.outputs.build == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $changelog = Get-Content -Raw CHANGELOG.md
+          $notes = [regex]::Match($changelog, '(?ms)^## v0\.2\.4 Windows release\r?\n(.*?)(?=^## |\z)').Groups[1].Value.Trim()
+          if (!$notes) { throw 'Release notes are missing.' }
+          $notesFile = Join-Path $env:RUNNER_TEMP 'netwatch-v0.2.4-notes.md'
+          $notes | Set-Content -Encoding utf8 $notesFile
+          gh release create v0.2.4 '.tools/release/NetWatch-0.2.4-Windows-x64-Setup.exe' '.tools/release/SHA256SUMS.txt' --repo $env:GITHUB_REPOSITORY --target $env:RELEASE_SHA --title 'NetWatch v0.2.4' --notes-file $notesFile --latest
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
