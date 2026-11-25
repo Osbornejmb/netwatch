@@ -1,5 +1,9 @@
 # Working checkpoint
 
+## Documentation follow-up (2026-11-25)
+
+- Documented session troubleshooting for generic startup errors, draft versus saved infrastructure enrollment, missing Ethernet gateway hints, Windows source IP versus management IP, SNMP ACL/user mismatches, VLAN context spelling, and ordered reachability and topology checks. See [Network setup and troubleshooting](NETWORK-TROUBLESHOOTING.md). Configuration guidance now obtains real addresses from the host/device instead of copying sample IPs. This is documentation only; no new hardware acceptance or software fix is claimed.
+
 ## Current status (2026-11-24)
 
 - Offline restore preserves the current remote access policy and audit log. Fresh restores start with remote access disabled. Outage attribution uses one graph traversal, and dashboard device names expose a Details button to assistive technology.

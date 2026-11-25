@@ -104,6 +104,8 @@ Initial schema creation and user_version are in one transaction. Migration failu
 
 ## Database backup and restore
 
+For generic Windows launcher startup errors, first follow [startup troubleshooting](WINDOWS-LAUNCHER.md#troubleshoot-startup). Use the exact database path displayed by the launcher; a different database path can make devices appear missing. Stop the host and maintenance processes before lock recovery. Never remove SQLite database, WAL or SHM files as a startup workaround.
+
 Stop the host, then:
 
 ```

@@ -49,6 +49,35 @@ Choose **Port monitoring** while the host is stopped to select a saved device, t
 
 The Node controller forks only its own host and uses private parent-child IPC for readiness/shutdown. Stop drains workers, closes SQLite and releases its lock. No HTTP start/stop endpoint is added. It cannot stop a separately started host/service: an occupied port or database produces an actionable error instead. Controller input closure requests graceful shutdown; abrupt Windows process-tree termination or a machine crash can leave the existing unclean-shutdown lock. The host and maintenance commands log and replace a stale lock when its local owner PID has exited or its owner record is unreadable and the directory is over 60 seconds old. If a lock remains, use the recovery procedure in HOST-API.md. Never delete a database to recover startup.
 
+## Troubleshoot startup
+
+The launcher message asking whether another copy is running is generic; it can also indicate a database, migration, Node or configuration error. First use **Quit** in the tray. In PowerShell check for hidden processes and the configured listener (default port 4317):
+
+~~~powershell
+Get-CimInstance Win32_Process | Where-Object {
+  $_.Name -eq 'NetWatch.exe' -or
+  ($_.Name -eq 'node.exe' -and $_.CommandLine -match 'netwatch|host[\\/]')
+} | Select-Object ProcessId, Name, CommandLine
+Get-NetTCPConnection -LocalPort 4317 -State Listen -ErrorAction SilentlyContinue
+~~~
+
+Inspect process ownership before stopping anything; do not kill unrelated Node processes. Check the actual database path displayed by the launcher, its parent directory, access permissions and the required offline migration backup. The lock is a directory named after that database plus `.lock`. If it remains, inspect its owner and follow [database recovery](HOST-API.md#database-backup-and-restore); only rename/quarantine a stale lock once no host or maintenance process is using that database. Never delete the database, WAL or SHM files.
+
+For an installed build, with the launcher and any maintenance process fully stopped, run the backend locally to expose its underlying error. Use the displayed database path (not a guessed default). Do not enable extra monitoring or LAN access for diagnosis. The standalone diagnostic does not reproduce every launcher setting; stop it with Ctrl+C before reopening NetWatch.
+
+~~~powershell
+Set-Location (Join-Path $env:LOCALAPPDATA 'Programs\NetWatch')
+$env:NETWATCH_DB = Read-Host 'Exact absolute database path displayed by launcher'
+$env:NETWATCH_ICMP = '0'
+$env:NETWATCH_SNMP = '0'
+$env:NETWATCH_DISCOVERY = '0'
+$env:NETWATCH_DISCOVERY_ICMP = '0'
+$env:NETWATCH_LAN = '0'
+.\node.exe host/main.js
+~~~
+
+For a source checkout use its actual directory and installed Node. Capture the error text, redacting credentials and private paths as needed. If the error names a migration backup, follow the database upgrade guide rather than deleting files.
+
 ## Deployment and remote browsers
 
 The intended deployment is one Windows host connected to the monitored network, with one authoritative inventory/history database and collector. Other PCs open a browser URL served from the launcher’s Remote access dialog. Start/Stop/Quit on the host affect **all** clients; closing any client browser does not stop the host. The tray app is installed only on the host, not on each remote PC.

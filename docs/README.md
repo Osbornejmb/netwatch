@@ -1,5 +1,8 @@
 # NetWatch documentation
 
+- [Network setup and troubleshooting](NETWORK-TROUBLESHOOTING.md) — required input sources, Windows reachability, VLAN/trunk, SNMP and enrollment diagnostics
+- [Managed switch setup](../switchconfig.md) — Cisco IOS configuration with explicitly identified inputs
+
 - [ARCHITECTURE](ARCHITECTURE.md) — maintained reference
 - [DESIGN](DESIGN.md) — maintained reference
 - [DISCOVERY](DISCOVERY.md) — maintained reference

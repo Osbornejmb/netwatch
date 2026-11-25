@@ -77,6 +77,8 @@ Issue #5's approved Windows device test is still required: record Windows/Node v
 
 ## Single-computer test
 
+For a real network target, obtain the approved device's actual management IPv4 from its console or administrator and verify the Windows source adapter with `ipconfig /all` and `route print -4`. See [network troubleshooting](NETWORK-TROUBLESHOOTING.md). A failed switch-to-PC ping may reflect inbound Windows ICMP filtering; test PC-to-switch separately. Fixed loopback examples below are intentionally local.
+
 When no other devices are available, run this from the checked-out branch on your Windows computer:
 
 ```powershell

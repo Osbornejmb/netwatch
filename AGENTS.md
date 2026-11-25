@@ -75,6 +75,8 @@ The latest explicit user decision defines scope. Code and passing checks establi
 
 ## UI & UX Copywriting Rules
 
+- In user-facing configuration guides, identify every required network input and its authoritative source (host adapter from ipconfig and route table, device management IP from console, exact SNMP user/context and ACL from device). Do not present arbitrary sample IPs as runnable configuration; retain intentional loopback and synthetic test fixtures.
+
 - Use one warm off-white design across the dashboard, editor, dialogs and Windows controls. Pure white (`#fff`, `#ffffff`, `rgb(255,255,255)`) is not allowed for app surfaces, text, borders or icons; use the shared off-white tokens, including text on dark buttons.
 - Prefer everyday labels: Edit map, Draft map, Monitored network, Ports, Outages and Overdue. Keep technical protocol/storage details in setup documentation; preserve the distinction between draft edits and the monitored network.
 - Write all UI text for a non-technical everyday user. Never expose raw error codes, database terms, or developer jargon.

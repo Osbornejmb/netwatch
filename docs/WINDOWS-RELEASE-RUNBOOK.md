@@ -10,7 +10,7 @@ This runbook covers one awake, signed-in Windows host and local browsers. Keep L
 4. Open the shortcut and confirm the host shows **Stopped** before you click **Start**. Confirm the displayed data location. First installations start empty; verify that no fixture devices appear. Existing installations preserve their devices/history.
 5. Start with ICMP disabled. Start/Open dashboard should show the local dashboard at `http://127.0.0.1:4317`. Confirm that closing the browser leaves the host running.
 6. Add only owner-approved devices in Topology editor. Export the browser map as a backup. In Edit map, choose Use this map, review and confirm replacement. Verify stable IDs/counts; editor additions and imports initially have monitoring disabled. Loading a host map replaces the browser working copy only after review.
-7. Enable local discovery only after approval for the attached network. Review discovered devices before adding them to the map. Explicit Add to map enables normal checks for the saved device; the global ICMP collector must still be separately enabled, and discovery's optional sweep never creates saved-device observations.
+7. Enable local discovery only after approval for the attached network. Review discovered devices before adding them to the map. Apply the reviewed draft using Use this map and enable device checks separately; the global ICMP collector must still be separately enabled, and discovery's optional sweep never creates saved-device observations.
 
 ## Timing and status expectations
 
@@ -23,6 +23,8 @@ This runbook covers one awake, signed-in Windows host and local browsers. Keep L
 
 ## Real-device acceptance
 
+Use [network troubleshooting](NETWORK-TROUBLESHOOTING.md) to verify host source IP, target management IP, per-device SNMP ACL and user before hardware checks. A successful ping does not prove SNMP or LLDP/CDP access. Record actual readings and reviewed links before claiming physical acceptance.
+
 Use a single explicitly approved device with an owner-controlled reversible interruption. Do not unplug production infrastructure, alter routing/firewalls, or automate Wi-Fi changes without specific authorization.
 
 With external Playwright and Chrome configured, the interactive helper can record a temporary test session:
@@ -30,7 +32,8 @@ With external Playwright and Chrome configured, the interactive helper can recor
 ```powershell
 $env:PLAYWRIGHT_MODULE = '<file URL or installed Playwright module>'
 $env:CHROMIUM_PATH = '<absolute Chrome executable path>'
-node scripts/check-windows-release-device.mjs --approved-target <approved-literal-IP>
+$target = Read-Host 'Actual approved test-device IPv4 from its settings or administrator'
+node scripts/check-windows-release-device.mjs --approved-target $target
 ```
 
 The script probes only that address, uses an isolated temporary database and an ephemeral loopback port, and does not control device Wi-Fi. Wait for READY_FOR_WIFI_OFF before turning off the device Wi-Fi. Leave it off until READY_FOR_WIFI_ON, then restore Wi-Fi immediately. Keep Wi-Fi restored even if the script reports a failure. The report omits the target and private paths; screenshots mask the management address and stay under ignored `.tools/`. It verifies real dashboard transitions, deduplication/recovery, genuine freshness aging, reconnect and offline backup/restore. Owner command times are not recorded automatically, so report observation timestamps/display lag rather than claiming exact radio-transition detection time.

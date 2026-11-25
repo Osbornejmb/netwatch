@@ -46,36 +46,36 @@ Each switch has its own forwarding-table context. Interface polling, LLDP, and C
 
 ## Cisco IOS example from a blank switch
 
-The examples use VLAN 100, a switch management IP of `192.0.2.2/24`, and a NetWatch PC at `192.0.2.10`. Replace the addresses, VLAN, and interface names with your own. Use the switch console during initial setup. Apply the matching trunk settings at the other end and give that switch a different management IP. Skip sections that are already configured on an in-service switch.
+Before running any command, collect the required values from [Network setup and troubleshooting](docs/NETWORK-TROUBLESHOOTING.md). Angle-bracket labels are required inputs, not literal IOS commands. Use the console, obtain a unique management IP and subnet mask from your network administrator/address plan, and use the actual management VLAN and physical port names. Check existing configuration before modifying an in-service switch; apply compatible trunk settings at both ends.
 
 ### A. Create the VLAN, management interface, and ports
 
-This example uses `Fa1/0/9` for an endpoint and `Fa1/0/2` for the inter-switch trunk.
+Supply the actual access and trunk ports from cable tracing and `show interfaces status`. Supply the management VLAN ID from the network plan and existing VLAN database.
 
 ```text
 configure terminal
-vlan 100
+vlan <MANAGEMENT_VLAN_ID>
  name NETWATCH-LAB
 exit
-interface vlan 100
- ip address 192.0.2.2 255.255.255.0
+interface vlan <MANAGEMENT_VLAN_ID>
+ ip address <SWITCH_MANAGEMENT_IPV4> <MANAGEMENT_SUBNET_MASK>
  no shutdown
 exit
-interface fastethernet1/0/9
+interface <PC_ACCESS_PORT>
  switchport mode access
- switchport access vlan 100
+ switchport access vlan <MANAGEMENT_VLAN_ID>
  no shutdown
 exit
-interface fastethernet1/0/2
+interface <LOCAL_TRUNK_PORT>
  switchport trunk encapsulation dot1q
  switchport mode trunk
- switchport trunk allowed vlan add 100
+ switchport trunk allowed vlan add <MANAGEMENT_VLAN_ID>
  no shutdown
 end
 show ip interface brief
-show interfaces fastethernet1/0/9 switchport
+show interfaces <PC_ACCESS_PORT> switchport
 show interfaces trunk
-show mac address-table interface fastethernet1/0/9
+show mac address-table interface <PC_ACCESS_PORT>
 ```
 
 If the switch only supports 802.1Q, it may omit the encapsulation command. Verify the allowed and native VLANs on both ends. If the monitoring PC is on another subnet, configure the switch's management return path for that network. An SVI may remain down until the VLAN has an active member port.
@@ -87,7 +87,7 @@ Enable LLDP on the switch and allow it to transmit and receive on the inter-swit
 ```text
 configure terminal
 lldp run
-interface fastethernet1/0/2
+interface <LOCAL_TRUNK_PORT>
  lldp transmit
  lldp receive
 end
@@ -100,7 +100,7 @@ Use CDP where both sides support it and your network permits it. NetWatch can us
 ```text
 configure terminal
 cdp run
-interface fastethernet1/0/2
+interface <LOCAL_TRUNK_PORT>
  cdp enable
 end
 show cdp neighbors detail
@@ -110,18 +110,18 @@ Verify the neighbor's management address, local interface, and remote port. Enab
 
 ### C. Create the read-only SNMPv3 account and views
 
-Replace the source PC address, username, and both passphrase placeholders. Use an appropriate unused ACL number or reuse the existing restricted ACL. The default view grants uptime, interface counters, LLDP, and CDP. Omit the discovery subtree for a protocol you do not use.
+Obtain the source PC IPv4 from `ipconfig /all` on the NetWatch host and verify the route to the switch with `route print -4`. Do not use the switch management IP or DHCP server address in the source ACL. Choose the username (or read the existing one with `show snmp user`) and enter both passphrases locally. Identify an appropriate unused ACL number or reuse the existing restricted ACL after checking its rules and other uses. The default view grants uptime, interface counters, LLDP, and CDP. Omit the discovery subtree for a protocol you do not use.
 
 ```text
 configure terminal
-access-list 42 permit host 192.0.2.10
+access-list <SNMP_ACL_NUMBER> permit host <NETWATCH_PC_IPV4>
 snmp-server view NETWATCH sysUpTime included
 snmp-server view NETWATCH ifTable included
 snmp-server view NETWATCH ifXTable included
 snmp-server view NETWATCH 1.0.8802.1.1.2 included
 snmp-server view NETWATCH 1.3.6.1.4.1.9.9.23.1.2.1.1 included
-snmp-server group NETWATCH v3 priv read NETWATCH access 42
-snmp-server user netwatch-poller NETWATCH v3 auth sha <AUTH_PASSPHRASE> priv aes 128 <PRIVACY_PASSPHRASE>
+snmp-server group NETWATCH v3 priv read NETWATCH access <SNMP_ACL_NUMBER>
+snmp-server user <SNMP_USERNAME> NETWATCH v3 auth sha <AUTH_PASSPHRASE> priv aes 128 <PRIVACY_PASSPHRASE>
 end
 show snmp group
 show snmp user
@@ -133,17 +133,17 @@ With IOS `auth sha`, select **SHA-1** in the NetWatch launcher. The privacy sett
 
 ### D. Expose the MAC forwarding table
 
-If `show snmp context` lists the endpoint VLAN as `vlan-100`, add a dedicated read view and a group entry for that exact context. Keep the default group entry for interface polling and neighbor discovery.
+If `show snmp context` lists a context for the endpoint VLAN, supply its exact name as `<VLAN_CONTEXT>` (Cisco names often contain a hyphen). Add a dedicated read view and group entry for that context. Keep the default group entry for interface polling and neighbor discovery.
 
 ```text
 configure terminal
-snmp-server view NETWATCH-VLAN100 1.3.6.1.2.1.17.1.4.1.2 included
-snmp-server view NETWATCH-VLAN100 1.3.6.1.2.1.17.4.3.1.2 included
-snmp-server group NETWATCH v3 priv context vlan-100 read NETWATCH-VLAN100 access 42
+snmp-server view NETWATCH-FDB 1.3.6.1.2.1.17.1.4.1.2 included
+snmp-server view NETWATCH-FDB 1.3.6.1.2.1.17.4.3.1.2 included
+snmp-server group NETWATCH v3 priv context <VLAN_CONTEXT> read NETWATCH-FDB access <SNMP_ACL_NUMBER>
 end
 show snmp group
 show snmp view
-show mac address-table interface fastethernet1/0/9
+show mac address-table interface <PC_ACCESS_PORT>
 ```
 
 If the switch exposes the forwarding table in the default context, use this block instead of the named VLAN view. Grant the VLAN-aware forwarding column when the switch supports it. NetWatch falls back to the standard forwarding column when the VLAN-aware table is empty.
@@ -172,7 +172,7 @@ show snmp view
 
 ### F. Enroll, test, and save
 
-1. [Enroll the switch in NetWatch](#4-enroll-the-switch-in-netwatch). Enter `vlan-100` in the launcher's **VLAN context** field only if you used the named context above. Save it during enrollment or with **Save context**.
+1. [Enroll the switch in NetWatch](#4-enroll-the-switch-in-netwatch). Enter the actual context name from `show snmp context` in the launcher's **VLAN context** field only if you used the named context above. Save it during enrollment or with **Save context**.
 2. [Review the discovered connections](#5-review-and-save-the-discovered-connections). Confirm the access-port hint and switch-to-switch link against the switch console.
 3. Save the switch configuration after verifying the results.
 
@@ -181,6 +181,10 @@ copy running-config startup-config
 ```
 
 ## Troubleshooting
+
+Start with the [ordered Windows, VLAN, ACL and SNMP diagnostics](docs/NETWORK-TROUBLESHOOTING.md). A failed interface test is not evidence of a VLAN-context problem; test the default-context interface view first.
+
+To replace an existing SNMPv3 username, create the new user in the same group with the command in section C, test and enroll it, then remove the old user with `no snmp-server user <OLD_SNMP_USERNAME> NETWATCH v3` only after verifying no other poller needs it. Save the configuration after verification.
 
 | Symptom | Check |
 | --- | --- |
